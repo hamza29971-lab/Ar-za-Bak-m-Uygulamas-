@@ -1,0 +1,30 @@
+name: nimo_arizabakim
+description: "NIMO Arıza Bakım Tablet Uygulaması"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.2
+  shared_preferences: ^2.3.2
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/nimo_logo.png
+    - assets/images/truck_damper.png
+    - assets/images/robot_character.png
+
+

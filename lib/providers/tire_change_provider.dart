@@ -1,0 +1,173 @@
+// lib/providers/tire_change_provider.dart
+
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/tire_change_model.dart';
+
+class TireChangeProvider extends ChangeNotifier {
+  // Tüm araç listesi
+  final List<VehicleModel> vehicles = VehicleModel.demoVehicles();
+
+  // Seçili araç
+  VehicleModel? _selectedVehicle;
+  VehicleModel? get selectedVehicle => _selectedVehicle;
+
+  // Seçili araca ait lastik kayıtları
+  List<TireRecord> _tireRecords = [];
+  List<TireRecord> get tireRecords => List.unmodifiable(_tireRecords);
+
+  // Hangi satır "değiştirme modunda" — null ise hiçbiri
+  int? _editingTireNumber;
+  int? get editingTireNumber => _editingTireNumber;
+
+  // Gönderme durumu (demo için simüle edilecek)
+  bool _isSending = false;
+  bool get isSending => _isSending;
+
+  bool _sendSuccess = false;
+  bool get sendSuccess => _sendSuccess;
+
+  // Arama sorgusu
+  String _searchQuery = '';
+  String get searchQuery => _searchQuery;
+
+  // Filtrelenmiş araç listesi
+  List<VehicleModel> get filteredVehicles {
+    if (_searchQuery.isEmpty) return vehicles;
+    final q = _searchQuery.toLowerCase();
+    return vehicles.where((v) => v.name.toLowerCase().contains(q)).toList();
+  }
+
+  TireChangeProvider() {
+    // Başlangıçta ilk aracı seç
+    selectVehicle(vehicles.first);
+  }
+
+  /// Arama sorgusunu güncelle
+  void updateSearch(String query) {
+    _searchQuery = query;
+    notifyListeners();
+  }
+
+  /// Arama sorgusunu temizle
+  void clearSearch() {
+    _searchQuery = '';
+    notifyListeners();
+  }
+
+  /// Araç seçimi
+  void selectVehicle(VehicleModel vehicle) {
+    _selectedVehicle = vehicle;
+    _editingTireNumber = null;
+    _loadTireRecords(vehicle);
+    notifyListeners();
+  }
+
+  /// SharedPreferences'tan lastik kayıtlarını yükle
+  Future<void> _loadTireRecords(VehicleModel vehicle) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'tire_records_${vehicle.id}';
+    final jsonStr = prefs.getString(key);
+
+    if (jsonStr != null) {
+      try {
+        final List<dynamic> jsonList = jsonDecode(jsonStr);
+        _tireRecords = jsonList.map((item) {
+          return TireRecord(
+            tireNumber: item['tireNumber'],
+            serialNumber: item['serialNumber'],
+            lastChangedDate: DateTime.parse(item['lastChangedDate']),
+          );
+        }).toList();
+      } catch (_) {
+        _tireRecords = _generateDefaultRecords(vehicle.tireCount);
+      }
+    } else {
+      _tireRecords = _generateDefaultRecords(vehicle.tireCount);
+    }
+
+    notifyListeners();
+  }
+
+  /// Varsayılan lastik kayıtları oluştur
+  List<TireRecord> _generateDefaultRecords(int count) {
+    return List.generate(count, (i) {
+      return TireRecord(
+        tireNumber: i + 1,
+        serialNumber: '---',
+        lastChangedDate: DateTime.now(),
+      );
+    });
+  }
+
+  /// Bir lastiği "düzenleme moduna" al
+  void startEditing(int tireNumber) {
+    _editingTireNumber = tireNumber;
+    notifyListeners();
+  }
+
+  /// Düzenlemeyi iptal et
+  void cancelEditing() {
+    _editingTireNumber = null;
+    notifyListeners();
+  }
+
+  /// Yeni seri numarası ile lastiği güncelle
+  Future<void> confirmChange(int tireNumber, String newSerial) async {
+    if (newSerial.trim().isEmpty) {
+      _editingTireNumber = null;
+      notifyListeners();
+      return;
+    }
+
+    final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
+    if (idx >= 0) {
+      _tireRecords[idx] = _tireRecords[idx].copyWith(
+        serialNumber: newSerial.trim(),
+        lastChangedDate: DateTime.now(),
+        isChanged: true,
+      );
+    }
+    _editingTireNumber = null;
+    await _saveTireRecords();
+    notifyListeners();
+  }
+
+  /// Kayıtları SharedPreferences'a kaydet
+  Future<void> _saveTireRecords() async {
+    if (_selectedVehicle == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'tire_records_${_selectedVehicle!.id}';
+    final jsonList = _tireRecords
+        .map((r) => {
+              'tireNumber': r.tireNumber,
+              'serialNumber': r.serialNumber,
+              'lastChangedDate': r.lastChangedDate.toIso8601String(),
+            })
+        .toList();
+    await prefs.setString(key, jsonEncode(jsonList));
+  }
+
+  /// Gönder — Demo: sunucuya gönderme simülasyonu
+  Future<void> sendReport() async {
+    _isSending = true;
+    _sendSuccess = false;
+    notifyListeners();
+
+    // Demo: 1.5 saniye bekle (gerçekte HTTP isteği yapılacak)
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // Gönderim sonrası "isChanged" bayraklarını sıfırla
+    _tireRecords = _tireRecords.map((r) => r.copyWith(isChanged: false)).toList();
+
+    _isSending = false;
+    _sendSuccess = true;
+    notifyListeners();
+
+    // 3 saniye sonra başarı mesajını gizle
+    await Future.delayed(const Duration(seconds: 3));
+    _sendSuccess = false;
+    notifyListeners();
+  }
+}
