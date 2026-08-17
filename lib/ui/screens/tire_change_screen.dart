@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/tire_change_model.dart';
 import '../../providers/tire_change_provider.dart';
+import 'login_screen.dart';
 
 class TireChangeScreen extends StatelessWidget {
   const TireChangeScreen({super.key});
@@ -64,7 +65,7 @@ class _Header extends StatelessWidget {
             ),
           ),
 
-          // Sağ: Profil
+          // Sağ: Profil ve Çıkış
           Row(
             children: [
               Container(
@@ -97,6 +98,53 @@ class _Header extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(width: 24),
+              
+              // Çıkış Butonu
+              ElevatedButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext dialogContext) {
+                      return AlertDialog(
+                        title: const Text('Çıkış Yap'),
+                        content: const Text('Çıkış yapmak istediğinize emin misiniz?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: const Text('İptal'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(dialogContext).pop();
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginScreen(),
+                                ),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                            child: const Text('Çıkış Yap', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Çıkış', style: TextStyle(fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFDE8E8),
+                  foregroundColor: Colors.red,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ],
           ),
@@ -314,10 +362,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
                       onPressed: () {
                         _controller.clear();
                         widget.provider.clearSearch();
-                        if (widget.provider.selectedVehicle != null) {
-                          _controller.text =
-                              widget.provider.selectedVehicle!.name;
-                        }
+                        widget.provider.clearSelectedVehicle();
                         setState(() => _isOpen = false);
                         FocusScope.of(context).unfocus();
                       },

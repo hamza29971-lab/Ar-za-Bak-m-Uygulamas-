@@ -55,15 +55,17 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _inputValue = '');
   }
 
-  // Telefon numarası formatlama: 05XX XXX XX XX
+  // Telefon numarası formatlama: (05XX) XXX XX XX
   String _formatPhone(String digits) {
     if (digits.isEmpty) return '';
-    if (digits.length <= 4) return digits;
-    if (digits.length <= 7) return '${digits.substring(0, 4)} ${digits.substring(4)}';
-    if (digits.length <= 9) {
-      return '${digits.substring(0, 4)} ${digits.substring(4, 7)} ${digits.substring(7)}';
+    if (digits.length <= 4) {
+      return digits.length == 4 ? '($digits) ' : '($digits';
     }
-    return '${digits.substring(0, 4)} ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
+    if (digits.length <= 7) return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
+    if (digits.length <= 9) {
+      return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
+    }
+    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
   }
 
   void _login() {

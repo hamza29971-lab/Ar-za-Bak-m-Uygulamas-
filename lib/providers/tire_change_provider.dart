@@ -13,6 +13,13 @@ class TireChangeProvider extends ChangeNotifier {
   VehicleModel? _selectedVehicle;
   VehicleModel? get selectedVehicle => _selectedVehicle;
 
+  void clearSelectedVehicle() {
+    _selectedVehicle = null;
+    _tireRecords = [];
+    _editingTireNumber = null;
+    notifyListeners();
+  }
+
   // Seçili araca ait lastik kayıtları
   List<TireRecord> _tireRecords = [];
   List<TireRecord> get tireRecords => List.unmodifiable(_tireRecords);
