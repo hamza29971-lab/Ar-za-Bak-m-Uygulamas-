@@ -105,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen>
                   children: [
                     // Robot Karakter
                     Image.asset(
-                      'assets/images/robot_character.png',
+                      'assets/images/robot_yenii.png',
                       height: 100,
                       fit: BoxFit.contain,
                     ),

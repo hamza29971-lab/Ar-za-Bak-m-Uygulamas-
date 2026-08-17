@@ -13,33 +13,30 @@ class VehicleModel {
     required this.imagePath,
   });
 
-  // Demo araç listesi
+  // Gerçek araç listesi
   static List<VehicleModel> demoVehicles() {
     return [
-      const VehicleModel(
-        id: 'damper_01',
-        name: 'Damper-01',
-        tireCount: 4,
-        imagePath: 'assets/images/truck_damper.png',
-      ),
-      const VehicleModel(
-        id: 'damper_02',
-        name: 'Damper-02',
-        tireCount: 4,
-        imagePath: 'assets/images/truck_damper.png',
-      ),
-      const VehicleModel(
-        id: 'damper_03',
-        name: 'Damper-03',
+      // Euclıd 1-12 (6 Lastik)
+      ...List.generate(12, (i) => VehicleModel(
+        id: 'euclid_${i + 1}',
+        name: 'Euclıd-${i + 1}',
         tireCount: 6,
         imagePath: 'assets/images/truck_damper.png',
-      ),
-      const VehicleModel(
-        id: 'minibus_01',
-        name: 'Minibüs-01',
-        tireCount: 4,
+      )),
+      // Lıugong 16-20 (10 Lastik)
+      ...List.generate(5, (i) => VehicleModel(
+        id: 'liugong_${i + 16}',
+        name: 'Lıugong-${i + 16}',
+        tireCount: 10,
         imagePath: 'assets/images/truck_damper.png',
-      ),
+      )),
+      // XCMG 13-15 (10 Lastik)
+      ...List.generate(3, (i) => VehicleModel(
+        id: 'xcmg_${i + 13}',
+        name: 'XCMG-${i + 13}',
+        tireCount: 10,
+        imagePath: 'assets/images/truck_damper.png',
+      )),
     ];
   }
 }
