@@ -584,18 +584,18 @@ class _TableHeader extends StatelessWidget {
           ),
           SizedBox(width: 8),
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Text(
               'Değiştirilme Tarihi',
-              textAlign: TextAlign.left,
+              textAlign: TextAlign.center,
               softWrap: false,
               maxLines: 1,
               overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF7B8094),
-                letterSpacing: 0.3,
+                letterSpacing: 0.5,
               ),
             ),
           ),
@@ -828,10 +828,10 @@ class _TireRowState extends State<_TireRow>
 
           // Tarih
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Text(
               dateStr,
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
