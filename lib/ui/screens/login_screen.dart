@@ -1,7 +1,11 @@
 // lib/ui/screens/login_screen.dart
 
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'tire_change_screen.dart';
+import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,6 +16,42 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
+  static const platform = MethodChannel('com.nimo.nimo_arizabakim/sms');
+
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideRightPanelAnim;
+  late final Animation<Offset> _slideLeftPanelAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _fadeAnim = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOut,
+    );
+    _slideRightPanelAnim = Tween<Offset>(
+      begin: const Offset(0.05, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    ));
+    _slideLeftPanelAnim = Tween<Offset>(
+      begin: const Offset(-0.05, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    _animController.forward();
+  }
+
   // 0 = Telefon, 1 = E-posta
   int _selectedTab = 0;
 
@@ -68,22 +108,78 @@ class _LoginScreenState extends State<LoginScreen>
     return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_canLogin) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const TireChangeScreen(),
-        transitionsBuilder: (context, anim, secondaryAnim, child) {
-          return FadeTransition(opacity: anim, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
-    );
+
+    if (_selectedTab == 0) {
+      // Telefon ile giriş
+      final cleanPhone = _inputValue.replaceAll(RegExp(r'\D'), '');
+      
+      // Rastgele 6 haneli kod üret
+      final otp = (100000 + Random().nextInt(900000)).toString();
+      final message = 'DTSPRO Giriş doğrulama kodunuz: $otp B021';
+
+      try {
+        // SMS İzni İste (Sadece Android'de)
+        if (Theme.of(context).platform == TargetPlatform.android) {
+          var status = await Permission.sms.request();
+          if (status.isGranted) {
+            await platform.invokeMethod('sendSms', {
+              'phone': cleanPhone,
+              'message': message,
+            });
+          } else if (status.isPermanentlyDenied) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('SMS izni kapalı. Lütfen Ayarlar menüsünden manuel olarak izin verin.')),
+            );
+            await openAppSettings();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('SMS gönderme izni verilmedi!')),
+            );
+          }
+        } else {
+          // Windows veya diğer platformlarda test ederken SMS gitmez, sadece loga bas
+          debugPrint('TEST MODU (SMS Gönderilmedi): $message');
+        }
+      } catch (e) {
+        debugPrint('SMS Gönderme Hatası: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('SMS Gönderilemedi: $e')),
+        );
+      }
+
+      if (!mounted) return;
+      
+      // Hata olsa dahi test edebilmek için OTP ekranına yönlendir
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              OtpScreen(phoneNumber: cleanPhone, correctCode: otp),
+          transitionsBuilder: (context, anim, secondaryAnim, child) {
+            return FadeTransition(opacity: anim, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+    } else {
+      // E-posta ile giriş (şimdilik direkt ana ekrana)
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const TireChangeScreen(),
+          transitionsBuilder: (context, anim, secondaryAnim, child) {
+            return FadeTransition(opacity: anim, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _animController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -95,80 +191,86 @@ class _LoginScreenState extends State<LoginScreen>
       body: Row(
         children: [
           // ── Sol Panel: Login Formu ────────────────────────────────
-          SizedBox(
-            width: 460,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Robot Karakter
-                    Image.asset(
-                      'assets/images/robot_yenii.png',
-                      height: 100,
-                      fit: BoxFit.contain,
-                    ),
-                    const SizedBox(height: 16),
+          SlideTransition(
+            position: _slideLeftPanelAnim,
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: SizedBox(
+                width: 460,
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Robot Karakter
+                        Image.asset(
+                          'assets/images/robot_yenii.png',
+                          height: 100,
+                          fit: BoxFit.contain,
+                        ),
+                        const SizedBox(height: 16),
 
-                    // Başlık
-                    const Text(
-                      'Giriş Yap',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A1D2E),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Telefon veya e-posta ile giriş yapın.\nDoğrulama kodu gönderilecektir.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF7B8094),
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                        // Başlık
+                        const Text(
+                          'Giriş Yap',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1A1D2E),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Telefon veya e-posta ile giriş yapın.\nDoğrulama kodu gönderilecektir.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF7B8094),
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
 
-                    // Tab Bar
-                    _TabBar(
-                      selectedTab: _selectedTab,
-                      onTabChanged: (i) {
-                        setState(() {
-                          _selectedTab = i;
-                          _inputValue = '';
-                          _emailController.clear();
-                        });
-                      },
+                        // Tab Bar
+                        _TabBar(
+                          selectedTab: _selectedTab,
+                          onTabChanged: (i) {
+                            setState(() {
+                              _selectedTab = i;
+                              _inputValue = '';
+                              _emailController.clear();
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // İçerik
+                        if (_selectedTab == 0) ...[
+                          _PhoneInput(value: _inputValue),
+                          const SizedBox(height: 16),
+                          _NumPad(
+                            onKey: _onNumKey,
+                            onDelete: _onDelete,
+                            onClear: _onClear,
+                          ),
+                        ] else ...[
+                          _EmailInput(
+                            controller: _emailController,
+                            onChanged: (value) => setState(() {}),
+                          ),
+                        ],
+
+                        const SizedBox(height: 20),
+
+                        // Giriş Yap Butonu
+                        _LoginButton(
+                          canLogin: _canLogin,
+                          onLogin: _login,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
-
-                    // İçerik
-                    if (_selectedTab == 0) ...[
-                      _PhoneInput(value: _inputValue),
-                      const SizedBox(height: 16),
-                      _NumPad(
-                        onKey: _onNumKey,
-                        onDelete: _onDelete,
-                        onClear: _onClear,
-                      ),
-                    ] else ...[
-                      _EmailInput(
-                        controller: _emailController,
-                        onChanged: (value) => setState(() {}),
-                      ),
-                    ],
-
-                    const SizedBox(height: 20),
-
-                    // Giriş Yap Butonu
-                    _LoginButton(
-                      canLogin: _canLogin,
-                      onLogin: _login,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -179,44 +281,50 @@ class _LoginScreenState extends State<LoginScreen>
 
           // ── Sağ Panel: Karşılama + Araç Görseli ──────────────────
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Column(
-                children: [
-                  // Hoşgeldiniz Metni
-                  const Text(
-                    'NUH ÇİMENTO',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1D2E),
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'BAKIM SİSTEMİNE HOŞGELDİNİZ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2E7D32),
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Araç Görseli
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Image.asset(
-                        'assets/images/truck_damper.png',
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
+            child: SlideTransition(
+              position: _slideRightPanelAnim,
+              child: FadeTransition(
+                opacity: _fadeAnim,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    children: [
+                      // Hoşgeldiniz Metni
+                      const Text(
+                        'NUH ÇİMENTO',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1D2E),
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'BAKIM SİSTEMİNE HOŞGELDİNİZ',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      // Araç Görseli
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Image.asset(
+                            'assets/images/truck_damper.png',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),

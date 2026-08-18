@@ -1,5 +1,5 @@
 // lib/ui/screens/tire_change_screen.dart
-
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -494,6 +494,44 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
 // ─────────────────────────────────────────────
 // TABLO BAŞLIĞI
 // ─────────────────────────────────────────────
+String _getTireName(String? vehicleId, int tireNumber) {
+  if (vehicleId == null) return '';
+  if (vehicleId.startsWith('lodel')) {
+    switch (tireNumber) {
+      case 1: return 'Ön sağ';
+      case 2: return 'Ön sol';
+      case 3: return 'Arka sağ';
+      case 4: return 'Arka sol';
+      default: return '';
+    }
+  } else if (vehicleId.startsWith('euclid')) {
+    switch (tireNumber) {
+      case 1: return 'Ön sağ';
+      case 2: return 'Ön sol';
+      case 3: return 'Arka sağ dış';
+      case 4: return 'Arka sağ iç';
+      case 5: return 'Arka sol iç';
+      case 6: return 'Arka sol dış';
+      default: return '';
+    }
+  } else if (vehicleId.startsWith('liugong') || vehicleId.startsWith('xcmg')) {
+    switch (tireNumber) {
+      case 1: return 'Ön sağ';
+      case 2: return 'Ön sol';
+      case 3: return 'Arka çeker sağ dış';
+      case 4: return 'Arka çeker sağ iç';
+      case 5: return 'Arka çeker sol iç';
+      case 6: return 'Arka çeker sol dış';
+      case 7: return 'Arka taşıyıcı sağ dış';
+      case 8: return 'Arka düz sağ iç';
+      case 9: return 'Arka düz sol iç';
+      case 10: return 'Arka düz sol dış';
+      default: return '';
+    }
+  }
+  return '';
+}
+
 class _TableHeader extends StatelessWidget {
   const _TableHeader();
 
@@ -507,15 +545,10 @@ class _TableHeader extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          SizedBox(
-            width: 40,
-            child: SizedBox.shrink(),
-          ),
-          SizedBox(width: 12),
           Expanded(
             flex: 3,
             child: Text(
-              'Seri No',
+              'Konum',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -524,24 +557,42 @@ class _TableHeader extends StatelessWidget {
               ),
             ),
           ),
+          SizedBox(width: 12),
+          Expanded(
+            flex: 3,
+            child: Text(
+              'Seri No',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF7B8094),
+                letterSpacing: 0.5,
+              ),
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           SizedBox(width: 8),
           SizedBox(
-            width: 100,
+            width: 160,
             child: Text(
               '',
               textAlign: TextAlign.center,
             ),
           ),
           SizedBox(width: 8),
-          SizedBox(
-            width: 100,
+          Expanded(
+            flex: 2,
             child: Text(
-              'Tarih',
+              'Değiştirilme Tarihi',
               textAlign: TextAlign.right,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF7B8094),
+                height: 1.1,
                 letterSpacing: 0.5,
               ),
             ),
@@ -623,24 +674,17 @@ class _TireRowState extends State<_TireRow>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // # kolonu
-          SizedBox(
-            width: 40,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2B3252),
-                borderRadius: BorderRadius.circular(8),
+          Expanded(
+            flex: 3,
+            child: Text(
+              '${widget.record.tireNumber}. ${_getTireName(provider.selectedVehicle?.id, widget.record.tireNumber)}',
+              style: const TextStyle(
+                color: Color(0xFF1A1D2E),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
               ),
-              alignment: Alignment.center,
-              child: Text(
-                '${widget.record.tireNumber}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 12),
@@ -652,9 +696,10 @@ class _TireRowState extends State<_TireRow>
                 ? TextField(
                     controller: _controller,
                     autofocus: true,
+                    textAlign: TextAlign.left,
                     decoration: InputDecoration(
-                      hintText: 'Yeni Seri No...',
-                      hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
+                      hintText: 'Yeni Seri No',
+                      hintStyle: const TextStyle(color: Color(0xFFBBC0CC), fontSize: 12),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 10),
@@ -676,6 +721,7 @@ class _TireRowState extends State<_TireRow>
                   )
                 : Text(
                     widget.record.serialNumber,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -683,14 +729,17 @@ class _TireRowState extends State<_TireRow>
                           ? const Color(0xFF198754)
                           : const Color(0xFF1A1D2E),
                     ),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
                   ),
           ),
 
           const SizedBox(width: 8),
 
-          // Değiştir / Tamam butonu
+          // Değiştir / Tamam / Kontrol butonu
           SizedBox(
-            width: 100,
+            width: 160,
             child: widget.isEditing
                 ? ElevatedButton(
                     onPressed: () {
@@ -702,7 +751,7 @@ class _TireRowState extends State<_TireRow>
                       backgroundColor: const Color(0xFF198754),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                          horizontal: 8, vertical: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -711,39 +760,71 @@ class _TireRowState extends State<_TireRow>
                     child: const Text(
                       'Tamam',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   )
-                : OutlinedButton(
-                    onPressed: () {
-                      provider.startEditing(widget.record.tireNumber);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF2B5CE6),
-                      side: const BorderSide(color: Color(0xFF2B5CE6)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () {
+                          provider.startEditing(widget.record.tireNumber);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2B5CE6),
+                          side: const BorderSide(color: Color(0xFF2B5CE6)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Değiştir',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'Değiştir',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(width: 4),
+                      Expanded( // Kontrol butonuna kalan boşluğu doldurt ki taşma olmasın
+                        child: ElevatedButton(
+                          onPressed: () {
+                            showTireActionSheet(context, provider, widget.record, 'Lastik #${widget.record.tireNumber}');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF198754),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Kontrol',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
           ),
 
           const SizedBox(width: 8),
 
           // Tarih
-          SizedBox(
-            width: 100,
+          Expanded(
+            flex: 2,
             child: Text(
               dateStr,
               textAlign: TextAlign.right,
@@ -763,7 +844,7 @@ class _TireRowState extends State<_TireRow>
 }
 
 // ─────────────────────────────────────────────
-// SAĞ PANEL
+// SAĞ PANEL (Animasyonlu Görsel)
 // ─────────────────────────────────────────────
 class _RightPanel extends StatelessWidget {
   const _RightPanel();
@@ -771,36 +852,292 @@ class _RightPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TireChangeProvider>();
+    final vehicle = provider.selectedVehicle;
 
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Araç Fotoğrafı
           Expanded(
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: provider.selectedVehicle != null
-                    ? Image.asset(
-                        provider.selectedVehicle!.imagePath,
-                        key: ValueKey(provider.selectedVehicle!.id),
-                        fit: BoxFit.contain,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
+            child: vehicle == null
+                ? const Center(child: Text('Lütfen bir araç seçin'))
+                : AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    child: _VehicleDisplay(
+                      key: ValueKey(vehicle.id),
+                      imagePath: vehicle.imagePath,
+                    ),
+                  ),
           ),
-
-          const SizedBox(height: 16),
-
+          const SizedBox(height: 24),
           // Gönder Butonu
           Align(
             alignment: Alignment.bottomRight,
             child: _SendButton(provider: provider),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VehicleDisplay extends StatelessWidget {
+  final String imagePath;
+  const _VehicleDisplay({required this.imagePath, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 320),
+          child: Image.asset(
+            imagePath,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// BOTTOM SHEET (KONTROL MENÜSÜ)
+// ─────────────────────────────────────────────
+void showTireActionSheet(BuildContext context, TireChangeProvider provider, TireRecord record, String label) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (BuildContext sheetContext) {
+      return _TireActionSheetContent(
+        provider: provider,
+        record: record,
+        label: label,
+      );
+    },
+  );
+}
+
+class _TireActionSheetContent extends StatefulWidget {
+  final TireChangeProvider provider;
+  final TireRecord record;
+  final String label;
+
+  const _TireActionSheetContent({
+    required this.provider,
+    required this.record,
+    required this.label,
+  });
+
+  @override
+  State<_TireActionSheetContent> createState() => _TireActionSheetContentState();
+}
+
+class _TireActionSheetContentState extends State<_TireActionSheetContent> {
+  bool _airChecked = false;
+  bool _repairChecked = false;
+
+  void _submit() {
+    List<String> actions = [];
+    if (_airChecked) actions.add('Lastiklerin havası tamamlandı');
+    if (_repairChecked) actions.add('Lastik tamiratı yapıldı');
+
+    if (actions.isNotEmpty) {
+      widget.provider.setTireAction(widget.record.tireNumber, actions.join(' / '));
+      Navigator.pop(context);
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasHistory = widget.record.lastAction != null && widget.record.lastAction!.isNotEmpty;
+    final dateStr = DateFormat('dd MMMM yyyy, HH:mm').format(widget.record.lastChangedDate);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Başlık
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDE1EA),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '${widget.label} Kontrolü',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF1A1D2E),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Tarihçe Kartı
+          if (hasHistory)
+            Container(
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F4FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2B5CE6).withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.history, size: 18, color: Color(0xFF2B5CE6)),
+                      SizedBox(width: 8),
+                      Text(
+                        'Son Kontrol Geçmişi',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2B5CE6),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.record.lastAction!,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1D2E),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    dateStr,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF7B8094),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Aksiyon Butonları (Checkboxes)
+          const Text(
+            'Yeni İşlem Ekle',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF7B8094),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildCheckboxOption(
+            title: 'Lastiklerin havası tamamlandı',
+            icon: Icons.air,
+            color: const Color(0xFF198754),
+            value: _airChecked,
+            onChanged: (val) {
+              setState(() {
+                _airChecked = val ?? false;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildCheckboxOption(
+            title: 'Lastik tamiratı yapıldı',
+            icon: Icons.build_circle_outlined,
+            color: const Color(0xFFF59E0B),
+            value: _repairChecked,
+            onChanged: (val) {
+              setState(() {
+                _repairChecked = val ?? false;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+          
+          ElevatedButton(
+            onPressed: (_airChecked || _repairChecked) ? _submit : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2B5CE6),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: const Color(0xFF2B5CE6).withValues(alpha: 0.5),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Tamamla',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckboxOption({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: value ? color.withValues(alpha: 0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: value ? color : const Color(0xFFDDE1EA),
+          width: value ? 2 : 1,
+        ),
+      ),
+      child: CheckboxListTile(
+        value: value,
+        onChanged: onChanged,
+        activeColor: color,
+        title: Row(
+          children: [
+            Icon(icon, size: 24, color: value ? color : const Color(0xFF7B8094)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: value ? FontWeight.w700 : FontWeight.w600,
+                  color: value ? color : const Color(0xFF1A1D2E),
+                ),
+              ),
+            ),
+          ],
+        ),
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -875,3 +1212,4 @@ class _SendButton extends StatelessWidget {
     );
   }
 }
+

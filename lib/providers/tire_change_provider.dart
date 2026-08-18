@@ -85,6 +85,7 @@ class TireChangeProvider extends ChangeNotifier {
             tireNumber: item['tireNumber'],
             serialNumber: item['serialNumber'],
             lastChangedDate: DateTime.parse(item['lastChangedDate']),
+            lastAction: item['lastAction'],
           );
         }).toList();
       } catch (_) {
@@ -141,6 +142,20 @@ class TireChangeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Tıklanan lastik için aksiyon belirle (örn: Havası tamamlandı)
+  Future<void> setTireAction(int tireNumber, String action) async {
+    final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
+    if (idx >= 0) {
+      _tireRecords[idx] = _tireRecords[idx].copyWith(
+        lastAction: action,
+        lastChangedDate: DateTime.now(),
+        isChanged: true,
+      );
+      await _saveTireRecords();
+      notifyListeners();
+    }
+  }
+
   /// Kayıtları SharedPreferences'a kaydet
   Future<void> _saveTireRecords() async {
     if (_selectedVehicle == null) return;
@@ -151,6 +166,7 @@ class TireChangeProvider extends ChangeNotifier {
               'tireNumber': r.tireNumber,
               'serialNumber': r.serialNumber,
               'lastChangedDate': r.lastChangedDate.toIso8601String(),
+              'lastAction': r.lastAction,
             })
         .toList();
     await prefs.setString(key, jsonEncode(jsonList));
