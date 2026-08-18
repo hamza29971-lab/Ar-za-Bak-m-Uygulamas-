@@ -1,5 +1,5 @@
 // lib/ui/screens/tire_change_screen.dart
-import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -546,7 +546,7 @@ class _TableHeader extends StatelessWidget {
       child: const Row(
         children: [
           Expanded(
-            flex: 3,
+            flex: 4, // Konum isimlerinin sığması için satır widgeti ile aynı flex
             child: Text(
               'Konum',
               style: TextStyle(
@@ -654,7 +654,9 @@ class _TireRowState extends State<_TireRow>
   @override
   Widget build(BuildContext context) {
     final provider = context.read<TireChangeProvider>();
-    final dateStr = DateFormat('dd.MM.yyyy').format(widget.record.lastChangedDate);
+    // Tabloda: son aksiyon tarihi varsa onu göster, yoksa seri no değiştirilme tarihini
+    final displayDate = widget.record.lastAction?.date ?? widget.record.lastChangedDate;
+    final dateStr = DateFormat('dd.MM.yyyy').format(displayDate);
 
     return AnimatedBuilder(
       animation: _flashColor,
@@ -665,17 +667,17 @@ class _TireRowState extends State<_TireRow>
               : (widget.isEditing
                   ? const Color(0xFFF0F4FF)
                   : Colors.transparent),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          // height sabit 58'den kaldırıldı — Konum isimleri 2 satıra inince satır büyüsün
           child: child,
         );
       },
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // # kolonu
+          // # kolonu — flex 4: uzun isimler için daha geniş pay
           Expanded(
-            flex: 3,
+            flex: 4,
             child: Text(
               '${widget.record.tireNumber}. ${_getTireName(provider.selectedVehicle?.id, widget.record.tireNumber)}',
               style: const TextStyle(
@@ -941,22 +943,20 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
   bool _repairChecked = false;
 
   void _submit() {
-    List<String> actions = [];
+    final List<String> actions = [];
     if (_airChecked) actions.add('Lastiklerin havası tamamlandı');
-    if (_repairChecked) actions.add('Lastik tamiratı yapıldı');
+    if (_repairChecked) actions.add('Lastik tamiraı yapıldı');
 
     if (actions.isNotEmpty) {
-      widget.provider.setTireAction(widget.record.tireNumber, actions.join(' / '));
-      Navigator.pop(context);
-    } else {
-      Navigator.pop(context);
+      // setTireActions: aynı anda seçilenler aynı timestamp alır
+      widget.provider.setTireActions(widget.record.tireNumber, actions);
     }
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool hasHistory = widget.record.lastAction != null && widget.record.lastAction!.isNotEmpty;
-    final dateStr = DateFormat('dd MMMM yyyy, HH:mm').format(widget.record.lastChangedDate);
+
 
     return Container(
       decoration: const BoxDecoration(
@@ -991,8 +991,8 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
           ),
           const SizedBox(height: 24),
 
-          // Tarihçe Kartı
-          if (hasHistory)
+          // Tarihçe Kartı — her aksiyon kendi tarihiyle ayrı satırda
+          if (widget.record.actionHistory.isNotEmpty)
             Container(
               padding: const EdgeInsets.all(16),
               margin: const EdgeInsets.only(bottom: 24),
@@ -1009,7 +1009,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
                       Icon(Icons.history, size: 18, color: Color(0xFF2B5CE6)),
                       SizedBox(width: 8),
                       Text(
-                        'Son Kontrol Geçmişi',
+                        'Kontrol Geçmişi',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -1019,22 +1019,36 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    widget.record.lastAction!,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1D2E),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    dateStr,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF7B8094),
-                    ),
-                  ),
+                  // Her aksiyonu kendi tarihiyle listele (en yeniden en eskiye)
+                  ...widget.record.actionHistory.reversed.map((entry) {
+                    final entryDate = DateFormat('dd.MM.yyyy HH:mm').format(entry.date);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              entry.action,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1D2E),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            entryDate,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7B8094),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),

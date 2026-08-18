@@ -74,18 +74,25 @@ class TireChangeProvider extends ChangeNotifier {
   /// SharedPreferences'tan lastik kayıtlarını yükle
   Future<void> _loadTireRecords(VehicleModel vehicle) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'tire_records_${vehicle.id}';
+    final key = 'tire_records_v2_${vehicle.id}'; // v2: yeni format
     final jsonStr = prefs.getString(key);
 
     if (jsonStr != null) {
       try {
         final List<dynamic> jsonList = jsonDecode(jsonStr);
         _tireRecords = jsonList.map((item) {
+          // actionHistory listesini yükle
+          final List<TireActionRecord> history = [];
+          if (item['actionHistory'] != null) {
+            for (final a in item['actionHistory'] as List) {
+              history.add(TireActionRecord.fromJson(Map<String, dynamic>.from(a)));
+            }
+          }
           return TireRecord(
             tireNumber: item['tireNumber'],
             serialNumber: item['serialNumber'],
             lastChangedDate: DateTime.parse(item['lastChangedDate']),
-            lastAction: item['lastAction'],
+            actionHistory: history,
           );
         }).toList();
       } catch (_) {
@@ -105,6 +112,7 @@ class TireChangeProvider extends ChangeNotifier {
         tireNumber: i + 1,
         serialNumber: '---',
         lastChangedDate: DateTime.now(),
+        actionHistory: [],
       );
     });
   }
@@ -142,13 +150,20 @@ class TireChangeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tıklanan lastik için aksiyon belirle (örn: Havası tamamlandı)
-  Future<void> setTireAction(int tireNumber, String action) async {
+  /// Tıklanan lastik için bir veya birden fazla aksiyonu listeye ekle.
+  /// Her aksiyon kendi DateTime.now() ile kaydedilir — aynı anda işaretlenenler
+  /// aynı timestamp'i paylaşır, farklı zamanlarda eklenirse farklı tarih alır.
+  Future<void> setTireActions(int tireNumber, List<String> actions) async {
+    if (actions.isEmpty) return;
     final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
     if (idx >= 0) {
+      final now = DateTime.now(); // Aynı anda işaretlenenler aynı zamanı paylaşır
+      final newHistory = List<TireActionRecord>.from(_tireRecords[idx].actionHistory);
+      for (final action in actions) {
+        newHistory.add(TireActionRecord(action: action, date: now));
+      }
       _tireRecords[idx] = _tireRecords[idx].copyWith(
-        lastAction: action,
-        lastChangedDate: DateTime.now(),
+        actionHistory: newHistory,
         isChanged: true,
       );
       await _saveTireRecords();
@@ -156,17 +171,17 @@ class TireChangeProvider extends ChangeNotifier {
     }
   }
 
-  /// Kayıtları SharedPreferences'a kaydet
+  /// Kayıtları SharedPreferences'a kaydet (v2 formatı)
   Future<void> _saveTireRecords() async {
     if (_selectedVehicle == null) return;
     final prefs = await SharedPreferences.getInstance();
-    final key = 'tire_records_${_selectedVehicle!.id}';
+    final key = 'tire_records_v2_${_selectedVehicle!.id}';
     final jsonList = _tireRecords
         .map((r) => {
               'tireNumber': r.tireNumber,
               'serialNumber': r.serialNumber,
               'lastChangedDate': r.lastChangedDate.toIso8601String(),
-              'lastAction': r.lastAction,
+              'actionHistory': r.actionHistory.map((a) => a.toJson()).toList(),
             })
         .toList();
     await prefs.setString(key, jsonEncode(jsonList));
