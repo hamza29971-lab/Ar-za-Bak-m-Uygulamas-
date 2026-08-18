@@ -150,9 +150,9 @@ class TireChangeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Tıklanan lastik için bir veya birden fazla aksiyonu listeye ekle.
-  /// Her aksiyon kendi DateTime.now() ile kaydedilir — aynı anda işaretlenenler
-  /// aynı timestamp'i paylaşır, farklı zamanlarda eklenirse farklı tarih alır.
+  /// Tıklanan lastik için aksiyonları upsert et:
+  /// - Aynı aksiyon daha önce eklenmişse tarihi günceller
+  /// - Yoksa yeni kayıt olarak ekler
   Future<void> setTireActions(int tireNumber, List<String> actions) async {
     if (actions.isEmpty) return;
     final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
@@ -160,7 +160,14 @@ class TireChangeProvider extends ChangeNotifier {
       final now = DateTime.now(); // Aynı anda işaretlenenler aynı zamanı paylaşır
       final newHistory = List<TireActionRecord>.from(_tireRecords[idx].actionHistory);
       for (final action in actions) {
-        newHistory.add(TireActionRecord(action: action, date: now));
+        final existingIdx = newHistory.indexWhere((a) => a.action == action);
+        if (existingIdx >= 0) {
+          // Aynı aksiyon zaten var — sadece tarihini güncelle
+          newHistory[existingIdx] = TireActionRecord(action: action, date: now);
+        } else {
+          // Yeni aksiyon — listeye ekle
+          newHistory.add(TireActionRecord(action: action, date: now));
+        }
       }
       _tireRecords[idx] = _tireRecords[idx].copyWith(
         actionHistory: newHistory,

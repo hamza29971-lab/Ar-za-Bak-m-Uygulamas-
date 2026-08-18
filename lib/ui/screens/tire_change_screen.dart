@@ -167,12 +167,12 @@ class _Body extends StatelessWidget {
       children: [
         // Sol panel: Araç seçimi + tablo
         const Expanded(
-          flex: 45,
+          flex: 50,
           child: _LeftPanel(),
         ),
         // Sağ panel: Araç fotoğrafı + gönder
         const Expanded(
-          flex: 55,
+          flex: 50,
           child: _RightPanel(),
         ),
       ],
@@ -587,13 +587,15 @@ class _TableHeader extends StatelessWidget {
             flex: 2,
             child: Text(
               'Değiştirilme Tarihi',
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.left,
+              softWrap: false,
+              maxLines: 1,
+              overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF7B8094),
-                height: 1.1,
-                letterSpacing: 0.5,
+                letterSpacing: 0.3,
               ),
             ),
           ),
@@ -945,7 +947,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
   void _submit() {
     final List<String> actions = [];
     if (_airChecked) actions.add('Lastiklerin havası tamamlandı');
-    if (_repairChecked) actions.add('Lastik tamiraı yapıldı');
+    if (_repairChecked) actions.add('Lastik tamiratı yapıldı');
 
     if (actions.isNotEmpty) {
       // setTireActions: aynı anda seçilenler aynı timestamp alır
