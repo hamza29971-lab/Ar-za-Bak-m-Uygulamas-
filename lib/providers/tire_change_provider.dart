@@ -47,8 +47,7 @@ class TireChangeProvider extends ChangeNotifier {
   }
 
   TireChangeProvider() {
-    // Başlangıçta ilk aracı seç
-    selectVehicle(vehicles.first);
+    // Başlangıçta hiçbir araç seçilmeyecek (Yağ ekranı ile aynı mantık)
   }
 
   /// Arama sorgusunu güncelle

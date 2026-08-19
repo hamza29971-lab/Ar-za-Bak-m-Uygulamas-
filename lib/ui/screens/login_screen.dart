@@ -4,8 +4,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'tire_change_screen.dart';
+import '../../screens/shell_screen.dart';
 import 'otp_screen.dart';
+import '../../services/auth_api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -111,13 +112,50 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _login() async {
     if (!_canLogin) return;
 
+    final String loginId = _selectedTab == 0 
+        ? _inputValue.replaceAll(RegExp(r'\D'), '') 
+        : _emailController.text.trim();
+    final String password = ""; // Şifresiz giriş (boş gönderiliyor)
+
+    if (AuthApiService.useRealApi) {
+      // Gerçek API ile Login
+      // Yükleniyor dialogu gösterilebilir (basitlik için bekleme süresince UI bloklanmıyor)
+      final otpRequestId = await AuthApiService.loginWithPhone(loginId, password);
+      
+      if (!mounted) return;
+      
+      if (otpRequestId != null) {
+        // OTP Ekranına yönlendir
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                OtpScreen(phoneNumber: loginId, correctCode: '', otpRequestId: otpRequestId),
+            transitionsBuilder: (context, anim, secondaryAnim, child) {
+              return FadeTransition(opacity: anim, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Giriş başarısız. Bilgilerinizi kontrol ediniz.')),
+        );
+      }
+      return;
+    }
+
+    // --- Eski Bypass/SMS Mantığı (useRealApi = false) ---
     if (_selectedTab == 0) {
       // Telefon ile giriş
-      final cleanPhone = _inputValue.replaceAll(RegExp(r'\D'), '');
+      final cleanPhone = loginId;
       
       // Rastgele 6 haneli kod üret
       final otp = (100000 + Random().nextInt(900000)).toString();
       final message = 'DTSPRO Giriş doğrulama kodunuz: $otp B021';
+
+      // Bypass şifresi (SMS çalışmadığında kullanılır)
+      const String bypassCode = '000000';
+      String correctCode = bypassCode;
 
       try {
         // SMS İzni İste (Sadece Android'de)
@@ -128,34 +166,39 @@ class _LoginScreenState extends State<LoginScreen>
               'phone': cleanPhone,
               'message': message,
             });
-          } else if (status.isPermanentlyDenied) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('SMS izni kapalı. Lütfen Ayarlar menüsünden manuel olarak izin verin.')),
-            );
-            await openAppSettings();
+            correctCode = otp; // SMS gittiyse gerçek kod
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('SMS gönderme izni verilmedi!')),
-            );
+            // SMS izni yok: bilgi ver ama OTP ekranına geç
+            if (status.isPermanentlyDenied) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('SMS izni kapalı. Giriş için bypass şifresi kullanın.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('SMS gönderilemedi. Bypass şifresi ile giriş yapabilirsiniz.')),
+              );
+            }
+            // Bypass şifresiyle OTP ekranına yönlendir
           }
         } else {
-          // Windows veya diğer platformlarda test ederken SMS gitmez, sadece loga bas
+          // Windows veya diğer platformlarda test ederken SMS gitmez
           debugPrint('TEST MODU (SMS Gönderilmedi): $message');
         }
       } catch (e) {
         debugPrint('SMS Gönderme Hatası: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('SMS Gönderilemedi: $e')),
-        );
+        // SMS hata verse de OTP'ye geç (bypass şifresiyle)
       }
 
       if (!mounted) return;
-      
-      // Hata olsa dahi test edebilmek için OTP ekranına yönlendir
+
+      // OTP ekranına yönlendir (SMS gittiyse gerçek kod, gitmediyse bypass: 1234)
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              OtpScreen(phoneNumber: cleanPhone, correctCode: otp),
+              OtpScreen(phoneNumber: cleanPhone, correctCode: correctCode),
           transitionsBuilder: (context, anim, secondaryAnim, child) {
             return FadeTransition(opacity: anim, child: child);
           },
@@ -163,11 +206,11 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       );
     } else {
-      // E-posta ile giriş (şimdilik direkt ana ekrana)
+      // E-posta ile giriş → ShellScreen'e gönder
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const TireChangeScreen(),
+              const ShellScreen(),
           transitionsBuilder: (context, anim, secondaryAnim, child) {
             return FadeTransition(opacity: anim, child: child);
           },
@@ -533,11 +576,12 @@ class _EmailInput extends StatelessWidget {
             color: Color(0xFF1A1D2E),
           ),
         ),
-        const SizedBox(height: 80), // E-posta sekmesinde numpad yok, boşluk
       ],
     );
   }
 }
+
+
 
 // ─────────────────────────────────────────────
 // ÖZEL NUMPAD

@@ -5,154 +5,24 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/tire_change_model.dart';
 import '../../providers/tire_change_provider.dart';
-import 'login_screen.dart';
+import '../../widgets/nimo_page.dart';
+import '../../theme/app_theme.dart';
 
 class TireChangeScreen extends StatelessWidget {
   const TireChangeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          const _Header(),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFDDE1EA)),
-          const Expanded(child: _Body()),
-        ],
+    return const NimoPage(
+      child: Padding(
+        padding: EdgeInsets.all(AppTheme.pagePadding),
+        child: _Body(),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-// HEADER
-// ─────────────────────────────────────────────
-class _Header extends StatelessWidget {
-  const _Header();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 68,
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Sol: NIMO Logo
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/images/nimo_logo.png',
-              height: 46,
-              fit: BoxFit.contain,
-            ),
-          ),
-
-          // Orta: Başlık
-          const Expanded(
-            child: Center(
-              child: Text(
-                'LASTİK DEĞİŞİMİ',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1D2E),
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-          ),
-
-          // Sağ: Profil ve Çıkış
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2B3252),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.person, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 8),
-              const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Operatör',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1D2E),
-                    ),
-                  ),
-                  Text(
-                    'Kullanıcı Adı',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF7B8094),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 24),
-              
-              // Çıkış Butonu
-              ElevatedButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext dialogContext) {
-                      return AlertDialog(
-                        title: const Text('Çıkış Yap'),
-                        content: const Text('Çıkış yapmak istediğinize emin misiniz?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dialogContext).pop(),
-                            child: const Text('İptal'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(dialogContext).pop();
-                              Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(
-                                  builder: (_) => const LoginScreen(),
-                                ),
-                              );
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.red,
-                            ),
-                            child: const Text('Çıkış Yap', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Çıkış', style: TextStyle(fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFDE8E8),
-                  foregroundColor: Colors.red,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────
 // BODY
@@ -170,6 +40,7 @@ class _Body extends StatelessWidget {
           flex: 50,
           child: _LeftPanel(),
         ),
+        const SizedBox(width: 20),
         // Sağ panel: Araç fotoğrafı + gönder
         const Expanded(
           flex: 50,
@@ -190,50 +61,15 @@ class _LeftPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<TireChangeProvider>();
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Araç Seçimi
-          const Text(
-            'Araç Seçimi',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF7B8094),
-              letterSpacing: 0.5,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+          const PageHeading(
+            title: 'Lastik Değişimi',
+            subtitle: 'Araç lastik kontrol ve değişim kayıtları',
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           _VehicleSearchField(provider: provider),
-          const SizedBox(height: 10),
-
-          // Lastik Sayısı
-          if (provider.selectedVehicle != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2B3252).withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.tire_repair, size: 16, color: Color(0xFF2B3252)),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Lastik Sayısı: ${provider.selectedVehicle!.tireCount}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2B3252),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
           const SizedBox(height: 20),
 
           // Tablo
@@ -281,8 +117,7 @@ class _LeftPanel extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 }
 
@@ -326,39 +161,24 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
   Widget build(BuildContext context) {
     final filtered = widget.provider.filteredVehicles;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Arama kutusu
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(
-              color: _isOpen
-                  ? const Color(0xFF2B3252)
-                  : const Color(0xFFDDE1EA),
-              width: _isOpen ? 2 : 1.5,
-            ),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: TextField(
+    return SizedBox(
+      width: 420,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Arama kutusu
+          TextField(
             controller: _controller,
             decoration: InputDecoration(
-              hintText: 'Araç ara...',
-              hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-              prefixIcon: const Icon(Icons.search_rounded,
-                  color: Color(0xFF7B8094), size: 20),
-              suffixIcon: _controller.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: Color(0xFF7B8094), size: 18),
+              hintText: 'Araç Seç',
+              prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_controller.text.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Temizle',
                       onPressed: () {
                         _controller.clear();
                         widget.provider.clearSearch();
@@ -366,17 +186,13 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
                         setState(() => _isOpen = false);
                         FocusScope.of(context).unfocus();
                       },
-                    )
-                  : null,
-              border: InputBorder.none,
-              isDense: true,
+                    ),
+                  const Icon(Icons.keyboard_arrow_down),
+                  const SizedBox(width: 8),
+                ],
+              ),
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
-            ),
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1D2E),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             ),
             onTap: () {
               setState(() => _isOpen = true);
@@ -388,7 +204,6 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
               setState(() => _isOpen = true);
             },
           ),
-        ),
 
         // Filtreli liste (açıkken görünür)
         if (_isOpen && filtered.isNotEmpty)
@@ -417,42 +232,54 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
                     widget.provider.selectedVehicle?.id == vehicle.id;
                 return InkWell(
                   onTap: () => _selectVehicle(vehicle),
-                  borderRadius: BorderRadius.circular(8),
                   child: Container(
+                    color: isSelected
+                        ? const Color(0xFF2B3252).withValues(alpha: 0.08)
+                        : Colors.transparent,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFF2B3252).withValues(alpha: 0.08)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
+                      horizontal: 14,
+                      vertical: 12,
                     ),
                     child: Row(
-                      children: [
+                      children: <Widget>[
                         Icon(
                           Icons.local_shipping_outlined,
-                          size: 16,
+                          size: 20,
                           color: isSelected
                               ? const Color(0xFF2B3252)
                               : const Color(0xFF7B8094),
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          vehicle.name,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: isSelected
-                                ? const Color(0xFF2B3252)
-                                : const Color(0xFF1A1D2E),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                vehicle.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected
+                                      ? const Color(0xFF2B3252)
+                                      : const Color(0xFF1A1D2E),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${vehicle.typeLabel} • ${vehicle.tireCount} lastik',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF7B8094),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const Spacer(),
                         if (isSelected)
-                          const Icon(Icons.check_rounded,
-                              size: 16, color: Color(0xFF2B3252)),
+                          const Icon(
+                            Icons.check_circle,
+                            size: 18,
+                            color: Color(0xFF2B3252),
+                          ),
                       ],
                     ),
                   ),
@@ -487,6 +314,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             ),
           ),
       ],
+      ),
     );
   }
 }
@@ -858,22 +686,25 @@ class _RightPanel extends StatelessWidget {
     final provider = context.watch<TireChangeProvider>();
     final vehicle = provider.selectedVehicle;
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: vehicle == null
-                ? const Center(child: Text('Lütfen bir araç seçin'))
-                : AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    child: _VehicleDisplay(
-                      key: ValueKey(vehicle.id),
-                      imagePath: vehicle.imagePath,
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: vehicle == null
+              ? const Center(
+                  child: Text(
+                    'Fotoğrafı görmek için bir araç seçin',
+                    style: TextStyle(color: Colors.grey),
                   ),
-          ),
+                )
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  child: _VehicleDisplay(
+                    key: ValueKey(vehicle.id),
+                    vehicle: vehicle,
+                  ),
+                ),
+        ),
           const SizedBox(height: 24),
           // Gönder Butonu
           Align(
@@ -881,14 +712,13 @@ class _RightPanel extends StatelessWidget {
             child: _SendButton(provider: provider),
           ),
         ],
-      ),
-    );
+      );
   }
 }
 
 class _VehicleDisplay extends StatelessWidget {
-  final String imagePath;
-  const _VehicleDisplay({required this.imagePath, super.key});
+  final VehicleModel vehicle;
+  const _VehicleDisplay({required this.vehicle, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -898,7 +728,7 @@ class _VehicleDisplay extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 320),
           child: Image.asset(
-            imagePath,
+            vehicle.imagePath,
             fit: BoxFit.contain,
           ),
         ),

@@ -1,16 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'tire_change_screen.dart';
+import '../../screens/shell_screen.dart';
 import 'login_screen.dart';
+import '../../services/auth_api_service.dart';
+import '../../services/auth_models.dart';
+import '../../state/app_state.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
   final String correctCode;
+  final String? otpRequestId; // API isteğinden dönen ID
   
   const OtpScreen({
     super.key,
     required this.phoneNumber,
     required this.correctCode,
+    this.otpRequestId,
   });
 
   @override
@@ -71,13 +76,54 @@ class _OtpScreenState extends State<OtpScreen> {
       _errorMessage = null;
     });
   }
-  
-  void _verifyCode() {
-    if (_enteredCode == widget.correctCode || _enteredCode == '0000' || _enteredCode == '000000') {
+  Future<void> _verifyCode() async {
+    if (AuthApiService.useRealApi && widget.otpRequestId != null) {
+      // Gerçek API Doğrulaması
+      final data = await AuthApiService.verifyOtp(
+        widget.otpRequestId!, 
+        widget.phoneNumber, 
+        _enteredCode,
+      );
+      
+      if (!mounted) return;
+      
+      if (data != null) {
+        // Profil bilgisini state'e kaydet (eğer API JSON'u AuthSession'a uyumluysa)
+        try {
+          final session = AuthSession.fromJson(data);
+          AppScope.read(context).applySession(session);
+        } catch (e) {
+          debugPrint('AuthSession Parse Hatası: $e');
+          // Dummy verilerle test login
+          AppScope.read(context).signIn(phone: widget.phoneNumber);
+        }
+        
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const ShellScreen(),
+            transitionsBuilder: (context, anim, secondaryAnim, child) {
+              return FadeTransition(opacity: anim, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      } else {
+        setState(() {
+          _errorMessage = 'Doğrulama kodu hatalı veya süresi dolmuş.';
+        });
+      }
+      return;
+    }
+
+    // --- Eski Mantık ---
+    if (_enteredCode == widget.correctCode) {
+      // Eski test/dummy mantığıyla giriş yap
+      AppScope.read(context).signIn(phone: widget.phoneNumber);
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              const TireChangeScreen(),
+              const ShellScreen(),
           transitionsBuilder: (context, anim, secondaryAnim, child) {
             return FadeTransition(opacity: anim, child: child);
           },
@@ -86,7 +132,7 @@ class _OtpScreenState extends State<OtpScreen> {
       );
     } else {
       setState(() {
-        _errorMessage = 'Dogrulama kodu hatali';
+        _errorMessage = 'Doğrulama kodu hatalı';
       });
     }
   }

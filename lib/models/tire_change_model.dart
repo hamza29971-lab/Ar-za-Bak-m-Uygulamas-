@@ -34,29 +34,27 @@ class VehicleModel {
     required this.topDownImagePath,
   });
 
+  String get typeLabel {
+    if (tireCount <= 4) return 'Yükleyici';
+    if (tireCount <= 6) return 'Kaya Kamyonu';
+    return 'Maden Kamyonu';
+  }
+
   // Gerçek araç listesi
   static List<VehicleModel> demoVehicles() {
     return [
-      // Lodel 1 (4 Lastik)
-      const VehicleModel(
-        id: 'lodel_1',
-        name: 'Lodel-1',
-        tireCount: 4,
-        imagePath: 'assets/images/loader.png',
-        topDownImagePath: 'assets/images/loader_top_down.jpg',
-      ),
       // Euclıd 1-12 (6 Lastik)
       ...List.generate(12, (i) => VehicleModel(
         id: 'euclid_${i + 1}',
-        name: 'Euclıd-${i + 1}',
+        name: 'Euclid-${i + 1}',
         tireCount: 6,
         imagePath: 'assets/images/euclid_truck.png',
         topDownImagePath: 'assets/images/truck_6_top_down.jpg',
       )),
-      // Lıugong 16-20 (10 Lastik)
+      // Liugong 16-20 (10 Lastik)
       ...List.generate(5, (i) => VehicleModel(
         id: 'liugong_${i + 16}',
-        name: 'Lıugong-${i + 16}',
+        name: 'Liugong-${i + 16}',
         tireCount: 10,
         imagePath: 'assets/images/green_truck.png',
         topDownImagePath: 'assets/images/truck_10_top_down.jpg',
@@ -68,6 +66,14 @@ class VehicleModel {
         tireCount: 10,
         imagePath: 'assets/images/xcmg_truck.png',
         topDownImagePath: 'assets/images/truck_10_top_down.jpg',
+      )),
+      // Liugong 33-39 — Loder tipi (4 Lastik)
+      ...List.generate(7, (i) => VehicleModel(
+        id: 'liugong_${i + 33}',
+        name: 'Liugong-${i + 33}',
+        tireCount: 4,
+        imagePath: 'assets/images/loader.png',
+        topDownImagePath: 'assets/images/loader_top_down.jpg',
       )),
     ];
   }
