@@ -44,7 +44,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final AppState state = AppScope.of(context);
     final UserProfile? user = state.user;
-    final Vehicle? vehicle = state.selectedVehicle;
+    final Vehicle? selectedVehicle = state.selectedVehicle;
+    
+    // Anasayfada gösterilecek araç: Eğer seçili bir araç yoksa profildeki aracı kullan
+    final Vehicle? displayVehicle = selectedVehicle ?? 
+        state.vehicles.where((v) => v.code == user?.machineCode).firstOrNull;
 
     return NimoPage(
       child: SingleChildScrollView(
@@ -91,9 +95,9 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Expanded(flex: 62, child: _buildActions(context, state, vehicle)),
+                  Expanded(flex: 62, child: _buildActions(context, state, displayVehicle)),
                   const SizedBox(width: 20),
-                  Expanded(flex: 38, child: _buildVehicleCard(context, vehicle)),
+                  Expanded(flex: 38, child: _buildVehicleCard(context, displayVehicle)),
                 ],
               ),
             ),

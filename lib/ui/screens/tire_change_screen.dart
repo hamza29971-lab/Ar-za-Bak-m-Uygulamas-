@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 import '../../models/tire_change_model.dart';
 import '../../providers/tire_change_provider.dart';
 import '../../widgets/nimo_page.dart';
+import '../../widgets/common.dart';
 import '../../theme/app_theme.dart';
+import '../../state/app_state.dart';
+import '../../services/publish_service.dart';
 
 class TireChangeScreen extends StatelessWidget {
   const TireChangeScreen({super.key});
@@ -69,7 +72,14 @@ class _LeftPanel extends StatelessWidget {
             subtitle: 'Araç lastik kontrol ve değişim kayıtları',
           ),
           const SizedBox(height: 16),
-          _VehicleSearchField(provider: provider),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: _VehicleSearchField(provider: provider)),
+              const SizedBox(width: 16),
+              _PendingSubmitButton(provider: provider),
+            ],
+          ),
           const SizedBox(height: 20),
 
           // Tablo
@@ -86,13 +96,19 @@ class _LeftPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  // Tablo başlıkları
-                  const _TableHeader(),
-                  const Divider(height: 1, thickness: 1, color: Color(0xFFEEF0F5)),
-                  // Tablo satırları
-                  Expanded(
+              child: provider.selectedVehicle == null
+                  ? const EmptyState(
+                      icon: Icons.tire_repair_outlined,
+                      title: 'Araç seçilmedi',
+                      message: 'Lastik kayıtlarını görmek için yukarıdaki "Araç Seç" alanından bir araç seçin.',
+                    )
+                  : Column(
+                      children: [
+                        // Tablo başlıkları
+                        const _TableHeader(),
+                        const Divider(height: 1, thickness: 1, color: Color(0xFFEEF0F5)),
+                        // Tablo satırları
+                        Expanded(
                     child: ListView.separated(
                       padding: EdgeInsets.zero,
                       itemCount: provider.tireRecords.length,
@@ -575,8 +591,24 @@ class _TireRowState extends State<_TireRow>
             child: widget.isEditing
                 ? ElevatedButton(
                     onPressed: () {
-                      provider.confirmChange(
-                          widget.record.tireNumber, _controller.text);
+                      final String newSerial = _controller.text;
+                      provider.confirmChange(widget.record.tireNumber, newSerial);
+                      final state = AppScope.read(context);
+                      final vehicle = provider.selectedVehicle;
+                      if (vehicle != null) {
+                        state.addPending(PendingOperation(
+                          kind: PendingKind.tire,
+                          vehicleCode: vehicle.name,
+                          label: 'Lastik #${widget.record.tireNumber} değiştirildi ($newSerial)',
+                          date: DateTime.now(),
+                          payload: <String, Object?>{
+                            'op': 'lastik_degisim',
+                            'tireId': 'Lastik #${widget.record.tireNumber}',
+                            'position': 'Lastik ${widget.record.tireNumber}',
+                            'serialNo': newSerial,
+                          },
+                        ));
+                      }
                       _controller.clear();
                     },
                     style: ElevatedButton.styleFrom(
@@ -705,14 +737,78 @@ class _RightPanel extends StatelessWidget {
                   ),
                 ),
         ),
-          const SizedBox(height: 24),
-          // Gönder Butonu
-          Align(
-            alignment: Alignment.bottomRight,
-            child: _SendButton(provider: provider),
-          ),
-        ],
-      );
+      ],
+    );
+  }
+}
+
+class _PendingSubmitButton extends StatefulWidget {
+  final TireChangeProvider provider;
+  const _PendingSubmitButton({required this.provider});
+
+  @override
+  State<_PendingSubmitButton> createState() => _PendingSubmitButtonState();
+}
+
+class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
+  bool _sending = false;
+
+  Future<void> _sendPending(BuildContext context, AppState state, VehicleModel? vehicle) async {
+    final List<PendingOperation> pending = state.pendingOf(PendingKind.tire);
+    if (pending.isEmpty) return;
+
+    setState(() => _sending = true);
+    final PublishResult result = await PublishService.instance.publishOperations(
+      topic: PendingKind.tire.topic,
+      group: PendingKind.tire.label,
+      operations: <Map<String, Object?>>[
+        for (final PendingOperation p in pending)
+          <String, Object?>{
+            ...p.payload,
+            'vehicle': p.vehicleCode,
+            'date': p.date.toIso8601String(),
+          },
+      ],
+      vehicleCode: vehicle?.name,
+      userRegistryNo: state.user?.registryNo,
+    );
+    if (!context.mounted) return;
+    setState(() => _sending = false);
+
+    if (!result.success) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Gönderilemedi: ${result.error ?? 'bilinmeyen hata'}'),
+          backgroundColor: Colors.red.shade800,
+        ));
+      return;
+    }
+
+    final int count = pending.length;
+    state.clearPending(PendingKind.tire);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('$count lastik işlemi başarıyla gönderildi.'),
+      ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final int pendingCount = state.pendingCount(PendingKind.tire);
+
+    return PrimaryActionButton(
+      label: 'Gönder',
+      icon: Icons.send_rounded,
+      accent: AppColors.form,
+      badge: pendingCount,
+      compact: true,
+      onPressed: pendingCount == 0 || _sending
+          ? null
+          : () => _sendPending(context, state, widget.provider.selectedVehicle),
+    );
   }
 }
 
@@ -782,6 +878,22 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
     if (actions.isNotEmpty) {
       // setTireActions: aynı anda seçilenler aynı timestamp alır
       widget.provider.setTireActions(widget.record.tireNumber, actions);
+      final state = AppScope.read(context);
+      final vehicle = widget.provider.selectedVehicle;
+      if (vehicle != null) {
+        state.addPending(PendingOperation(
+          kind: PendingKind.tire,
+          vehicleCode: vehicle.name,
+          label: 'Lastik #${widget.record.tireNumber} kontrol edildi',
+          date: DateTime.now(),
+          payload: <String, Object?>{
+            'op': 'lastik_kontrol',
+            'tireId': 'Lastik #${widget.record.tireNumber}',
+            'position': 'Lastik ${widget.record.tireNumber}',
+            'items': actions,
+          },
+        ));
+      }
     }
     Navigator.pop(context);
   }
@@ -1021,7 +1133,10 @@ class _SendButton extends StatelessWidget {
     }
 
     return ElevatedButton(
-      onPressed: provider.isSending ? null : () => provider.sendReport(),
+      onPressed: provider.isSending ? null : () {
+        final state = AppScope.of(context);
+        provider.sendReport(state);
+      },
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF2B3252),
         foregroundColor: Colors.white,

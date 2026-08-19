@@ -41,6 +41,26 @@ class PublishService {
     return publish('$baseTopic/rapor', payload);
   }
 
+  /// Lastik / Yağ ekranındaki "Gönder" butonunun yükü: o ekranda yapılıp
+  /// henüz gönderilmemiş işlemler tek mesajda toplanır.
+  Future<PublishResult> publishOperations({
+    required String topic,
+    required String group,
+    required List<Map<String, Object?>> operations,
+    String? vehicleCode,
+    String? userRegistryNo,
+  }) async {
+    final Map<String, Object?> payload = <String, Object?>{
+      'group': group,
+      'vehicle': vehicleCode,
+      'user': userRegistryNo,
+      'operationCount': operations.length,
+      'operations': operations,
+      'sentAt': DateTime.now().toIso8601String(),
+    };
+    return publish(topic, payload);
+  }
+
   Future<PublishResult> publish(String topic, Map<String, Object?> payload) async {
     final String json = jsonEncode(payload);
     // TODO(mqtt): gerçek broker bağlantısı eklenecek.

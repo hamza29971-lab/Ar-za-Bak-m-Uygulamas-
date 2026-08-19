@@ -306,3 +306,115 @@ class SectionCard extends StatelessWidget {
     );
   }
 }
+
+/// Tablonun üstünde, sekmelerin sağında duran ana işlem butonu
+/// ("Takviye Yap", "Lastik Değiştir"). Tablodaki satır butonlarından ayrışsın
+/// diye biraz daha büyük, yuvarlak hatlı ve ikonu çerçeve içinde.
+class PrimaryActionButton extends StatelessWidget {
+  const PrimaryActionButton({
+    super.key,
+    required this.label,
+    required this.accent,
+    required this.onPressed,
+    this.icon = Icons.add_rounded,
+    this.filled = true,
+    this.badge,
+    this.compact = false,
+  });
+
+  final String label;
+  final Color accent;
+
+  /// `null` verilirse buton soluk ve tıklanamaz olur.
+  final VoidCallback? onPressed;
+
+  final IconData icon;
+
+  /// `false` ise dolgusuz, yalnızca çerçeveli çizilir (ikincil işlemler).
+  final bool filled;
+
+  /// Etiketin sonuna eklenen küçük sayaç (ör. bekleyen işlem sayısı).
+  final int? badge;
+
+  /// İkincil işlemler için daha dar hâli: ikon çerçevesiz, iç boşluk küçük.
+  /// Aynı satırda birden fazla buton olduğunda yer kazandırır; böylece üç
+  /// buton dar tablette de sekmelerin yanında kalabilir.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onPressed != null;
+    final Color base = enabled ? accent : context.mutedColor.withValues(alpha: 0.35);
+    final Color fg = filled ? Colors.white : base;
+    final BorderRadius radius = BorderRadius.circular(12);
+
+    return Material(
+      color: filled ? base : Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: radius,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 11 : 14,
+            vertical: compact ? 9 : 9,
+          ),
+          decoration: filled
+              ? null
+              : BoxDecoration(
+                  borderRadius: radius,
+                  border: Border.all(color: base.withValues(alpha: 0.55), width: 1.5),
+                ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (compact)
+                Icon(icon, size: 16, color: fg)
+              else
+                Container(
+                  width: 21,
+                  height: 21,
+                  decoration: BoxDecoration(
+                    color: filled
+                        ? Colors.white.withValues(alpha: 0.22)
+                        : base.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 15, color: fg),
+                ),
+              SizedBox(width: compact ? 6 : 7),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+              if (badge != null) ...<Widget>[
+                const SizedBox(width: 7),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: filled
+                        ? Colors.white.withValues(alpha: 0.24)
+                        : base.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$badge',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: fg,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

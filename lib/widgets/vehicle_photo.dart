@@ -10,12 +10,14 @@ import '../theme/app_theme.dart';
 /// diğer ekranlar sol görünümü kullanır.
 enum VehicleImageSide { left, right }
 
-/// Taraflı görseli bulunan Euclid araçları (`Euclid-1` … `Euclid-11`) ve
-/// Liugong araçları (`Liugong-16` … `Liugong-20`). Bunların dışındaki araçlar
-/// genel görsele düşer.
+/// Taraflı görseli bulunan Euclid araçları (`Euclid-1` … `Euclid-11`),
+/// Liugong maden kamyonları (`Liugong-16` … `Liugong-20`) ve Liugong loderler
+/// (`Liugong-33` … `Liugong-39`). Bunların dışındaki araçlar genel görsele düşer.
 const int _euclidSideImageCount = 11;
-const int _liugongFirstSideImage = 16;
-const int _liugongLastSideImage = 20;
+const int _liugongFirstTruck = 16;
+const int _liugongLastTruck = 20;
+const int _liugongFirstLoader = 33;
+const int _liugongLastLoader = 39;
 
 /// `Euclid-4` + `euclid` -> 4, eşleşmezse `null`.
 int? _vehicleNumber(String code, String prefix) {
@@ -39,69 +41,151 @@ String? _euclidSideAsset(String code, VehicleImageSide side) {
       : 'assets/images/sol/Euclid$number.png';
 }
 
-/// Liugong araçlarının taraflı görselleri:
+/// Liugong araçlarının taraflı görsel yolu:
 /// sol -> `assets/images/sol/Liugong[N].png`,
 /// sağ -> `assets/images/sağ/Liugong[N]yansıma.png`.
-String? _liugongSideAsset(String code, VehicleImageSide side) {
+String _liugongAsset(int number, VehicleImageSide side) =>
+    side == VehicleImageSide.right
+        ? 'assets/images/sağ/Liugong${number}yansıma.png'
+        : 'assets/images/sol/Liugong$number.png';
+
+/// Liugong maden kamyonlarının (10 lastik) görselleri.
+String? _liugongTruckSideAsset(String code, VehicleImageSide side) {
   final int? number = _vehicleNumber(code, 'liugong');
-  if (number == null ||
-      number < _liugongFirstSideImage ||
-      number > _liugongLastSideImage) {
+  if (number == null || number < _liugongFirstTruck || number > _liugongLastTruck) {
     return null;
   }
+  return _liugongAsset(number, side);
+}
 
-  return side == VehicleImageSide.right
-      ? 'assets/images/sağ/Liugong${number}yansıma.png'
-      : 'assets/images/sol/Liugong$number.png';
+/// Liugong loderlerin (4 lastik) görselleri.
+String? _liugongLoaderSideAsset(String code, VehicleImageSide side) {
+  final int? number = _vehicleNumber(code, 'liugong');
+  if (number == null ||
+      number < _liugongFirstLoader ||
+      number > _liugongLastLoader) {
+    return null;
+  }
+  return _liugongAsset(number, side);
 }
 
 /// Euclid görsellerinin en-boy oranları (tuval ölçüleri sabit).
 const double _leftViewAspectRatio = 1024 / 572;
 const double _rightViewAspectRatio = 1024 / 660;
 
+/// Loder görsellerinin tuval oranı; iki taraf da aynı ölçüde hazırlanmıştır.
+const double _loaderAspectRatio = 1024 / 659;
+
 /// Görsel üzerindeki tıklanabilir tekerlek bölgesi.
 /// [rect] görselin sol üst köşesine göre 0..1 aralığında normalize edilmiştir;
 /// [position] araç tanımındaki konum adıyla birebir aynı olmalıdır.
+///
+/// İkili (yan yana) tekerlekler için [TireHotspot.pair] kullanılır: iki tekerlek
+/// tek bir bölgeyle temsil edilir, tıklanınca kullanıcı "İç" / "Dış" seçer.
+/// Böylece parmakla yanlış tekerleğe basma riski ortadan kalkar.
 @immutable
 class TireHotspot {
-  const TireHotspot(this.position, this.rect);
+  /// Tek bir tekerleğe karşılık gelen bölge.
+  const TireHotspot(this.position, this.rect) : pairedPosition = null;
 
+  /// Yan yana duran iki tekerleği kapsayan tek bölge. [position] içteki,
+  /// [pairedPosition] dıştaki tekerlektir.
+  const TireHotspot.pair(this.position, this.pairedPosition, this.rect);
+
+  /// Tek tekerlekli bölgelerde tekerleğin konumu; ikili bölgelerde içteki.
   final String position;
+
+  /// İkili bölgede dıştaki tekerleğin konumu; tek tekerlekli bölgede `null`.
+  final String? pairedPosition;
+
   final Rect rect;
+
+  /// Bölge yan yana iki tekerleği mi kapsıyor?
+  bool get isPair => pairedPosition != null;
+
+  /// Bölgenin kapsadığı konumlar (ikili bölgede iç, dış sırasıyla).
+  List<String> get positions => pairedPosition == null
+      ? <String>[position]
+      : <String>[position, pairedPosition!];
+
+  /// İkili bölgenin ortak adı: "Sol Arka İç" -> "Sol Arka".
+  String get groupLabel {
+    final int cut = position.lastIndexOf(' ');
+    return cut <= 0 ? position : position.substring(0, cut);
+  }
+
+  /// Konumun ayırt edici son sözcüğü: "Sol Arka İç" -> "İç".
+  static String choiceLabelOf(String position) {
+    final int cut = position.lastIndexOf(' ');
+    return cut < 0 ? position : position.substring(cut + 1);
+  }
 }
 
-/// Euclid sol görünümünde görünen tekerlekler (ön ve arka ikili).
+/// Euclid sol görünümünde görünen tekerlekler: ön tekerlek tek, arkadaki ikili
+/// tekerlekler tek bölgede birleştirilmiştir.
 const List<TireHotspot> _euclidLeftHotspots = <TireHotspot>[
   TireHotspot('Sol Ön', Rect.fromLTRB(0.335, 0.555, 0.550, 0.990)),
-  TireHotspot('Sol Arka İç', Rect.fromLTRB(0.590, 0.550, 0.663, 0.930)),
-  TireHotspot('Sol Arka Dış', Rect.fromLTRB(0.660, 0.550, 0.765, 0.930)),
+  TireHotspot.pair(
+    'Sol Arka İç',
+    'Sol Arka Dış',
+    Rect.fromLTRB(0.590, 0.550, 0.765, 0.930),
+  ),
 ];
 
 /// Euclid sağ (yansımalı) görünümünde görünen tekerlekler.
 const List<TireHotspot> _euclidRightHotspots = <TireHotspot>[
   TireHotspot('Sağ Ön', Rect.fromLTRB(0.365, 0.530, 0.590, 0.950)),
-  TireHotspot('Sağ Arka İç', Rect.fromLTRB(0.265, 0.555, 0.355, 0.930)),
-  TireHotspot('Sağ Arka Dış', Rect.fromLTRB(0.130, 0.555, 0.270, 0.930)),
+  TireHotspot.pair(
+    'Sağ Arka İç',
+    'Sağ Arka Dış',
+    Rect.fromLTRB(0.130, 0.555, 0.355, 0.930),
+  ),
 ];
 
-/// Liugong sol görünümünde görünen tekerlekler (ön aks + ikili arka akslar).
-/// İkili akslarda dıştaki tekerlek tam görünür, içteki onun arkasında kalır;
-/// iç bölge görünen dar şeride yerleştirilmiştir.
+/// Liugong sol görünümünde görünen tekerlekler (ön aks + ikili orta ve arka
+/// akslar). İkili akslarda dıştaki tekerlek tam görünür, içteki onun arkasında
+/// kalır; ikisi tek bölgede birleştirilip seçim menüsüyle ayrıştırılır.
 const List<TireHotspot> _liugongLeftHotspots = <TireHotspot>[
   TireHotspot('Sol Ön', Rect.fromLTRB(0.480, 0.600, 0.640, 0.985)),
-  TireHotspot('Sol Orta İç', Rect.fromLTRB(0.686, 0.640, 0.728, 0.935)),
-  TireHotspot('Sol Orta Dış', Rect.fromLTRB(0.728, 0.640, 0.786, 0.935)),
-  TireHotspot('Sol Arka İç', Rect.fromLTRB(0.786, 0.650, 0.820, 0.925)),
-  TireHotspot('Sol Arka Dış', Rect.fromLTRB(0.820, 0.650, 0.858, 0.925)),
+  TireHotspot.pair(
+    'Sol Orta İç',
+    'Sol Orta Dış',
+    Rect.fromLTRB(0.686, 0.640, 0.786, 0.935),
+  ),
+  TireHotspot.pair(
+    'Sol Arka İç',
+    'Sol Arka Dış',
+    Rect.fromLTRB(0.786, 0.650, 0.858, 0.925),
+  ),
 ];
 
 /// Liugong sağ (yansımalı) görünümünde görünen tekerlekler.
 const List<TireHotspot> _liugongRightHotspots = <TireHotspot>[
   TireHotspot('Sağ Ön', Rect.fromLTRB(0.355, 0.615, 0.510, 0.985)),
-  TireHotspot('Sağ Orta İç', Rect.fromLTRB(0.222, 0.660, 0.268, 0.925)),
-  TireHotspot('Sağ Orta Dış', Rect.fromLTRB(0.165, 0.660, 0.222, 0.925)),
-  TireHotspot('Sağ Arka İç', Rect.fromLTRB(0.128, 0.665, 0.165, 0.925)),
-  TireHotspot('Sağ Arka Dış', Rect.fromLTRB(0.085, 0.665, 0.128, 0.925)),
+  TireHotspot.pair(
+    'Sağ Orta İç',
+    'Sağ Orta Dış',
+    Rect.fromLTRB(0.165, 0.660, 0.268, 0.925),
+  ),
+  TireHotspot.pair(
+    'Sağ Arka İç',
+    'Sağ Arka Dış',
+    Rect.fromLTRB(0.085, 0.665, 0.165, 0.925),
+  ),
+];
+
+/// Liugong loderlerin sol görünümünde görünen tekerlekler. Loderde her köşede
+/// tek teker vardır; ikili bölgeye (iç/dış seçimine) gerek yoktur.
+/// Kepçe solda kaldığı için öndeki tekerlek görselin ortasına yakındır.
+const List<TireHotspot> _loaderLeftHotspots = <TireHotspot>[
+  TireHotspot('Sol Ön', Rect.fromLTRB(0.651, 0.470, 0.813, 0.880)),
+  TireHotspot('Sol Arka', Rect.fromLTRB(0.871, 0.504, 0.986, 0.835)),
+];
+
+/// Liugong loderlerin sağ (yansımalı) görünümündeki tekerlekler.
+const List<TireHotspot> _loaderRightHotspots = <TireHotspot>[
+  TireHotspot('Sağ Ön', Rect.fromLTRB(0.187, 0.470, 0.349, 0.880)),
+  TireHotspot('Sağ Arka', Rect.fromLTRB(0.014, 0.504, 0.129, 0.835)),
 ];
 
 /// Bir aracın görseli ve görsel üzerindeki tekerlek bölgeleri.
@@ -163,13 +247,22 @@ VehicleImageSpec vehicleImageSpec(
     );
   }
 
-  final String? liugongAsset = _liugongSideAsset(code, side);
+  final String? liugongAsset = _liugongTruckSideAsset(code, side);
   if (liugongAsset != null) {
     // Liugong görselleri tuvale ortalanmış hazırlandığı için öteleme gerekmez.
     return VehicleImageSpec(
       asset: liugongAsset,
       aspectRatio: right ? _rightViewAspectRatio : _leftViewAspectRatio,
       hotspots: right ? _liugongRightHotspots : _liugongLeftHotspots,
+    );
+  }
+
+  final String? loaderAsset = _liugongLoaderSideAsset(code, side);
+  if (loaderAsset != null) {
+    return VehicleImageSpec(
+      asset: loaderAsset,
+      aspectRatio: _loaderAspectRatio,
+      hotspots: right ? _loaderRightHotspots : _loaderLeftHotspots,
     );
   }
 
@@ -262,9 +355,9 @@ class VehiclePhoto extends StatelessWidget {
                     width: hotspot.rect.width * w,
                     height: hotspot.rect.height * h,
                     child: _TireHotspotButton(
-                      position: hotspot.position,
+                      hotspot: hotspot,
                       color: color,
-                      onTap: () => onTireTap!(hotspot.position),
+                      onSelected: onTireTap!,
                     ),
                   ),
               ],
@@ -319,40 +412,162 @@ class VehiclePhoto extends StatelessWidget {
   }
 }
 
+const Duration _tooltipDelay = Duration(milliseconds: 400);
+
 /// Görsel üzerindeki şeffaf tekerlek butonu.
-/// Dolgusu yoktur; yalnızca ince bir çerçeveyle tıklanabilir olduğu belli edilir.
+///
+/// Tek tekerlekli bölgede dokunuş doğrudan o tekerleği açar. İkili bölgede
+/// (yan yana iki tekerlek) önce "İç" / "Dış" menüsü açılır; iki küçük buton
+/// yerine tek büyük bölge kullanıldığı için yanlış tekerleğe basılamaz.
 class _TireHotspotButton extends StatelessWidget {
   const _TireHotspotButton({
-    required this.position,
+    required this.hotspot,
     required this.color,
-    required this.onTap,
+    required this.onSelected,
   });
 
-  final String position;
+  final TireHotspot hotspot;
+  final Color color;
+  final void Function(String position) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hotspot.isPair) {
+      return Tooltip(
+        message: hotspot.position,
+        waitDuration: _tooltipDelay,
+        child: _HotspotOutline(
+          color: color,
+          onTap: () => onSelected(hotspot.position),
+        ),
+      );
+    }
+
+    return Tooltip(
+      message: '${hotspot.groupLabel} — iç / dış seçin',
+      waitDuration: _tooltipDelay,
+      child: MenuAnchor(
+        alignmentOffset: const Offset(0, 6),
+        menuChildren: <Widget>[
+          for (final String position in hotspot.positions)
+            _TireChoiceItem(
+              position: position,
+              color: color,
+              onPressed: () => onSelected(position),
+            ),
+        ],
+        builder: (
+          BuildContext context,
+          MenuController controller,
+          Widget? child,
+        ) =>
+            _HotspotOutline(
+          color: color,
+          hasChoices: true,
+          onTap: () =>
+              controller.isOpen ? controller.close() : controller.open(),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tekerlek bölgesinin çerçevesi. Dolgusu yoktur; yalnızca ince bir çerçeveyle
+/// tıklanabilir olduğu belli edilir. [hasChoices] ise altına, menü açılacağını
+/// belirten küçük bir ok rozeti eklenir.
+class _HotspotOutline extends StatelessWidget {
+  const _HotspotOutline({
+    required this.color,
+    required this.onTap,
+    this.hasChoices = false,
+  });
+
   final Color color;
   final VoidCallback onTap;
+  final bool hasChoices;
 
   @override
   Widget build(BuildContext context) {
     final BorderRadius radius = BorderRadius.circular(999);
 
-    return Tooltip(
-      message: position,
-      waitDuration: const Duration(milliseconds: 400),
-      child: Material(
-        color: Colors.transparent,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: radius,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: radius,
-          hoverColor: color.withValues(alpha: 0.22),
-          splashColor: color.withValues(alpha: 0.28),
-          highlightColor: color.withValues(alpha: 0.14),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              border: Border.all(color: color.withValues(alpha: 0.55), width: 2),
+        hoverColor: color.withValues(alpha: 0.22),
+        splashColor: color.withValues(alpha: 0.28),
+        highlightColor: color.withValues(alpha: 0.14),
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  border:
+                      Border.all(color: color.withValues(alpha: 0.55), width: 2),
+                ),
+              ),
             ),
+            if (hasChoices)
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 3),
+                  width: 26,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: color.withValues(alpha: 0.55)),
+                  ),
+                  child: Icon(Icons.expand_more, size: 13, color: color),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// İkili tekerlek bölgesine dokunulunca açılan menüdeki seçenek:
+/// büyük "İç" / "Dış" etiketi ve altında tam konum adı.
+class _TireChoiceItem extends StatelessWidget {
+  const _TireChoiceItem({
+    required this.position,
+    required this.color,
+    required this.onPressed,
+  });
+
+  final String position;
+  final Color color;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuItemButton(
+      onPressed: onPressed,
+      leadingIcon: Icon(Icons.trip_origin, size: 20, color: color),
+      child: Padding(
+        // Tablette parmakla rahat seçilebilsin diye satır yüksek tutulur.
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SizedBox(
+          width: 150,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                TireHotspot.choiceLabelOf(position),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                position,
+                style: TextStyle(fontSize: 12, color: context.mutedColor),
+              ),
+            ],
           ),
         ),
       ),
@@ -360,6 +575,7 @@ class _TireHotspotButton extends StatelessWidget {
   }
 }
 
+/// Görsel bulunamadığında gösterilen vektörel kaya kamyonu çizimi.
 class _MiningTruckArt extends StatelessWidget {
   const _MiningTruckArt();
 

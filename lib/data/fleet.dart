@@ -11,7 +11,7 @@ class Fleet {
 
   // -------------------------------------------------------- lastik konumları
 
-  /// 4 lastikli araçlar (loder/yükleyici): 1 ön aks + 1 arka aks.
+  /// 4 lastikli araçlar (loder): 1 ön aks + 1 arka aks, her köşede tek teker.
   static const List<String> tires4 = <String>[
     'Sol Ön',
     'Sağ Ön',
@@ -75,6 +75,32 @@ class Fleet {
     OilArea(id: 'MN-08', name: 'Muhtelif', category: OilCategory.manual),
   ];
 
+  /// Sahada kullanılabilecek yağ / gres ürünleri. Takviye penceresinde
+  /// "Yağ Seçin" listesini doldurur: kullanıcı önce takviye türünü, sonra
+  /// hangi ürünü kullandığını seçer.
+  static const List<String> oilProducts = <String>[
+    'M.YAĞ-PO MAXIGEAR EP 80W-90 185kg VARİL',
+    'M.YAĞ-PO SUPER GRES EP-2 180kg VARİL',
+    'M.YAĞ-PO MAXIGEAR EP-X 85W-140 185KG',
+    'M.YAĞ-PO HYDRO-TECH HVI 46(1varil:180kg)',
+    'M.YAĞ-MAXIM.TURBO DİZ.EXTRA 15W/40 DÖKME',
+    'M.YAĞ-MAXIM.TURBO DİZ.EXTRA 15W/40 FIÇI 180Kg',
+    'M.YAĞ-ANTİFRİZ ÖZEL VARİL KOD:13202-10YG 200Kg',
+    'M.YAĞ-PO TMS OIL 973 PETROL OFİSİ 180',
+    'M.YAĞ-TMS OIL 975 180',
+    'M.YAĞ-HİDROLIK DOT4 (1paket:20x0,5lt)',
+    'M.YAĞ-MOBİL ALMO527 PAIL 17.80KG(149872)',
+    'M.YAĞ-PO ATF II (180kg) PETROL OFİSİ',
+    'M.YAĞ-PO HYDRO-TECH HVI TX 32 175',
+    'M.YAĞ-PO MOLIBDENLI GRES 2 (1tnk:15kg)',
+    'M.YAĞ-CAM SUYU KATKISI KIŞLIK/Mono etilen gliko 30Kg',
+    'M.YAĞ-NEW HOLLA.Hİ SPEC 10W30 ŞANZIMAN',
+    'M.YAĞ-PO FULLGEAR 85W-90  LS 185 Kg',
+    'M.YAĞ-KP 3 E-10 KAUÇUKLU GRES 3 DIN51825 14Kg',
+    'ADBLUE KATKI MADDESİ (10 L HUNİLİ)',
+    'DYNATRANS MPV    185K   TOT   TR',
+  ];
+
   /// Tüm araçlarda ortak alanlar: önce yağ takviyeleri, sonra manuel yağlamalar.
   static const List<OilArea> standardOilAreas = <OilArea>[
     ...oilRefillAreas,
@@ -112,7 +138,8 @@ class Fleet {
             type: 'MINING_TRUCK',
             positions: tires10,
           ),
-        // Liugong loder tipi — 4 lastik
+
+        // Liugong loderler — 4 lastik
         for (int i = 33; i <= 39; i++)
           _vehicle(
             code: 'Liugong-$i',

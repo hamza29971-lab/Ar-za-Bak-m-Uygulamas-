@@ -113,6 +113,18 @@ class AppState extends ChangeNotifier {
       ..lastChangeDate = now
       ..lastCheckDate = now;
     _recordTireChange(vehicle, record, now);
+    addPending(PendingOperation(
+      kind: PendingKind.tire,
+      vehicleCode: vehicle.code,
+      label: '${record.tireId} değiştirildi (${record.serialNo})',
+      date: now,
+      payload: <String, Object?>{
+        'op': 'lastik_degisim',
+        'tireId': record.tireId,
+        'position': record.position,
+        'serialNo': record.serialNo,
+      },
+    ));
     addNotification(
       NotificationItem(
         title: 'Lastik değişimi kaydedildi',
@@ -135,6 +147,19 @@ class AppState extends ChangeNotifier {
     record.lastCheckDate = now;
     final String detail = items.isEmpty ? '' : ' • ${items.join(', ')}';
     final String noteText = note.trim().isEmpty ? '' : ' • Not: ${note.trim()}';
+    addPending(PendingOperation(
+      kind: PendingKind.tire,
+      vehicleCode: vehicle.code,
+      label: '${record.tireId} kontrol edildi',
+      date: now,
+      payload: <String, Object?>{
+        'op': 'lastik_kontrol',
+        'tireId': record.tireId,
+        'position': record.position,
+        'items': items,
+        'note': note.trim(),
+      },
+    ));
     addNotification(
       NotificationItem(
         title: 'Lastik kontrolü tamamlandı',
@@ -146,7 +171,14 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  void refillOil(Vehicle vehicle, OilRecord record, double amount) {
+  /// [product] kullanılan yağ / gres ürünüdür;
+  /// takviye penceresinde seçilir, rapora ve MQTT yüküne yazılır.
+  void refillOil(
+    Vehicle vehicle,
+    OilRecord record,
+    double amount, {
+    String product = '',
+  }) {
     final DateTime now = DateTime.now();
     record
       ..amount = amount
@@ -161,11 +193,26 @@ class AppState extends ChangeNotifier {
         amount: amount,
       ),
     );
+    addPending(PendingOperation(
+      kind: PendingKind.oil,
+      vehicleCode: vehicle.code,
+      label: '${record.label} • ${amount.toStringAsFixed(1)} L'
+          '${product.isEmpty ? '' : ' • $product'}',
+      date: now,
+      payload: <String, Object?>{
+        'op': 'yag_takviye',
+        'areaId': record.areaId,
+        'oilType': record.oilType,
+        'amount': amount,
+        'product': product,
+      },
+    ));
     addNotification(
       NotificationItem(
         title: 'Yağ takviyesi kaydedildi',
-        message:
-            '${vehicle.code} • ${record.label} • ${amount.toStringAsFixed(1)} L',
+        message: '${vehicle.code} • ${record.label}'
+            ' • ${amount.toStringAsFixed(1)} L'
+            '${product.isEmpty ? '' : ' • $product'}',
         date: now,
         kind: NotificationKind.oil,
       ),
@@ -177,6 +224,17 @@ class AppState extends ChangeNotifier {
     // günceller (Servis Raporu bu tarihi kullanır).
     final DateTime now = DateTime.now();
     record.lastCheckDate = now;
+    addPending(PendingOperation(
+      kind: PendingKind.oil,
+      vehicleCode: vehicle.code,
+      label: '${record.label} kontrol edildi',
+      date: now,
+      payload: <String, Object?>{
+        'op': 'yag_kontrol',
+        'areaId': record.areaId,
+        'oilType': record.oilType,
+      },
+    ));
     addNotification(
       NotificationItem(
         title: 'Kontroller tamamlandı',
@@ -239,6 +297,27 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  // ------------------------------------------------- gönderilmeyi bekleyenler
+  final List<PendingOperation> _pending = <PendingOperation>[];
+
+  /// Belirtilen ekranda yapılıp henüz gönderilmemiş işlemler (eskiden yeniye).
+  List<PendingOperation> pendingOf(PendingKind kind) => List<PendingOperation>
+      .unmodifiable(_pending.where((PendingOperation p) => p.kind == kind));
+
+  int pendingCount(PendingKind kind) =>
+      _pending.where((PendingOperation p) => p.kind == kind).length;
+
+  void addPending(PendingOperation operation) {
+    _pending.add(operation);
+    notifyListeners();
+  }
+
+  /// Gönderim başarılı olunca kuyruk boşaltılır.
+  void clearPending(PendingKind kind) {
+    _pending.removeWhere((PendingOperation p) => p.kind == kind);
+    notifyListeners();
+  }
+
   // ------------------------------------------------------------ bildirimler
   late List<NotificationItem> _notifications;
   List<NotificationItem> get notifications =>
@@ -261,6 +340,46 @@ class AppState extends ChangeNotifier {
     _notifications = <NotificationItem>[];
     notifyListeners();
   }
+}
+
+/// Bekleyen işlemlerin hangi ekrana ait olduğu.
+enum PendingKind {
+  tire('lastik', 'nimo/bakim/lastik'),
+  oil('yag', 'nimo/bakim/yag');
+
+  const PendingKind(this.label, this.topic);
+
+  /// Yükteki grup adı.
+  final String label;
+
+  /// İşlemlerin gönderileceği MQTT konusu.
+  final String topic;
+}
+
+/// Yapılmış ama henüz gönderilmemiş bir işlem.
+///
+/// Lastik / Yağ ekranlarındaki "Gönder" butonu bu kuyruğu boşaltır; böylece
+/// saha çalışanı birkaç işlemi arka arkaya yapıp tek seferde gönderebilir.
+@immutable
+class PendingOperation {
+  const PendingOperation({
+    required this.kind,
+    required this.vehicleCode,
+    required this.label,
+    required this.date,
+    required this.payload,
+  });
+
+  final PendingKind kind;
+  final String vehicleCode;
+
+  /// Kullanıcıya gösterilen kısa açıklama (ör. "Euclid-1-L01 değiştirildi").
+  final String label;
+
+  final DateTime date;
+
+  /// MQTT yüküne eklenecek alanlar.
+  final Map<String, Object?> payload;
 }
 
 /// [AppState]'i widget ağacına dağıtan kapsayıcı.

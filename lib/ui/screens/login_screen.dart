@@ -56,66 +56,29 @@ class _LoginScreenState extends State<LoginScreen>
   // 0 = Telefon, 1 = E-posta
   int _selectedTab = 0;
 
-  // Girilen değer
-  String _inputValue = '';
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   bool get _canLogin {
+    final passwordFilled = _passwordController.text.isNotEmpty;
     if (_selectedTab == 0) {
       // Telefon: en az 10 rakam
-      return _inputValue.replaceAll(RegExp(r'\D'), '').length >= 10;
+      return _phoneController.text.replaceAll(RegExp(r'\D'), '').length >= 10 && passwordFilled;
     } else {
       // E-posta: @ içermeli
       return _emailController.text.contains('@') &&
-          _emailController.text.contains('.');
+          _emailController.text.contains('.') && passwordFilled;
     }
-  }
-
-  // Numpad tuşuna basıldı
-  void _onNumKey(String key) {
-    setState(() {
-      final digits = _inputValue.replaceAll(RegExp(r'\D'), '');
-      if (digits.length < 11) {
-        _inputValue = _formatPhone(digits + key);
-      }
-    });
-  }
-
-  // Sil (backspace)
-  void _onDelete() {
-    setState(() {
-      final digits = _inputValue.replaceAll(RegExp(r'\D'), '');
-      if (digits.isNotEmpty) {
-        _inputValue = _formatPhone(digits.substring(0, digits.length - 1));
-      }
-    });
-  }
-
-  // Temizle
-  void _onClear() {
-    setState(() => _inputValue = '');
-  }
-
-  // Telefon numarası formatlama: (05XX) XXX XX XX
-  String _formatPhone(String digits) {
-    if (digits.isEmpty) return '';
-    if (digits.length <= 4) {
-      return digits.length == 4 ? '($digits) ' : '($digits';
-    }
-    if (digits.length <= 7) return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
-    if (digits.length <= 9) {
-      return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
-    }
-    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
   }
 
   Future<void> _login() async {
     if (!_canLogin) return;
 
     final String loginId = _selectedTab == 0 
-        ? _inputValue.replaceAll(RegExp(r'\D'), '') 
+        ? _phoneController.text.replaceAll(RegExp(r'\D'), '') 
         : _emailController.text.trim();
-    final String password = ""; // Şifresiz giriş (boş gönderiliyor)
+    final String password = _passwordController.text.trim();
 
     if (AuthApiService.useRealApi) {
       // Gerçek API ile Login
@@ -223,7 +186,9 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _animController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -281,8 +246,9 @@ class _LoginScreenState extends State<LoginScreen>
                           onTabChanged: (i) {
                             setState(() {
                               _selectedTab = i;
-                              _inputValue = '';
+                              _phoneController.clear();
                               _emailController.clear();
+                              _passwordController.clear();
                             });
                           },
                         ),
@@ -290,17 +256,24 @@ class _LoginScreenState extends State<LoginScreen>
 
                         // İçerik
                         if (_selectedTab == 0) ...[
-                          _PhoneInput(value: _inputValue),
+                          _PhoneInput(
+                            controller: _phoneController,
+                            onChanged: (val) => setState(() {}),
+                          ),
                           const SizedBox(height: 16),
-                          _NumPad(
-                            onKey: _onNumKey,
-                            onDelete: _onDelete,
-                            onClear: _onClear,
+                          _PasswordInput(
+                            controller: _passwordController,
+                            onChanged: (val) => setState(() {}),
                           ),
                         ] else ...[
                           _EmailInput(
                             controller: _emailController,
                             onChanged: (value) => setState(() {}),
+                          ),
+                          const SizedBox(height: 16),
+                          _PasswordInput(
+                            controller: _passwordController,
+                            onChanged: (val) => setState(() {}),
                           ),
                         ],
 
@@ -474,11 +447,15 @@ class _TabItem extends StatelessWidget {
 // TELEFON GİRİŞ ALANI
 // ─────────────────────────────────────────────
 class _PhoneInput extends StatelessWidget {
-  final String value;
-  const _PhoneInput({required this.value});
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _PhoneInput({required this.controller, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
+    final bool hasValue = controller.text.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -491,29 +468,45 @@ class _PhoneInput extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(
-              color: value.isNotEmpty
-                  ? const Color(0xFF2E7D32)
-                  : const Color(0xFFDDE1EA),
-              width: value.isNotEmpty ? 2 : 1.5,
+        TextField(
+          controller: controller,
+          onChanged: onChanged,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [PhoneInputFormatter()],
+          decoration: InputDecoration(
+            hintText: '(05XX) XXX XX XX',
+            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
+            prefixIcon: const Icon(Icons.phone_outlined,
+                color: Color(0xFF7B8094), size: 20),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(
+                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                width: hasValue ? 2 : 1.5,
+              ),
             ),
-            borderRadius: BorderRadius.circular(10),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(
+                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                width: hasValue ? 2 : 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+            ),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-          child: Text(
-            value.isEmpty ? '(05XX) XXX XX XX' : value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: value.isEmpty
-                  ? const Color(0xFFBBC0CC)
-                  : const Color(0xFF1A1D2E),
-              letterSpacing: 1.2,
-            ),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1A1D2E),
+            letterSpacing: 1.2,
           ),
         ),
       ],
@@ -583,153 +576,7 @@ class _EmailInput extends StatelessWidget {
 
 
 
-// ─────────────────────────────────────────────
-// ÖZEL NUMPAD
-// ─────────────────────────────────────────────
-class _NumPad extends StatelessWidget {
-  final ValueChanged<String> onKey;
-  final VoidCallback onDelete;
-  final VoidCallback onClear;
 
-  const _NumPad({
-    required this.onKey,
-    required this.onDelete,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5)),
-      ),
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        children: [
-          _NumRow(keys: ['1', '2', '3'], onKey: onKey),
-          const SizedBox(height: 8),
-          _NumRow(keys: ['4', '5', '6'], onKey: onKey),
-          const SizedBox(height: 8),
-          _NumRow(keys: ['7', '8', '9'], onKey: onKey),
-          const SizedBox(height: 8),
-          // Son satır: Temizle | 0 | Sil
-          Row(
-            children: [
-              Expanded(
-                child: _SpecialKey(
-                  label: 'Temizle',
-                  onTap: onClear,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _NumKey(label: '0', onKey: onKey),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _SpecialKey(
-                  label: '⌫ Sil',
-                  onTap: onDelete,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NumRow extends StatelessWidget {
-  final List<String> keys;
-  final ValueChanged<String> onKey;
-
-  const _NumRow({required this.keys, required this.onKey});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: keys
-          .expand((k) => [
-                Expanded(child: _NumKey(label: k, onKey: onKey)),
-                if (k != keys.last) const SizedBox(width: 8),
-              ])
-          .toList(),
-    );
-  }
-}
-
-class _NumKey extends StatelessWidget {
-  final String label;
-  final ValueChanged<String> onKey;
-
-  const _NumKey({required this.label, required this.onKey});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: () => onKey(label),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDDE1EA)),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1D2E),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SpecialKey extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _SpecialKey({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFE8F5E9),
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          height: 52,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFC8E6C9)),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF2E7D32),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────
 // GİRİŞ BUTONU
@@ -771,5 +618,125 @@ class _LoginButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────
+// ŞİFRE GİRİŞ ALANI
+// ─────────────────────────────────────────────
+class _PasswordInput extends StatefulWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _PasswordInput({required this.controller, required this.onChanged});
+
+  @override
+  State<_PasswordInput> createState() => _PasswordInputState();
+}
+
+class _PasswordInputState extends State<_PasswordInput> {
+  bool _obscureText = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool hasValue = widget.controller.text.isNotEmpty;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Şifre',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF7B8094),
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: widget.controller,
+          onChanged: widget.onChanged,
+          obscureText: _obscureText,
+          decoration: InputDecoration(
+            hintText: '••••••••',
+            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
+            prefixIcon: const Icon(Icons.lock_outline,
+                color: Color(0xFF7B8094), size: 20),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscureText ? Icons.visibility_off : Icons.visibility,
+                color: const Color(0xFF7B8094),
+                size: 20,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscureText = !_obscureText;
+                });
+              },
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(
+                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                width: hasValue ? 2 : 1.5,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(
+                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                width: hasValue ? 2 : 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+            ),
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF1A1D2E),
+            letterSpacing: _obscureText ? 2.0 : 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length > 11) {
+      return oldValue; // 11 haneden fazla girmesin
+    }
+    
+    final String formatted = _formatPhone(digits);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  String _formatPhone(String digits) {
+    if (digits.isEmpty) return '';
+    if (digits.length <= 4) {
+      return digits.length == 4 ? '($digits) ' : '($digits';
+    }
+    if (digits.length <= 7) return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
+    if (digits.length <= 9) {
+      return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
+    }
+    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
   }
 }

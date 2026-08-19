@@ -185,11 +185,11 @@ class UserProfile {
   /// NIMO API'sinin döndüğü kullanıcı gövdesi.
   /// Alan adları backend ile netleştikçe burada güncellenir.
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        fullName: json['fullName'] as String? ?? '',
+        fullName: json['fullName'] as String? ?? json['name'] as String? ?? json['firstName'] as String? ?? '',
         email: json['email'] as String? ?? '',
-        phone: json['phone'] as String? ?? '',
-        role: json['role'] as String? ?? '',
-        registryNo: json['registryNo'] as String? ?? '',
+        phone: json['phone'] as String? ?? json['phoneNumber'] as String? ?? '',
+        role: json['role'] as String? ?? json['title'] as String? ?? '',
+        registryNo: json['registryNo'] as String? ?? json['id']?.toString() ?? '',
         machineCode: json['machineCode'] as String? ?? '',
         machineType: json['machineType'] as String? ?? '',
       );

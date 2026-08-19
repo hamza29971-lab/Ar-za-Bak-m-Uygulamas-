@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../data/fleet.dart';
 import '../models/models.dart';
+import '../services/publish_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/formats.dart';
 import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
 import '../widgets/nimo_table.dart';
-
+import '../widgets/vehicle_photo.dart';
 import '../widgets/vehicle_selector.dart';
 
 /// "Yağ Takviyesi" ekranı.
@@ -25,6 +27,9 @@ class OilScreen extends StatefulWidget {
 class _OilScreenState extends State<OilScreen> {
   OilCategory _category = OilCategory.refill;
 
+  /// "Gönder" sürerken buton kilitlenir.
+  bool _sending = false;
+
   Color get accent => OilScreen.accent;
 
   /// Seçili gruba göre tarih sütununun başlığı.
@@ -35,6 +40,7 @@ class _OilScreenState extends State<OilScreen> {
   Widget build(BuildContext context) {
     final AppState state = AppScope.of(context);
     final Vehicle? vehicle = state.selectedVehicle;
+    final int pendingCount = state.pendingCount(PendingKind.oil);
     final List<OilRecord> records = vehicle == null
         ? <OilRecord>[]
         : state
@@ -49,7 +55,7 @@ class _OilScreenState extends State<OilScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
-              flex: 50,
+              flex: 55,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -66,28 +72,52 @@ class _OilScreenState extends State<OilScreen> {
                         onSelected: state.selectVehicle,
                       ),
                       const SizedBox(width: 16),
-                      if (vehicle != null)
-                        _OilSummary(records: records, category: _category),
+                      if (vehicle != null) _OilSummary(records: records),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Row(
+                  // Dar ekranlarda buton grubu sekmelerin altına iner.
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: <Widget>[
-                      // Dar ekranlarda sekmeler yatay kayar, buton sağda kalır.
-                      Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: _buildCategoryTabs(context),
-                        ),
+                      // Sekmeler sığmazsa kendi içinde yatay kayar.
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: _buildCategoryTabs(context),
                       ),
-                      const SizedBox(width: 12),
-                      // Satır seçmeden, tür + miktar seçilerek takviye yapılır.
-                      _NewRefillButton(
-                        label: 'Takviye Yap',
+                      // Takviye yalnızca buradan yapılır; tabloda satır başına
+                      // "Takviye Yap" butonu yoktur.
+                      PrimaryActionButton(
+                        label: _category == OilCategory.refill
+                            ? 'Takviye Yap'
+                            : 'Yağlama Yap',
                         accent: accent,
                         onPressed: vehicle == null || records.isEmpty
                             ? null
-                            : () => _newRefillDialog(context, state, vehicle, records),
+                            : () =>
+                                _newRefillDialog(context, state, vehicle, records),
+                      ),
+                      PrimaryActionButton(
+                        label: 'Tümünü Kontrol Et',
+                        icon: Icons.fact_check_outlined,
+                        accent: AppColors.form,
+                        filled: false,
+                        compact: true,
+                        onPressed: vehicle == null || records.isEmpty
+                            ? null
+                            : () => _checkAll(context, state, vehicle, records),
+                      ),
+                      PrimaryActionButton(
+                        label: 'Gönder',
+                        icon: Icons.send_rounded,
+                        accent: AppColors.form,
+                        badge: pendingCount,
+                        compact: true,
+                        onPressed: pendingCount == 0 || _sending
+                            ? null
+                            : () => _sendPending(context, state, vehicle),
                       ),
                     ],
                   ),
@@ -98,10 +128,8 @@ class _OilScreenState extends State<OilScreen> {
             ),
             const SizedBox(width: 20),
             Expanded(
-              flex: 50,
-              child: SizedBox.expand(
-                child: _VehicleSidePhoto(vehicle: vehicle),
-              ),
+              flex: 45,
+              child: SizedBox.expand(child: VehiclePhoto(vehicle: vehicle)),
             ),
           ],
         ),
@@ -136,12 +164,13 @@ class _OilScreenState extends State<OilScreen> {
   ) {
     return NimoTable(
       accent: accent,
-      // "İşlem" başlığı butonların üstüne gelecek şekilde sağa kaydırılır.
+      // "İşlem" sütununda tek buton kaldığı için dar; başlık butonun soluyla
+      // aynı hizada durur.
       columns: <NimoColumn>[
-        NimoColumn(_category.columnLabel, flex: 24),
-        NimoColumn(_dateColumnLabel, flex: 22),
-        const NimoColumn('Son Kontrol Tarihi', flex: 22),
-        const NimoColumn('İşlem', flex: 32, headerInset: 92),
+        NimoColumn(_category.columnLabel, flex: 30),
+        NimoColumn(_dateColumnLabel, flex: 25),
+        const NimoColumn('Son Kontrol Tarihi', flex: 25),
+        const NimoColumn('İşlem', flex: 20),
       ],
       rowCount: records.length,
       empty: EmptyState(
@@ -164,52 +193,25 @@ class _OilScreenState extends State<OilScreen> {
             formatDate(r.lastCheckDate),
             subtitle: '${daysSince(r.lastCheckDate)} gün önce',
           ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              RowActionButton(
-                label: 'Takviye Yap',
-                icon: Icons.local_gas_station_outlined,
-                color: accent,
-                onPressed: () => _refillDialog(context, state, vehicle!, r),
-              ),
-              RowActionButton(
-                label: 'Kontrol Et',
-                icon: Icons.fact_check_outlined,
-                color: AppColors.form,
-                filled: false,
-                onPressed: () {
-                  state.checkOil(vehicle!, r);
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(
-                      const SnackBar(content: Text('Kontroller Tamamlandı')),
-                    );
-                },
-              ),
-            ],
+          // Takviye yalnızca tablonun üstündeki butondan yapılır; satırda
+          // sadece kontrol kalır.
+          RowActionButton(
+            label: 'Kontrol Et',
+            icon: Icons.fact_check_outlined,
+            color: AppColors.form,
+            filled: false,
+            onPressed: () {
+              state.checkOil(vehicle!, r);
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(content: Text('Kontroller Tamamlandı')),
+                );
+            },
           ),
         ];
       },
     );
-  }
-
-  /// Satırdaki "Takviye Yap": miktarı sorar. Tür satıra sabit olduğu için seçilemez.
-  Future<void> _refillDialog(
-    BuildContext context,
-    AppState state,
-    Vehicle vehicle,
-    OilRecord record,
-  ) async {
-    final double? value = await showDialog<double>(
-      context: context,
-      builder: (BuildContext context) =>
-          _OilRefillDialog(vehicle: vehicle, record: record),
-    );
-
-    if (value == null || !context.mounted) return;
-    _commitRefill(context, state, vehicle, record, value);
   }
 
   /// Sekmelerin yanındaki "Takviye Yap": önce tür, sonra miktar seçilir.
@@ -230,7 +232,139 @@ class _OilScreenState extends State<OilScreen> {
     );
 
     if (request == null || !context.mounted) return;
-    _commitRefill(context, state, vehicle, request.record, request.amount);
+    _commitRefill(context, state, vehicle, request.record, request.amount,
+        request.product);
+  }
+
+  /// "Tümünü Kontrol Et": listelenen alanların tamamını kontrol edilmiş olarak
+  /// işaretler. Çok kaydı birden değiştirdiği için önce onay alınır.
+  Future<void> _checkAll(
+    BuildContext context,
+    AppState state,
+    Vehicle vehicle,
+    List<OilRecord> records,
+  ) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Tümünü Kontrol Et'),
+        content: Text(
+          '${vehicle.code} aracının listelenen ${records.length} alanı '
+          'kontrol edilmiş olarak işaretlenecek. Onaylıyor musunuz?',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.form),
+            icon: const Icon(Icons.fact_check_outlined, size: 18),
+            label: const Text('Kontrol Et'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    for (final OilRecord r in records) {
+      state.checkOil(vehicle, r);
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('${records.length} alan kontrol edildi.')),
+      );
+  }
+
+  /// "Gönder": bu ekranda yapılıp bekleyen işlemleri tek mesajda yollar.
+  Future<void> _sendPending(
+    BuildContext context,
+    AppState state,
+    Vehicle? vehicle,
+  ) async {
+    final List<PendingOperation> pending = state.pendingOf(PendingKind.oil);
+    if (pending.isEmpty) return;
+
+    setState(() => _sending = true);
+    final PublishResult result = await PublishService.instance.publishOperations(
+      topic: PendingKind.oil.topic,
+      group: PendingKind.oil.label,
+      operations: <Map<String, Object?>>[
+        for (final PendingOperation p in pending)
+          <String, Object?>{
+            ...p.payload,
+            'vehicle': p.vehicleCode,
+            'date': p.date.toIso8601String(),
+          },
+      ],
+      vehicleCode: vehicle?.code,
+      userRegistryNo: state.user?.registryNo,
+    );
+    if (!context.mounted) return;
+    setState(() => _sending = false);
+
+    if (!result.success) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('Gönderilemedi: ${result.error ?? 'bilinmeyen hata'}'),
+        ));
+      return;
+    }
+
+    final int count = pending.length;
+    state.clearPending(PendingKind.oil);
+    state.addNotification(
+      NotificationItem(
+        title: 'Yağ işlemleri gönderildi',
+        message: '$count işlem${vehicle != null ? ' • ${vehicle.code}' : ''}',
+        date: DateTime.now(),
+        kind: NotificationKind.oil,
+      ),
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
+        title: const Text('İşlemler gönderildi'),
+        content: SizedBox(
+          width: 460,
+          // Uzun listede pencere taşmasın diye içerik kaydırılır.
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('$count işlem gönderildi:',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                for (final PendingOperation p in pending)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Text('• ${p.vehicleCode} — ${p.label}',
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                const SizedBox(height: 12),
+                InfoLine(
+                  label: 'MQTT konusu',
+                  value: result.topic,
+                  labelWidth: 110,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Takviyeyi kaydeder ve kullanıcıya bilgi verir.
@@ -240,79 +374,27 @@ class _OilScreenState extends State<OilScreen> {
     Vehicle vehicle,
     OilRecord record,
     double amount,
+    String product,
   ) {
-    state.refillOil(vehicle, record, amount);
+    state.refillOil(vehicle, record, amount, product: product);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
-        content:
-            Text('${record.oilType} için ${amount.toStringAsFixed(1)} L kaydedildi.'),
+        content: Text('${record.oilType} için ${amount.toStringAsFixed(1)} L'
+            ' kaydedildi ($product).'),
       ));
-  }
-}
-
-/// Sekmelerin yanındaki ana "Takviye Yap" butonu.
-/// Tablodaki satır butonlarından ayrışsın diye biraz daha büyük, yuvarlak hatlı
-/// ve ikonu çerçeve içinde.
-class _NewRefillButton extends StatelessWidget {
-  const _NewRefillButton({
-    required this.label,
-    required this.accent,
-    required this.onPressed,
-  });
-
-  final String label;
-  final Color accent;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool enabled = onPressed != null;
-    final Color base = enabled ? accent : context.mutedColor.withValues(alpha: 0.35);
-
-    return Material(
-      color: base,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-              ),
-              const SizedBox(width: 9),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
 /// Tür seçilerek yapılan takviyenin sonucu.
 class _RefillRequest {
-  const _RefillRequest(this.record, this.amount);
+  const _RefillRequest(this.record, this.amount, this.product);
 
   final OilRecord record;
   final double amount;
+
+  /// Kullanılan yağ / gres ürünü (bkz. [Fleet.oilProducts]).
+  final String product;
 }
 
 /// Tür + miktar seçilen "Takviye Yap" penceresi.
@@ -335,9 +417,13 @@ class _OilTypePickerDialog extends StatefulWidget {
 }
 
 class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
-  late OilRecord _record = widget.records.first;
-  late final TextEditingController _amount =
-      TextEditingController(text: _record.amount.toStringAsFixed(1));
+  /// Tür seçilene kadar `null`; ürün listesi buna bağlı olarak açılır.
+  OilRecord? _record;
+  String? _product;
+  final TextEditingController _amount = TextEditingController();
+
+  /// Eksik alan uyarısı yalnızca kaydetmeye çalışıldıktan sonra gösterilir.
+  bool _showErrors = false;
 
   bool get _manual => widget.category == OilCategory.manual;
 
@@ -357,10 +443,15 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
   }
 
   void _save() {
+    final OilRecord? record = _record;
+    final String? product = _product;
     final double value =
-        double.tryParse(_amount.text.replaceAll(',', '.')) ?? _record.amount;
-    if (value <= 0) return;
-    Navigator.of(context).pop(_RefillRequest(_record, value));
+        double.tryParse(_amount.text.replaceAll(',', '.')) ?? 0;
+    if (record == null || product == null || value <= 0) {
+      setState(() => _showErrors = true);
+      return;
+    }
+    Navigator.of(context).pop(_RefillRequest(record, value, product));
   }
 
   @override
@@ -369,7 +460,9 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
       title: Text(_manual ? 'Manuel Yağlama' : 'Yağ Takviyesi'),
       content: SizedBox(
         width: 460,
-        child: Column(
+        // Alan sayısı arttı; küçük tablette pencere taşmasın diye kaydırılır.
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -378,14 +471,47 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
             const SizedBox(height: 18),
             Text(widget.category.columnLabel, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 6),
-            DropdownButtonFormField<OilRecord>(
-              initialValue: _record,
-              isExpanded: true,
-              items: <DropdownMenuItem<OilRecord>>[
+            // Liste alanın üstünü kapatmasın diye DropdownMenu kullanılır;
+            // menü her zaman alanın altına açılır.
+            DropdownMenu<OilRecord>(
+              initialSelection: _record,
+              requestFocusOnTap: false,
+              menuHeight: 320,
+              expandedInsets: EdgeInsets.zero,
+              hintText: _manual
+                  ? 'Manuel yağlama türünü seçin'
+                  : 'Yağ takviyesi türünü seçin',
+              errorText: _showErrors && _record == null
+                  ? 'Önce takviye türünü seçin.'
+                  : null,
+              dropdownMenuEntries: <DropdownMenuEntry<OilRecord>>[
                 for (final OilRecord r in widget.records)
-                  DropdownMenuItem<OilRecord>(value: r, child: Text(r.label)),
+                  DropdownMenuEntry<OilRecord>(value: r, label: r.label),
               ],
-              onChanged: _selectRecord,
+              onSelected: _selectRecord,
+            ),
+            const SizedBox(height: 16),
+            const Text('Yağ Seçin', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 6),
+            // Kullanılan ürün, ancak tür seçildikten sonra seçilebilir.
+            DropdownMenu<String>(
+              key: const ValueKey<String>('oil-product'),
+              enabled: _record != null,
+              initialSelection: _product,
+              requestFocusOnTap: false,
+              menuHeight: 320,
+              expandedInsets: EdgeInsets.zero,
+              hintText: _record == null
+                  ? 'Önce takviye türünü seçin'
+                  : 'Kullanılan yağı seçin',
+              errorText: _showErrors && _record != null && _product == null
+                  ? 'Kullanılan yağı seçin.'
+                  : null,
+              dropdownMenuEntries: <DropdownMenuEntry<String>>[
+                for (final String p in Fleet.oilProducts)
+                  DropdownMenuEntry<String>(value: p, label: p),
+              ],
+              onSelected: (String? p) => setState(() => _product = p),
             ),
             const SizedBox(height: 16),
             Text(_manual ? 'Kullanılan yağ miktarı (Litre)' : 'Takviye miktarı (Litre)',
@@ -393,12 +519,17 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
             const SizedBox(height: 6),
             TextField(
               controller: _amount,
-              autofocus: true,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: <TextInputFormatter>[
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
-              decoration: const InputDecoration(suffixText: 'L'),
+              decoration: InputDecoration(
+                suffixText: 'L',
+                errorText: _showErrors &&
+                        (double.tryParse(_amount.text.replaceAll(',', '.')) ?? 0) <= 0
+                    ? 'Miktar girin.'
+                    : null,
+              ),
               onSubmitted: (_) => _save(),
             ),
             const SizedBox(height: 16),
@@ -408,6 +539,7 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
               labelWidth: 120,
             ),
           ],
+          ),
         ),
       ),
       actions: <Widget>[
@@ -425,198 +557,26 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
   }
 }
 
-/// "Takviye Yap" penceresi: yalnızca miktar girilir, tür sabittir.
-/// Kaydedilirse girilen litre değeri ile kapanır.
-class _OilRefillDialog extends StatefulWidget {
-  const _OilRefillDialog({required this.vehicle, required this.record});
-
-  final Vehicle vehicle;
-  final OilRecord record;
-
-  @override
-  State<_OilRefillDialog> createState() => _OilRefillDialogState();
-}
-
-class _OilRefillDialogState extends State<_OilRefillDialog> {
-  late final TextEditingController _amount =
-      TextEditingController(text: widget.record.amount.toStringAsFixed(1));
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    final double value =
-        double.tryParse(_amount.text.replaceAll(',', '.')) ?? widget.record.amount;
-    Navigator.of(context).pop(value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final OilRecord record = widget.record;
-    final bool manual = record.category == OilCategory.manual;
-
-    return AlertDialog(
-      title: Text(manual ? 'Manuel Yağlama' : 'Yağ Takviyesi'),
-      content: SizedBox(
-        width: 460,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text('${widget.vehicle.code} • ${record.label}',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 18),
-            Text(record.category.columnLabel, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 6),
-            // Tür satıra sabittir; kullanıcı yalnızca bastığı satıra işlem yapar.
-            _ReadOnlyField(value: record.oilType),
-            const SizedBox(height: 16),
-            Text(manual ? 'Kullanılan yağ miktarı (Litre)' : 'Takviye miktarı (Litre)',
-                style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _amount,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-              ],
-              decoration: const InputDecoration(suffixText: 'L'),
-              onSubmitted: (_) => _save(),
-            ),
-            const SizedBox(height: 16),
-            InfoLine(
-              label: manual ? 'Yağlama tarihi' : 'Takviye tarihi',
-              value: formatDateTime(DateTime.now()),
-              labelWidth: 120,
-            ),
-          ],
-        ),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Vazgeç'),
-        ),
-        FilledButton(
-          onPressed: _save,
-          style: FilledButton.styleFrom(backgroundColor: OilScreen.accent),
-          child: Text(manual ? 'Yağlamayı Kaydet' : 'Takviyeyi Kaydet'),
-        ),
-      ],
-    );
-  }
-}
-
-/// Değiştirilemeyen (sabit) alan görünümü.
-class _ReadOnlyField extends StatelessWidget {
-  const _ReadOnlyField({required this.value});
-
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.lock_outline, size: 18, color: context.mutedColor),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _OilSummary extends StatelessWidget {
-  const _OilSummary({required this.records, required this.category});
+  const _OilSummary({required this.records});
 
   final List<OilRecord> records;
-  final OilCategory category;
 
   @override
   Widget build(BuildContext context) {
-    final String unit = category == OilCategory.refill ? 'alan' : 'nokta';
-
     return Expanded(
       child: Wrap(
         spacing: 10,
         runSpacing: 8,
         children: <Widget>[
+          // Hem yağ takviyeleri hem manuel yağlamalar "alan" olarak sayılır.
           InfoChip(
             icon: Icons.water_drop_outlined,
-            label: '${records.length} $unit',
+            label: '${records.length} alan',
             color: AppColors.oil,
           ),
         ],
       ),
-    );
-  }
-}
-
-class _VehicleSidePhoto extends StatelessWidget {
-  const _VehicleSidePhoto({required this.vehicle});
-
-  final Vehicle? vehicle;
-
-  String _imagePath() {
-    if (vehicle == null) return '';
-    final code = vehicle!.code.toLowerCase();
-    
-    if (code.startsWith('euclid')) {
-      return 'assets/images/euclid_truck.png';
-    }
-    if (code.startsWith('liugong')) {
-      // 33-39 loader
-      final num = int.tryParse(code.replaceFirst('liugong-', '')) ?? 0;
-      if (num >= 33 && num <= 39) return 'assets/images/loader.png';
-      return 'assets/images/green_truck.png';
-    }
-    if (code.startsWith('xcmg')) {
-      return 'assets/images/xcmg_truck.png';
-    }
-    // Fallback
-    if (vehicle!.tireCount <= 4) return 'assets/images/loader.png';
-    return 'assets/images/euclid_truck.png';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (vehicle == null) {
-      return const Center(
-        child: Text(
-          'Fotoğrafı görmek için bir araç seçin',
-          style: TextStyle(color: Colors.grey),
-        ),
-      );
-    }
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 320),
-          child: Image.asset(
-            _imagePath(),
-            fit: BoxFit.contain,
-          ),
-        ),
-      ],
     );
   }
 }

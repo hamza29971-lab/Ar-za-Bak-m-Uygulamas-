@@ -11,19 +11,21 @@ class AuthApiService {
   static Future<String?> loginWithPhone(String emailOrPhoneNumber, String password) async {
     final url = Uri.parse('$baseUrl/auth/login');
     try {
+      final String base64Password = base64Encode(utf8.encode(password));
+      
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'emailOrPhoneNumber': emailOrPhoneNumber,
-          'password': password,
+          'password': base64Password,
         }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        // API'nin döndüğü otpRequestId alanını alıyoruz
-        return data['otpRequestId']?.toString();
+        // API'nin döndüğü veri yapısı: data['data']['otpRequestId']
+        return data['data']?['otpRequestId']?.toString();
       } else {
         print('Login Error: ${response.statusCode} - ${response.body}');
         return null;

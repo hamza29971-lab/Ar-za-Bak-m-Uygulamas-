@@ -8,37 +8,58 @@ import '../models/models.dart';
 import '../services/publish_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
-import '../utils/formats.dart';
 import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
-import '../widgets/nimo_table.dart';
 import '../widgets/vehicle_selector.dart';
 
-/// Gönderilebilecek rapor türleri.
+/// Gönderilebilecek rapor türleri. İkisi de araç kaydı okumaz: raporda
+/// yalnızca görsel ve açıklama gönderilir, araç seçimi isteğe bağlıdır.
 enum ReportType {
-  /// Seçilen aracın lastik kayıtları rapora eklenir.
-  tireChange('Lastik Değişim Raporu', Icons.trip_origin),
+  /// Sahada yapılan ve arıza sayılmayan işler için serbest form.
+  serviceForm('Servis Formu', Icons.assignment_outlined),
 
-  /// Seçilen aracın yağ takviyesi kayıtları rapora eklenir.
-  oilRefill('Yağ Takviye Raporu', Icons.water_drop_outlined),
+  /// Arıza bildirimi.
+  fault('Arıza Raporu', Icons.report_gmailerrorred_outlined),
 
-  /// Araç kaydı okunmaz; yalnızca görsel ve açıklama gönderilir.
-  fault('Arıza Raporu', Icons.report_gmailerrorred_outlined);
+  /// Mekanik Operasyon ekranının tek türü.
+  mechanical('Mekanik Operasyon', Icons.build_outlined);
 
   const ReportType(this.label, this.icon);
 
   final String label;
   final IconData icon;
 
-  /// Rapor, araç kayıtlarından veri çekiyor mu?
-  bool get usesVehicleData => this != ReportType.fault;
+  /// "Servis Raporu" sekmesinde seçilebilen türler.
+  static const List<ReportType> serviceTypes = <ReportType>[
+    serviceForm,
+    fault,
+  ];
+
+  /// "Mekanik Operasyon" sekmesinin tek türü.
+  static const List<ReportType> mechanicalTypes = <ReportType>[mechanical];
 }
 
-/// "Servis Raporu" ekranı: rapor türü + araç kayıtları + görsel(ler) + açıklama.
+/// "Servis Raporu" ekranı: rapor türü + araç seçimi + görsel(ler) + açıklama.
+///
+/// Aynı ekran "Mekanik Operasyon" sekmesinde de kullanılır; tek fark rapor
+/// türü listesinin [types] ile daraltılması ve başlıktır.
 class ServiceReportScreen extends StatefulWidget {
-  const ServiceReportScreen({super.key});
+  const ServiceReportScreen({
+    super.key,
+    this.title = 'Servis Raporu',
+    this.types = ReportType.serviceTypes,
+    this.accent = AppColors.form,
+  });
 
-  static const Color accent = AppColors.form;
+  /// Sayfa başlığı.
+  final String title;
+
+  /// "Rapor türü" listesinde gösterilecek türler; ilki varsayılan seçimdir.
+  /// Boş verilmemelidir.
+  final List<ReportType> types;
+
+  /// Ekranın vurgu rengi; sekme rengiyle aynı olmalıdır.
+  final Color accent;
 
   @override
   State<ServiceReportScreen> createState() => _ServiceReportScreenState();
@@ -48,57 +69,15 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _description = TextEditingController();
   final List<XFile> _images = <XFile>[];
-  ReportType _type = ReportType.tireChange;
+  late ReportType _type = widget.types.first;
   bool _sending = false;
 
-  /// Araç tablosu görünürken görsel/açıklama kartlarının yüksekliği.
-  static const double _cardsHeight = 380;
-
-  Color get accent => ServiceReportScreen.accent;
+  Color get accent => widget.accent;
 
   @override
   void dispose() {
     _description.dispose();
     super.dispose();
-  }
-
-  // ------------------------------------------------------------ rapor verisi
-
-  /// Rapora eklenecek lastik kayıtları.
-  List<TireRecord> _tireRows(AppState state, Vehicle? vehicle) =>
-      vehicle == null || _type != ReportType.tireChange
-          ? <TireRecord>[]
-          : state.tiresOf(vehicle);
-
-  /// Rapora eklenecek yağ takviyesi kayıtları ("Manuel Yağlamalar" hariç).
-  List<OilRecord> _oilRows(AppState state, Vehicle? vehicle) =>
-      vehicle == null || _type != ReportType.oilRefill
-          ? <OilRecord>[]
-          : state
-              .oilsOf(vehicle)
-              .where((OilRecord r) => r.category == OilCategory.refill)
-              .toList();
-
-  /// Rapor gövdesine (MQTT yüküne) eklenecek satırlar.
-  List<Map<String, Object?>> _payloadItems(AppState state, Vehicle? vehicle) {
-    return <Map<String, Object?>>[
-      for (final TireRecord r in _tireRows(state, vehicle))
-        <String, Object?>{
-          'tireId': r.tireId,
-          'position': r.position,
-          'serialNo': r.serialNo,
-          'lastChangeDate': r.lastChangeDate.toIso8601String(),
-          'lastCheckDate': r.lastCheckDate.toIso8601String(),
-        },
-      for (final OilRecord r in _oilRows(state, vehicle))
-        <String, Object?>{
-          'areaId': r.areaId,
-          'oilType': r.oilType,
-          'amount': r.amount,
-          'lastOilDate': r.lastOilDate.toIso8601String(),
-          'lastCheckDate': r.lastCheckDate.toIso8601String(),
-        },
-    ];
   }
 
   // ---------------------------------------------------------------- görseller
@@ -116,6 +95,11 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     }
   }
 
+  /// Masaüstünde `image_picker` kamerayı desteklemez (hata fırlatır); saha
+  /// tabletlerinde çalışır. Kullanıcı bunu bir arıza sanmasın diye ayrı mesaj.
+  static bool get _desktop =>
+      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+
   Future<void> _takePhoto() async {
     try {
       final XFile? shot = await _picker.pickImage(source: ImageSource.camera);
@@ -124,7 +108,13 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     } on Object catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Kamera kullanılamadı: $e')),
+        SnackBar(
+          content: Text(_desktop
+              ? 'Masaüstünde kamera kullanılamıyor. Fotoğraf çekmek için '
+                  'uygulamayı tablette çalıştırın; buradan "Görsel Ekle" ile '
+                  'dosya seçebilirsiniz.'
+              : 'Kamera kullanılamadı: $e'),
+        ),
       );
     }
   }
@@ -135,12 +125,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     final AppState state = AppScope.read(context);
     final Vehicle? vehicle = state.selectedVehicle;
 
-    if (_type.usesVehicleData && vehicle == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rapor için önce araç seçin.')),
-      );
-      return;
-    }
     if (_images.isEmpty && _description.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('En az bir görsel ekleyin veya açıklama yazın.')),
@@ -148,7 +132,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       return;
     }
 
-    final List<Map<String, Object?>> items = _payloadItems(state, vehicle);
     final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
 
     setState(() => _sending = true);
@@ -156,7 +139,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       reportType: _type.label,
       description: _description.text.trim(),
       imagePaths: imagePaths,
-      items: items,
+      items: const <Map<String, Object?>>[],
       vehicleCode: vehicle?.code,
       userRegistryNo: state.user?.registryNo,
     );
@@ -172,7 +155,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         reportType: _type.label,
         description: _description.text.trim(),
         imagePaths: imagePaths,
-        itemCount: items.length,
+        itemCount: 0,
       ),
     );
     state.addNotification(
@@ -198,12 +181,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
             children: <Widget>[
               InfoLine(label: 'Rapor türü', value: _type.label, labelWidth: 110),
               InfoLine(label: 'Araç', value: vehicle?.code ?? '-', labelWidth: 110),
-              if (_type.usesVehicleData)
-                InfoLine(
-                  label: 'Kayıt',
-                  value: '${items.length} satır',
-                  labelWidth: 110,
-                ),
               InfoLine(
                 label: 'Görsel',
                 value: '${imagePaths.length} adet',
@@ -242,9 +219,10 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            const PageHeading(
-              title: 'Servis Raporu',
-              subtitle: 'Rapor türünü ve aracı seçin, görsel ve açıklama ile gönderin',
+            PageHeading(
+              title: widget.title,
+              subtitle:
+                  'Rapor türünü ve aracı seçin, görsel ve açıklama ile gönderin',
             ),
             const SizedBox(height: 16),
             Row(
@@ -263,7 +241,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                   ),
                   textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                   dropdownMenuEntries: <DropdownMenuEntry<ReportType>>[
-                    for (final ReportType t in ReportType.values)
+                    for (final ReportType t in widget.types)
                       DropdownMenuEntry<ReportType>(
                         value: t,
                         label: t.label,
@@ -283,28 +261,9 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(
-              // Araç kayıtları tüm satırlarıyla listelenir; sığmadığında tablo
-              // kendi içinde değil, sayfa kaydırılır.
-              child: _type.usesVehicleData
-                  ? SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          _buildDataSection(context, state, vehicle),
-                          const SizedBox(height: 20),
-                          SizedBox(height: _cardsHeight, child: _buildCards(context)),
-                        ],
-                      ),
-                    )
-                  : _buildCards(context),
-            ),
-            // Gönderim alanı, rapor araç kaydı kullanıyorsa yalnızca araç
-            // seçildikten sonra görünür.
-            if (!_type.usesVehicleData || vehicle != null) ...<Widget>[
-              const SizedBox(height: 20),
-              _buildActions(context),
-            ],
+            Expanded(child: _buildCards(context)),
+            const SizedBox(height: 20),
+            _buildActions(context),
           ],
         ),
       ),
@@ -320,119 +279,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         const SizedBox(width: 20),
         Expanded(child: _buildDescriptionCard(context)),
       ],
-    );
-  }
-
-  /// Rapora eklenecek araç kayıtları (lastik / yağ takviyesi).
-  Widget _buildDataSection(BuildContext context, AppState state, Vehicle? vehicle) {
-    final bool tire = _type == ReportType.tireChange;
-    final int rowCount =
-        tire ? _tireRows(state, vehicle).length : _oilRows(state, vehicle).length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Icon(_type.icon, size: 18, color: accent),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                tire
-                    ? 'Rapora Eklenecek Lastik Kayıtları'
-                    : 'Rapora Eklenecek Yağ Takviyesi Kayıtları',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              vehicle == null ? 'Araç seçilmedi' : '$rowCount kayıt',
-              style: TextStyle(fontSize: 13, color: context.mutedColor),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (tire)
-          _buildTireTable(context, state, vehicle)
-        else
-          _buildOilTable(context, state, vehicle),
-      ],
-    );
-  }
-
-  Widget _buildTireTable(BuildContext context, AppState state, Vehicle? vehicle) {
-    final List<TireRecord> rows = _tireRows(state, vehicle);
-
-    return NimoTable(
-      accent: accent,
-      shrinkWrap: true,
-      columns: const <NimoColumn>[
-        NimoColumn('Lastik ID', flex: 26),
-        NimoColumn('Seri No', flex: 22),
-        NimoColumn('Son Değiştirme Tarihi', flex: 26),
-        NimoColumn('Son Kontrol Tarihi', flex: 26),
-      ],
-      rowCount: rows.length,
-      empty: _emptyState(vehicle, 'lastik'),
-      cellsBuilder: (BuildContext context, int index) {
-        final TireRecord r = rows[index];
-
-        return <Widget>[
-          CellText(r.tireId, subtitle: r.position, bold: true),
-          CellText(r.serialNo),
-          CellText(
-            formatDate(r.lastChangeDate),
-            subtitle: '${daysSince(r.lastChangeDate)} gün önce',
-          ),
-          CellText(
-            formatDate(r.lastCheckDate),
-            subtitle: '${daysSince(r.lastCheckDate)} gün önce',
-          ),
-        ];
-      },
-    );
-  }
-
-  Widget _buildOilTable(BuildContext context, AppState state, Vehicle? vehicle) {
-    final List<OilRecord> rows = _oilRows(state, vehicle);
-
-    return NimoTable(
-      accent: accent,
-      shrinkWrap: true,
-      columns: const <NimoColumn>[
-        NimoColumn('Yağ Takviyesi Türü', flex: 34),
-        NimoColumn('Son Yağ Takviyesi', flex: 33),
-        NimoColumn('Son Kontrol Tarihi', flex: 33),
-      ],
-      rowCount: rows.length,
-      empty: _emptyState(vehicle, 'yağ takviyesi'),
-      cellsBuilder: (BuildContext context, int index) {
-        final OilRecord r = rows[index];
-
-        return <Widget>[
-          CellText(r.oilType, subtitle: r.areaId, bold: true),
-          CellText(
-            formatDate(r.lastOilDate),
-            subtitle: '${daysSince(r.lastOilDate)} gün önce',
-          ),
-          CellText(
-            formatDate(r.lastCheckDate),
-            subtitle: '${daysSince(r.lastCheckDate)} gün önce',
-          ),
-        ];
-      },
-    );
-  }
-
-  Widget _emptyState(Vehicle? vehicle, String what) {
-    return EmptyState(
-      icon: _type.icon,
-      title: vehicle == null ? 'Araç seçilmedi' : 'Kayıt bulunamadı',
-      message: vehicle == null
-          ? 'Rapora eklenecek kayıtları görmek için yukarıdaki "Araç Seç" alanından bir araç seçin.'
-          : 'Bu araç için $what kaydı bulunmuyor.',
     );
   }
 

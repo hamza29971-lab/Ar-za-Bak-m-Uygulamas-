@@ -5,6 +5,7 @@ import 'login_screen.dart';
 import '../../services/auth_api_service.dart';
 import '../../services/auth_models.dart';
 import '../../state/app_state.dart';
+import '../../models/models.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -90,7 +91,15 @@ class _OtpScreenState extends State<OtpScreen> {
       if (data != null) {
         // Profil bilgisini state'e kaydet (eğer API JSON'u AuthSession'a uyumluysa)
         try {
-          final session = AuthSession.fromJson(data);
+          final payload = data['data'] ?? data;
+          final userJson = payload['user'] ?? payload['profile'] ?? payload;
+          final Map<String, dynamic> safeUser = userJson is Map<String, dynamic> ? userJson : {};
+          
+          final session = AuthSession(
+            accessToken: (payload['accessToken'] ?? payload['token'] ?? '').toString(),
+            refreshToken: (payload['refreshToken'] ?? '').toString(),
+            user: UserProfile.fromJson(safeUser),
+          );
           AppScope.read(context).applySession(session);
         } catch (e) {
           debugPrint('AuthSession Parse Hatası: $e');

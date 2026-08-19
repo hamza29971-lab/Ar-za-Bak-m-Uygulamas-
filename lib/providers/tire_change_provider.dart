@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/tire_change_model.dart';
+import '../state/app_state.dart';
 
 class TireChangeProvider extends ChangeNotifier {
   // Tüm araç listesi
@@ -193,14 +194,35 @@ class TireChangeProvider extends ChangeNotifier {
     await prefs.setString(key, jsonEncode(jsonList));
   }
 
-  /// Gönder — Demo: sunucuya gönderme simülasyonu
-  Future<void> sendReport() async {
+  /// Gönder — Demo: sunucuya gönderme simülasyonu ve AppState'e kaydetme
+  Future<void> sendReport(AppState state) async {
     _isSending = true;
     _sendSuccess = false;
     notifyListeners();
 
+    // Anasayfa Son İşlemler için değişen lastikleri ayır
+    final changedTires = _tireRecords.where((r) => r.isChanged).toList();
+    final vehicleName = _selectedVehicle?.name;
+
     // Demo: 1.5 saniye bekle (gerçekte HTTP isteği yapılacak)
     await Future.delayed(const Duration(milliseconds: 1500));
+
+    // Değişen lastik işlemlerini AppState'e ekle
+    if (vehicleName != null && changedTires.isNotEmpty) {
+      final vehicle = state.vehicles.where((v) => v.code == vehicleName).firstOrNull;
+      if (vehicle != null) {
+        for (final tireModel in changedTires) {
+          final tireId = '${vehicle.code}-L${tireModel.tireNumber.toString().padLeft(2, '0')}';
+          final tireRecord = state.tiresOf(vehicle)
+              .where((t) => t.tireId == tireId)
+              .firstOrNull;
+          if (tireRecord != null) {
+            // Eğer yeni bir lastik takıldı ise seri no parametresi verilebilir
+            state.changeTire(vehicle, tireRecord, newSerialNo: tireModel.serialNumber);
+          }
+        }
+      }
+    }
 
     // Gönderim sonrası "isChanged" bayraklarını sıfırla
     _tireRecords = _tireRecords.map((r) => r.copyWith(isChanged: false)).toList();
