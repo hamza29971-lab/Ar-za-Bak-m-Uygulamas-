@@ -96,8 +96,8 @@ class TireRecord {
     required this.tireId,
     required this.serialNo,
     required this.position,
-    required this.lastChangeDate,
-    required this.lastCheckDate,
+    this.lastChangeDate,
+    this.lastCheckDate,
   });
 
   final String tireId;
@@ -108,8 +108,8 @@ class TireRecord {
   /// Sol ön, sağ arka gibi konum bilgisi (liste okunurluğu için).
   final String position;
 
-  DateTime lastChangeDate;
-  DateTime lastCheckDate;
+  DateTime? lastChangeDate;
+  DateTime? lastCheckDate;
 }
 
 /// Yağ Takviyesi ekranındaki bir satır.
@@ -119,8 +119,8 @@ class OilRecord {
     required this.oilType,
     required this.category,
     required this.amount,
-    required this.lastOilDate,
-    required this.lastCheckDate,
+    this.lastOilDate,
+    this.lastCheckDate,
   });
 
   /// Alan kodu, ör. YT-09.
@@ -134,10 +134,10 @@ class OilRecord {
 
   /// Litre cinsinden kullanılan yağ miktarı.
   double amount;
-  DateTime lastOilDate;
+  DateTime? lastOilDate;
 
   /// Seviye kontrolünün yapıldığı son tarih ("Kontrol Et").
-  DateTime lastCheckDate;
+  DateTime? lastCheckDate;
 
   /// Kayıtların tam adı: `Motor (YT-09)`
   String get label => '$oilType ($areaId)';
@@ -186,13 +186,43 @@ class UserProfile {
   /// Alan adları backend ile netleştikçe burada güncellenir.
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
         fullName: json['fullName'] as String? ?? json['name'] as String? ?? json['firstName'] as String? ?? '',
-        email: json['email'] as String? ?? '',
+        email: json['email'] as String? ?? json['mail'] as String? ?? '',
         phone: json['phone'] as String? ?? json['phoneNumber'] as String? ?? '',
-        role: json['role'] as String? ?? json['title'] as String? ?? '',
+        role: (json['role'] is Map ? json['role']['name'] as String? : json['role'] as String?) ?? json['title'] as String? ?? '',
         registryNo: json['registryNo'] as String? ?? json['id']?.toString() ?? '',
         machineCode: json['machineCode'] as String? ?? '',
         machineType: json['machineType'] as String? ?? '',
       );
+
+  Map<String, dynamic> toJson() => {
+        'fullName': fullName,
+        'email': email,
+        'phone': phone,
+        'role': role,
+        'registryNo': registryNo,
+        'machineCode': machineCode,
+        'machineType': machineType,
+      };
+
+  UserProfile copyWith({
+    String? fullName,
+    String? email,
+    String? phone,
+    String? role,
+    String? registryNo,
+    String? machineCode,
+    String? machineType,
+  }) {
+    return UserProfile(
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      registryNo: registryNo ?? this.registryNo,
+      machineCode: machineCode ?? this.machineCode,
+      machineType: machineType ?? this.machineType,
+    );
+  }
 
   String get initials {
     final List<String> parts =
@@ -297,6 +327,8 @@ class OilRefillActivity extends ActivityRecord {
 }
 
 /// Servis Raporu ekranından gönderilen rapor.
+
+
 class ServiceReportActivity extends ActivityRecord {
   ServiceReportActivity({
     required super.id,

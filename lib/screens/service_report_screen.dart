@@ -186,7 +186,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                 value: '${imagePaths.length} adet',
                 labelWidth: 110,
               ),
-              InfoLine(label: 'MQTT konusu', value: result.topic, labelWidth: 110),
             ],
           ),
         ),
@@ -214,57 +213,37 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     final Vehicle? vehicle = state.selectedVehicle;
 
     return NimoPage(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.pagePadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            PageHeading(
-              title: widget.title,
-              subtitle:
-                  'Rapor türünü ve aracı seçin, görsel ve açıklama ile gönderin',
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: <Widget>[
-                // Liste alanın üstünü kapatmasın diye DropdownMenu kullanılır;
-                // menü her zaman alanın altına açılır.
-                DropdownMenu<ReportType>(
-                  width: 320,
-                  menuHeight: 320,
-                  initialSelection: _type,
-                  requestFocusOnTap: false,
-                  label: const Text('Rapor türü'),
-                  leadingIcon: Padding(
-                    padding: const EdgeInsets.only(left: 14, right: 8),
-                    child: Icon(_type.icon, size: 20, color: accent),
-                  ),
-                  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                  dropdownMenuEntries: <DropdownMenuEntry<ReportType>>[
-                    for (final ReportType t in widget.types)
-                      DropdownMenuEntry<ReportType>(
-                        value: t,
-                        label: t.label,
-                        leadingIcon: Icon(t.icon, size: 18, color: accent),
-                      ),
-                  ],
-                  onSelected: (ReportType? v) => setState(() => _type = v ?? _type),
-                ),
-                const SizedBox(width: 16),
-                // Araç listeden seçilir; seçim diğer ekranlarla ortaktır.
-                VehicleSelector(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.pagePadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              PageHeading(
+                title: widget.title,
+                subtitle:
+                    'Rapor türünü ve aracı seçin, görsel ve açıklama ile gönderin',
+              ),
+              const SizedBox(height: 16),
+              // Araç listeden seçilir; seçim diğer ekranlarla ortaktır.
+              Align(
+                alignment: Alignment.centerLeft,
+                child: VehicleSelector(
                   selected: vehicle,
                   accentColor: accent,
                   width: 360,
                   onSelected: state.selectVehicle,
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(child: _buildCards(context)),
-            const SizedBox(height: 20),
-            _buildActions(context),
-          ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 400,
+                child: _buildCards(context),
+              ),
+              const SizedBox(height: 20),
+              _buildActions(context),
+            ],
+          ),
         ),
       ),
     );

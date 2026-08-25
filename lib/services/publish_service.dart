@@ -1,24 +1,15 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
+import 'fleet_event_client.dart';
+import 'fleet_event_mapper.dart';
 
-/// MQTT / backend entegrasyonu için tek giriş noktası.
-///
-/// Şu an yalnızca gönderilecek yükü hazırlayıp konsola yazar.
-/// MQTT eklenince [publish] gövdesi `MqttServerClient.publishMessage(...)`
-/// çağrısıyla değiştirilecek; ekranlarda başka değişiklik gerekmeyecek.
 class PublishService {
   PublishService._();
 
   static final PublishService instance = PublishService._();
+  final FleetEventClient _client = HttpFleetEventClient();
 
   static const String baseTopic = 'nimo/bakim';
 
-  /// Servis Raporu ekranının yükü.
-  ///
-  /// [items] rapora eklenen satırlardır: lastik raporunda her lastiğin seri no
-  /// ve tarihleri, yağ raporunda her takviye türünün tarihleri. Arıza
-  /// raporunda boş gelir.
   Future<PublishResult> publishReport({
     required String reportType,
     required String description,
@@ -27,22 +18,26 @@ class PublishService {
     String? vehicleCode,
     String? userRegistryNo,
   }) async {
-    final Map<String, Object?> payload = <String, Object?>{
-      'reportType': reportType,
-      'description': description,
-      'vehicle': vehicleCode,
-      'user': userRegistryNo,
-      'imageCount': imagePaths.length,
-      'images': imagePaths,
-      'itemCount': items.length,
-      'items': items,
-      'sentAt': DateTime.now().toIso8601String(),
-    };
-    return publish('$baseTopic/rapor', payload);
+    final FleetEvent event = FleetEventMapper.fromReport(
+      reportType: reportType,
+      description: description,
+      imageCount: imagePaths.length,
+      imageNames: imagePaths,
+      deviceId: null,
+      vehicleLabel: vehicleCode,
+      operatorLabel: userRegistryNo,
+      occurredAt: DateTime.now(),
+    );
+
+    final FleetResult result = await _client.send(event);
+    return PublishResult(
+      topic: baseTopic,
+      payload: event.toJson().toString(),
+      success: result.ok,
+      error: result.error,
+    );
   }
 
-  /// Lastik / Yağ ekranındaki "Gönder" butonunun yükü: o ekranda yapılıp
-  /// henüz gönderilmemiş işlemler tek mesajda toplanır.
   Future<PublishResult> publishOperations({
     required String topic,
     required String group,
@@ -50,23 +45,29 @@ class PublishService {
     String? vehicleCode,
     String? userRegistryNo,
   }) async {
-    final Map<String, Object?> payload = <String, Object?>{
-      'group': group,
-      'vehicle': vehicleCode,
-      'user': userRegistryNo,
-      'operationCount': operations.length,
-      'operations': operations,
-      'sentAt': DateTime.now().toIso8601String(),
-    };
-    return publish(topic, payload);
-  }
+    // operations listesi PendingOperation'in payload'ı gibi.
+    // Her işlem için ayrı event oluşturmamız gerekir, ancak publishOperations tek sonuç bekliyor.
+    // Bu yüzden tümünü toplu bir olay olarak gönderelim.
+    final FleetEvent event = FleetEvent(
+      title: group,
+      type: 'İŞLEM',
+      note: 'Toplu İşlem (${operations.length} adet)',
+      vehicleLabel: vehicleCode,
+      operatorLabel: userRegistryNo,
+      occurredAt: DateTime.now(),
+      fields: <String, Object?>{
+        'islem': group,
+        'operationCount': operations.length,
+      },
+    );
 
-  Future<PublishResult> publish(String topic, Map<String, Object?> payload) async {
-    final String json = jsonEncode(payload);
-    // TODO(mqtt): gerçek broker bağlantısı eklenecek.
-    debugPrint('[MQTT] $topic -> $json');
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-    return PublishResult(topic: topic, payload: json, success: true);
+    final FleetResult result = await _client.send(event);
+    return PublishResult(
+      topic: topic,
+      payload: event.toJson().toString(),
+      success: result.ok,
+      error: result.error,
+    );
   }
 }
 

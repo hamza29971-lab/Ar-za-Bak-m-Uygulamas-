@@ -10,20 +10,18 @@ import '../../models/models.dart';
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
   final String correctCode;
-  final String? otpRequestId; // API isteğinden dönen ID
+  final String? otpRequestId;
+  final String? password; // API isteğinden dönen ID
   
-  const OtpScreen({
-    super.key,
-    required this.phoneNumber,
-    required this.correctCode,
-    this.otpRequestId,
-  });
+  const OtpScreen({super.key, required this.phoneNumber, required this.correctCode, this.otpRequestId, this.password});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
 }
 
 class _OtpScreenState extends State<OtpScreen> {
+  String? _currentOtpRequestId;
+  bool _isResending = false;
   String _enteredCode = '';
   int _remainingSeconds = 48;
   Timer? _timer;
@@ -32,6 +30,7 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   void initState() {
     super.initState();
+    _currentOtpRequestId = widget.otpRequestId;
     _startTimer();
   }
 
@@ -78,10 +77,10 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
   Future<void> _verifyCode() async {
-    if (AuthApiService.useRealApi && widget.otpRequestId != null) {
+    if (AuthApiService.useRealApi && _currentOtpRequestId != null) {
       // Gerçek API Doğrulaması
       final data = await AuthApiService.verifyOtp(
-        widget.otpRequestId!, 
+        _currentOtpRequestId!, 
         widget.phoneNumber, 
         _enteredCode,
       );
@@ -92,7 +91,7 @@ class _OtpScreenState extends State<OtpScreen> {
         // Profil bilgisini state'e kaydet (eğer API JSON'u AuthSession'a uyumluysa)
         try {
           final payload = data['data'] ?? data;
-          final userJson = payload['user'] ?? payload['profile'] ?? payload;
+          final userJson = payload['userData'] ?? payload['user'] ?? payload['profile'] ?? payload;
           final Map<String, dynamic> safeUser = userJson is Map<String, dynamic> ? userJson : {};
           
           final session = AuthSession(
@@ -298,11 +297,35 @@ class _OtpScreenState extends State<OtpScreen> {
                           ),
                         ),
                         OutlinedButton(
-                          onPressed: _remainingSeconds == 0
-                              ? () {
-                                  _startTimer();
-                                }
-                              : null,
+                            onPressed: _remainingSeconds == 0 && !_isResending
+                                ? () async {
+                                    if (AuthApiService.useRealApi && widget.password != null) {
+                                      setState(() => _isResending = true);
+                                      try {
+                                        final newId = await AuthApiService.loginWithPhone(widget.phoneNumber, widget.password!);
+                                        if (newId != null) {
+                                          _currentOtpRequestId = newId;
+                                          _startTimer();
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Yeni doğrulama kodu gönderildi.')),
+                                            );
+                                          }
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          String errorMsg = e.toString();
+                                          if (errorMsg.startsWith('Exception: ')) errorMsg = errorMsg.substring(11);
+                                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg)));
+                                        }
+                                      } finally {
+                                        if (mounted) setState(() => _isResending = false);
+                                      }
+                                    } else {
+                                      _startTimer();
+                                    }
+                                  }
+                                : null,
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
                               color: _remainingSeconds == 0

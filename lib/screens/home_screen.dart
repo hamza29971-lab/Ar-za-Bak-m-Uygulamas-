@@ -9,14 +9,10 @@ import '../utils/formats.dart';
 import '../widgets/activity_details_dialog.dart';
 import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
-import '../widgets/vehicle_photo.dart';
 
-/// Anasayfa: vardiya özeti, hızlı işlemler ve son hareketler.
+/// Anasayfa: vardiya bilgileri, son işlemler kutucuğu ve tanıtım bloğu.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.onNavigate});
-
-  /// Alt sekmelere geçiş (1: Lastik, 2: Yağ, 3: Form).
-  final ValueChanged<int> onNavigate;
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -44,14 +40,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final AppState state = AppScope.of(context);
     final UserProfile? user = state.user;
-    final Vehicle? selectedVehicle = state.selectedVehicle;
-    
-    // Anasayfada gösterilecek araç: Eğer seçili bir araç yoksa profildeki aracı kullan
-    final Vehicle? displayVehicle = selectedVehicle ?? 
-        state.vehicles.where((v) => v.code == user?.machineCode).firstOrNull;
+    final List<ActivityRecord> activities = state.recentActivities();
 
     return NimoPage(
-      child: SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.all(AppTheme.pagePadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,161 +76,151 @@ class _HomeScreenState extends State<HomeScreen> {
                     hint: formatFullDate(_now),
                   ),
                 ),
+                const SizedBox(width: 16),
+                // Diğerleriyle aynı görünümde, ama basılabilir: son işlemler
+                // listesi artık anasayfada durmuyor, buradan açılıyor.
+                Expanded(
+                  child: _InfoTile(
+                    icon: Icons.history,
+                    label: 'SON İŞLEMLER',
+                    value: activities.isEmpty
+                        ? 'Kayıt yok'
+                        : '${activities.length} işlem',
+                    hint: 'Görmek için dokunun',
+                    onTap: () => _showActivities(context, state),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
-            _buildActivities(context, state),
-            const SizedBox(height: 20),
-
-            // Özet + hızlı işlemler
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Expanded(flex: 62, child: _buildActions(context, state, displayVehicle)),
-                  const SizedBox(width: 20),
-                  Expanded(flex: 38, child: _buildVehicleCard(context, displayVehicle)),
-                ],
-              ),
-            ),
+            const SizedBox(height: 24),
+            Expanded(child: _buildIntro(context)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildActions(BuildContext context, AppState state, Vehicle? vehicle) {
-    final List<TireRecord> tires =
-        vehicle == null ? <TireRecord>[] : state.tiresOf(vehicle);
-    final List<OilRecord> oils = vehicle == null ? <OilRecord>[] : state.oilsOf(vehicle);
-    final int tireOverdue =
-        tires.where((TireRecord r) => daysSince(r.lastCheckDate) > 30).length;
+  /// Anasayfanın tanıtım bloğu: solda açıklama, sağda araç görseli.
+  Widget _buildIntro(BuildContext context) {
+    // Üst şerit, alt sekme çubuğu ve boşluklar çıkarıldığında kalan yükseklik;
+    // görsel buna göre ölçeklenir ki her pencerede kaydırmadan sığsın.
+    final double screenHeight = MediaQuery.sizeOf(context).height;
+    final double artHeight = ((screenHeight - 440) * 1.25).clamp(330.0, 680.0);
+    final double titleSize = screenHeight >= 950
+        ? 40
+        : screenHeight >= 820
+            ? 36
+            : 30;
 
-    return SectionCard(
-      title: 'Hızlı İşlemler',
-      child: Column(
+    final Widget heading = Text(
+      'Lastik Değişim, Yağ Takviye ve Mekanik Operasyonlarınızı '
+      'Bu Panelden Yönetebilirsiniz',
+      style: TextStyle(
+        fontSize: titleSize,
+        height: 1.3,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.5,
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
+    );
+
+    // Görsel şeffaf zeminli olduğu için çerçevesiz, olduğu gibi yerleştirilir.
+    final Widget art = Image.asset(
+      'assets/images/anasayfa/EuclidAnasayfa.png',
+      fit: BoxFit.contain,
+      errorBuilder: (BuildContext context, Object e, StackTrace? s) =>
+          const SizedBox.shrink(),
+    );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        // Dar ekranda görsel metnin altına iner.
+        if (constraints.maxWidth < 900) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              heading,
+              const SizedBox(height: 20),
+              Expanded(child: Center(child: art)),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            Expanded(flex: 44, child: heading),
+            const SizedBox(width: 32),
+            Expanded(flex: 56, child: art),
+          ],
+        );
+      },
+    );
+  }
+
+  /// "Son İşlemler" kutucuğu: listeyi pencerede açar.
+  Future<void> _showActivities(BuildContext context, AppState state) async {
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => _ActivitiesDialog(state: state),
+    );
+  }
+
+}
+
+/// "Son İşlemler" penceresi: kullanıcının son lastik değişimi, yağ takviyesi
+/// ve form gönderimleri. Satıra dokunulduğunda türüne özel detay açılır.
+class _ActivitiesDialog extends StatelessWidget {
+  const _ActivitiesDialog({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<ActivityRecord> items = state.recentActivities();
+
+    return AlertDialog(
+      title: Row(
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _ActionCard(
-                  color: AppColors.tire,
-                  icon: Icons.trip_origin,
-                  title: 'Lastik Değişimi',
-                  subtitle: vehicle == null
-                      ? 'Araç seçilmedi'
-                      : '${tires.length} lastik kaydı',
-                  badge: tireOverdue > 0 ? '$tireOverdue kontrol gecikti' : null,
-                  onTap: () => widget.onNavigate(1),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _ActionCard(
-                  color: AppColors.oil,
-                  icon: Icons.water_drop_outlined,
-                  title: 'Yağ Takviyesi',
-                  subtitle:
-                      vehicle == null ? 'Araç seçilmedi' : '${oils.length} alan kaydı',
-                  onTap: () => widget.onNavigate(2),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _ActionCard(
-                  color: AppColors.form,
-                  icon: Icons.description_outlined,
-                  title: 'Servis Raporu',
-                  subtitle: 'Rapor oluştur ve gönder',
-                  onTap: () => widget.onNavigate(3),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: _StatBox(
-                  label: 'Bekleyen lastik kontrolü',
-                  value: '$tireOverdue',
-                  icon: Icons.trip_origin,
-                  color: tireOverdue > 0 ? AppColors.fault : AppColors.brand,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _StatBox(
-                  // Yağ takviyesi için süre kuralı yok; toplam kayıt gösterilir.
-                  label: 'Yağ takviyesi kaydı',
-                  value: '${oils.length}',
-                  icon: Icons.water_drop_outlined,
-                  color: AppColors.oil,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _StatBox(
-                  label: 'Okunmamış bildirim',
-                  value: '${state.unreadCount}',
-                  icon: Icons.notifications_none,
-                  color: AppColors.form,
-                ),
-              ),
-            ],
+          const Icon(Icons.history, size: 22, color: AppColors.brand),
+          const SizedBox(width: 10),
+          const Expanded(child: Text('Son İşlemler')),
+          Text(
+            items.isEmpty ? 'kayıt yok' : 'son ${items.length} işlem',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: context.mutedColor,
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildVehicleCard(BuildContext context, Vehicle? vehicle) {
-    // Başlık satırı kaldırıldı; kart yalnızca aracın görselini gösterir.
-    return SectionCard(
-      child: SizedBox(
-        height: 260,
-        child: VehiclePhoto(vehicle: vehicle),
-      ),
-    );
-  }
-
-  /// Kullanıcının son 10 lastik değişimi, yağ takviyesi ve form gönderimi.
-  /// Satıra dokunulduğunda türüne özel detay penceresi açılır.
-  Widget _buildActivities(BuildContext context, AppState state) {
-    final List<ActivityRecord> items = state.recentActivities();
-
-    return SectionCard(
-      title: 'Son İşlemler',
-      icon: Icons.history,
-      trailing: Text(
-        items.isEmpty ? 'kayıt yok' : 'son ${items.length} işlem',
-        style: TextStyle(fontSize: 13, color: context.mutedColor),
-      ),
-      child: items.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
+      content: SizedBox(
+        width: 640,
+        child: items.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32),
                 child: Text(
-                  'Henüz lastik değişimi, yağ takviyesi veya form gönderimi yapılmadı.',
+                  'Henüz lastik değişimi, yağ takviyesi veya form gönderimi '
+                  'yapılmadı.',
                   style: TextStyle(color: context.mutedColor),
                 ),
-              ),
-            )
-          : SizedBox(
-              height: items.length > 5 ? 330 : null,
-              child: ListView.separated(
+              )
+            : ListView.separated(
                 padding: EdgeInsets.zero,
-                shrinkWrap: items.length <= 5,
-                physics: items.length > 5
-                    ? const ClampingScrollPhysics()
-                    : const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
                 itemCount: items.length,
                 separatorBuilder: (_, _) =>
                     Divider(height: 1, color: context.borderColor),
                 itemBuilder: (BuildContext context, int i) =>
                     _ActivityRow(activity: items[i]),
               ),
-            ),
+      ),
+      actions: <Widget>[
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Kapat'),
+        ),
+      ],
     );
   }
 }
@@ -249,6 +231,7 @@ class _InfoTile extends StatelessWidget {
     required this.label,
     required this.value,
     this.hint,
+    this.onTap,
   });
 
   final IconData icon;
@@ -256,9 +239,13 @@ class _InfoTile extends StatelessWidget {
   final String value;
   final String? hint;
 
+  /// Verilirse kutucuk butona dönüşür; görünüm diğerleriyle aynı kalır,
+  /// yalnızca sağa küçük bir ok eklenir.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final Widget tile = Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: context.pageColor,
@@ -272,15 +259,21 @@ class _InfoTile extends StatelessWidget {
             children: <Widget>[
               Icon(icon, size: 16, color: context.mutedColor),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 0.8,
-                  fontWeight: FontWeight.w600,
-                  color: context.mutedColor,
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 0.8,
+                    fontWeight: FontWeight.w600,
+                    color: context.mutedColor,
+                  ),
                 ),
               ),
+              if (onTap != null)
+                Icon(Icons.chevron_right, size: 18, color: context.mutedColor),
             ],
           ),
           const SizedBox(height: 8),
@@ -300,122 +293,20 @@ class _InfoTile extends StatelessWidget {
         ],
       ),
     );
-  }
-}
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.color,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.badge,
-  });
-
-  final Color color;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String? badge;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, color: color, size: 21),
-            ),
-            const SizedBox(height: 14),
-            Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(fontSize: 12, color: context.mutedColor)),
-            if (badge != null) ...<Widget>[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.fault.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(badge!,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.fault,
-                        fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ],
-        ),
+    if (onTap == null) return tile;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppTheme.radius),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radius),
+        child: tile,
       ),
     );
   }
 }
 
-class _StatBox extends StatelessWidget {
-  const _StatBox({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(value,
-                    style: TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w700, color: color)),
-                Text(label,
-                    maxLines: 2,
-                    style: TextStyle(fontSize: 11, color: context.mutedColor)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "Son İşlemler" listesindeki tek satır.
 class _ActivityRow extends StatelessWidget {
   const _ActivityRow({required this.activity});
 

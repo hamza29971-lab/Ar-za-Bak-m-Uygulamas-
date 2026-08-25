@@ -28,13 +28,13 @@ int? _vehicleNumber(String code, String prefix) {
 
 /// Euclid araçlarının taraflı görselleri:
 /// sol -> `assets/images/sol/Euclid[N].png` (Euclid-1 dosyası `Euclid.png`),
-/// sağ -> `assets/images/sağ/Euclid[N]yansıma.png`.
+/// sağ -> `assets/images/sag/Euclid[N]yansıma.png`.
 String? _euclidSideAsset(String code, VehicleImageSide side) {
   final int? number = _vehicleNumber(code, 'euclid');
   if (number == null || number < 1 || number > _euclidSideImageCount) return null;
 
   if (side == VehicleImageSide.right) {
-    return 'assets/images/sağ/Euclid${number}yansıma.png';
+    return 'assets/images/sag/Euclid${number}yansıma.png';
   }
   return number == 1
       ? 'assets/images/sol/Euclid.png'
@@ -43,10 +43,10 @@ String? _euclidSideAsset(String code, VehicleImageSide side) {
 
 /// Liugong araçlarının taraflı görsel yolu:
 /// sol -> `assets/images/sol/Liugong[N].png`,
-/// sağ -> `assets/images/sağ/Liugong[N]yansıma.png`.
+/// sağ -> `assets/images/sag/Liugong[N]yansıma.png`.
 String _liugongAsset(int number, VehicleImageSide side) =>
     side == VehicleImageSide.right
-        ? 'assets/images/sağ/Liugong${number}yansıma.png'
+        ? 'assets/images/sag/Liugong${number}yansıma.png'
         : 'assets/images/sol/Liugong$number.png';
 
 /// Liugong maden kamyonlarının (10 lastik) görselleri.

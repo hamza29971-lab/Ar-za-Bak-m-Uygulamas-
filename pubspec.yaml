@@ -29,5 +29,8 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/anasayfa/
+    - assets/images/sol/
+    - assets/images/sag/
 
 

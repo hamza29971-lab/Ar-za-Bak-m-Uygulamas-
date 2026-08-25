@@ -273,20 +273,17 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           _DetailRow(
               icon: Icons.mail_outline, label: 'E-POSTA', value: user?.email ?? '-'),
           _DetailRow(
-              icon: Icons.phone_outlined, label: 'TELEFON', value: user?.phone ?? '-'),
+              icon: Icons.phone_outlined,
+              label: 'TELEFON',
+              value: user?.phone ?? '-',
+              onEdit: () => _editProfileField(context, state, 'Telefon', user?.phone, (String v) => state.updateUserLocalData(phone: v))),
           _DetailRow(icon: Icons.badge_outlined, label: 'ROL', value: user?.role ?? '-'),
           _DetailRow(
               icon: Icons.vpn_key_outlined,
               label: 'SİCİL / KİMLİK',
-              value: user?.registryNo ?? '-'),
-          _DetailRow(
-              icon: Icons.precision_manufacturing_outlined,
-              label: 'MAKİNE',
-              value: state.selectedVehicle?.code ?? user?.machineCode ?? '-'),
-          _DetailRow(
-              icon: Icons.sell_outlined,
-              label: 'MAKİNE TÜRÜ',
-              value: state.selectedVehicle?.type ?? user?.machineType ?? '-'),
+              value: user?.registryNo ?? '-',
+              onEdit: () => _editProfileField(context, state, 'Sicil / Kimlik', user?.registryNo, (String v) => state.updateUserLocalData(registryNo: v))),
+
           const SizedBox(height: 24),
           Align(
             alignment: Alignment.centerLeft,
@@ -302,6 +299,73 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _editProfileField(BuildContext context, AppState state, String title, String? initialValue, Function(String) onSave) {
+    final TextEditingController controller = TextEditingController(text: initialValue);
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          title: Text(
+            '$title Bilgisini Düzenle',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: SizedBox(
+            width: 400, // Make it wider
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'Girdiğiniz $title bilgisi tabletinizin hafızasına güvenli bir şekilde kaydedilecek ve bir sonraki girişinizde de hatırlanacaktır.',
+                  style: TextStyle(fontSize: 13, color: context.mutedColor, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Yeni değer',
+                    hintText: 'Lütfen bilginizi buraya yazın',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.brand, width: 1.5),
+                    ),
+                  ),
+                  autofocus: true,
+                ),
+              ],
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: context.mutedColor,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              child: const Text('İptal', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                onSave(controller.text.trim());
+                Navigator.of(ctx).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Kaydet', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -546,54 +610,71 @@ class _MenuCard extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.icon, required this.label, required this.value});
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.onEdit,
+  });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
+    final String displayValue = value.trim().isEmpty ? '-' : value;
+    final Widget content = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF5B6BE1).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 19, color: const Color(0xFF5B6BE1)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 0.6,
+                        fontWeight: FontWeight.w600,
+                        color: context.mutedColor)),
+                const SizedBox(height: 4),
+                Text(displayValue,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+          if (onEdit != null)
+            Icon(Icons.edit_outlined, size: 20, color: context.mutedColor),
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: context.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFF5B6BE1).withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 19, color: const Color(0xFF5B6BE1)),
+      child: onEdit == null
+          ? content
+          : InkWell(
+              onTap: onEdit,
+              borderRadius: BorderRadius.circular(12),
+              child: content,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(label,
-                      style: TextStyle(
-                          fontSize: 11,
-                          letterSpacing: 0.6,
-                          fontWeight: FontWeight.w600,
-                          color: context.mutedColor)),
-                  const SizedBox(height: 4),
-                  Text(value,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

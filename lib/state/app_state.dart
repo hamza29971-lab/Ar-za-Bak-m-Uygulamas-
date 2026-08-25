@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/mock_data.dart';
 import '../models/models.dart';
@@ -10,7 +12,7 @@ import '../services/service_locator.dart';
 class AppState extends ChangeNotifier {
   AppState() {
     _vehicles = MockData.vehicles();
-    _notifications = MockData.notifications();
+    _notifications = <NotificationItem>[];
     _activities = MockData.activities(_vehicles);
   }
 
@@ -26,9 +28,52 @@ class AppState extends ChangeNotifier {
   /// saklanır. Anahtarların nerede tutulacağı [TokenStorage] ile belirlenir.
   Future<void> applySession(AuthSession session) async {
     _session = session;
-    _user = session.user;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final String key = 'local_user_profile_${session.user.email}';
+    final String? localProfileJson = prefs.getString(key);
+    
+    UserProfile mergedUser = session.user;
+    
+    if (localProfileJson != null) {
+      try {
+        final Map<String, dynamic> localData = jsonDecode(localProfileJson);
+        mergedUser = mergedUser.copyWith(
+          phone: mergedUser.phone.trim().isEmpty ? localData['phone'] : null,
+          registryNo: mergedUser.registryNo.trim().isEmpty ? localData['registryNo'] : null,
+          machineCode: mergedUser.machineCode.trim().isEmpty ? localData['machineCode'] : null,
+          machineType: mergedUser.machineType.trim().isEmpty ? localData['machineType'] : null,
+        );
+      } catch (_) {}
+    }
+    
+    await prefs.setString(key, jsonEncode(mergedUser.toJson()));
+    _user = mergedUser;
+    
     await ServiceLocator.tokens.save(session);
     notifyListeners();
+  }
+
+  /// Eksik profil bilgilerini elle girildiğinde kaydetmek için kullanılır.
+  Future<void> updateUserLocalData({
+    String? phone,
+    String? registryNo,
+    String? machineCode,
+    String? machineType,
+  }) async {
+    if (_user == null) return;
+    
+    _user = _user!.copyWith(
+      phone: phone,
+      registryNo: registryNo,
+      machineCode: machineCode,
+      machineType: machineType,
+    );
+    notifyListeners();
+    
+    final prefs = await SharedPreferences.getInstance();
+    final String key = 'local_user_profile_${_user!.email}';
+    await prefs.setString(key, jsonEncode(_user!.toJson()));
   }
 
   /// Servis çağrısı yapmadan yerel oturum açar (testler ve demo için).
@@ -268,7 +313,7 @@ class AppState extends ChangeNotifier {
       serialNo: record.serialNo,
       position: record.position,
       changedAt: now,
-      lastCheckDate: record.lastCheckDate,
+      lastCheckDate: record.lastCheckDate ?? now,
     );
 
     // Liste yeniden eskiye sıralı; ilk eşleşen kayıt en günceli.

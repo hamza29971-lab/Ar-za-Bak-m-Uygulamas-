@@ -27,12 +27,13 @@ class AuthApiService {
         // API'nin döndüğü veri yapısı: data['data']['otpRequestId']
         return data['data']?['otpRequestId']?.toString();
       } else {
-        print('Login Error: ${response.statusCode} - ${response.body}');
-        return null;
+        final data = jsonDecode(response.body);
+        final message = data['message'] ?? 'Giriş başarısız. Bilgilerinizi kontrol ediniz.';
+        throw Exception(message);
       }
     } catch (e) {
       print('Login Exception: $e');
-      return null;
+      rethrow;
     }
   }
 

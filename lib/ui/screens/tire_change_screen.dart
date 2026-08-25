@@ -10,6 +10,7 @@ import '../../widgets/common.dart';
 import '../../theme/app_theme.dart';
 import '../../state/app_state.dart';
 import '../../services/publish_service.dart';
+import '../../models/models.dart' as global_models;
 
 class TireChangeScreen extends StatelessWidget {
   const TireChangeScreen({super.key});
@@ -73,11 +74,17 @@ class _LeftPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: _VehicleSearchField(provider: provider)),
               const SizedBox(width: 16),
-              _PendingSubmitButton(provider: provider),
+              SizedBox(
+                height: 50,
+                child: Align(
+                  alignment: Alignment.center,
+                  child: _PendingSubmitButton(provider: provider),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -86,7 +93,7 @@ class _LeftPanel extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.cardColor,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -96,37 +103,37 @@ class _LeftPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              child: provider.selectedVehicle == null
-                  ? const EmptyState(
-                      icon: Icons.tire_repair_outlined,
-                      title: 'Araç seçilmedi',
-                      message: 'Lastik kayıtlarını görmek için yukarıdaki "Araç Seç" alanından bir araç seçin.',
-                    )
-                  : Column(
-                      children: [
-                        // Tablo başlıkları
-                        const _TableHeader(),
-                        const Divider(height: 1, thickness: 1, color: Color(0xFFEEF0F5)),
-                        // Tablo satırları
-                        Expanded(
-                    child: ListView.separated(
-                      padding: EdgeInsets.zero,
-                      itemCount: provider.tireRecords.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFEEF0F5),
-                      ),
-                      itemBuilder: (context, index) {
-                        final record = provider.tireRecords[index];
-                        final isEditing =
-                            provider.editingTireNumber == record.tireNumber;
-                        return _TireRow(
-                          record: record,
-                          isEditing: isEditing,
-                        );
-                      },
-                    ),
+              child: Column(
+                children: [
+                  // Tablo başlıkları
+                  const _TableHeader(),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFEEF0F5)),
+                  // Tablo satırları
+                  Expanded(
+                    child: provider.selectedVehicle == null || provider.tireRecords.isEmpty
+                        ? const EmptyState(
+                            icon: Icons.tire_repair_outlined,
+                            title: 'Araç seçilmedi',
+                            message: 'Lastik kayıtlarını görmek için yukarıdaki "Araç Seç" alanından bir araç seçin.',
+                          )
+                        : ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: provider.tireRecords.length,
+                            separatorBuilder: (context, index) => const Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Color(0xFFEEF0F5),
+                            ),
+                            itemBuilder: (context, index) {
+                              final record = provider.tireRecords[index];
+                              final isEditing =
+                                  provider.editingTireNumber == record.tireNumber;
+                              return _TireRow(
+                                record: record,
+                                isEditing: isEditing,
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -227,9 +234,9 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             margin: const EdgeInsets.only(top: 4),
             constraints: const BoxConstraints(maxHeight: 200),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFDDE1EA), width: 1.5),
+              border: Border.all(color: context.borderColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.10),
@@ -274,9 +281,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
                                 vehicle.name,
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
-                                  color: isSelected
-                                      ? const Color(0xFF2B3252)
-                                      : const Color(0xFF1A1D2E),
+                                  color: context.text.bodyMedium?.color,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -310,9 +315,9 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             margin: const EdgeInsets.only(top: 4),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFDDE1EA), width: 1.5),
+              border: Border.all(color: context.borderColor, width: 1.5),
             ),
             child: const Row(
               children: [
@@ -383,9 +388,9 @@ class _TableHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8F9FC),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      decoration: BoxDecoration(
+        color: context.isDark ? context.cardColor : const Color(0xFFF8F9FC),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       ),
       child: const Row(
         children: [
@@ -511,7 +516,7 @@ class _TireRowState extends State<_TireRow>
           color: widget.record.isChanged
               ? _flashColor.value
               : (widget.isEditing
-                  ? const Color(0xFFF0F4FF)
+                  ? (context.isDark ? const Color(0xFF2C3238) : const Color(0xFFF0F4FF))
                   : Colors.transparent),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           // height sabit 58'den kaldırıldı — Konum isimleri 2 satıra inince satır büyüsün
@@ -526,8 +531,8 @@ class _TireRowState extends State<_TireRow>
             flex: 4,
             child: Text(
               '${widget.record.tireNumber}. ${_getTireName(provider.selectedVehicle?.id, widget.record.tireNumber)}',
-              style: const TextStyle(
-                color: Color(0xFF1A1D2E),
+              style: TextStyle(
+                color: context.text.bodyMedium?.color,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -543,7 +548,7 @@ class _TireRowState extends State<_TireRow>
             child: widget.isEditing
                 ? TextField(
                     controller: _controller,
-                    autofocus: true,
+                    autofocus: false,
                     textAlign: TextAlign.left,
                     decoration: InputDecoration(
                       hintText: 'Yeni Seri No',
@@ -561,10 +566,10 @@ class _TireRowState extends State<_TireRow>
                             color: Color(0xFF2B3252), width: 2),
                       ),
                     ),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1D2E),
+                      color: context.text.bodyMedium?.color,
                     ),
                   )
                 : Text(
@@ -575,7 +580,7 @@ class _TireRowState extends State<_TireRow>
                       fontWeight: FontWeight.w700,
                       color: widget.record.isChanged
                           ? const Color(0xFF198754)
-                          : const Color(0xFF1A1D2E),
+                          : context.text.bodyMedium?.color,
                     ),
                     maxLines: 1,
                     softWrap: false,
@@ -591,6 +596,7 @@ class _TireRowState extends State<_TireRow>
             child: widget.isEditing
                 ? ElevatedButton(
                     onPressed: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
                       final String newSerial = _controller.text;
                       provider.confirmChange(widget.record.tireNumber, newSerial);
                       final state = AppScope.read(context);
@@ -608,6 +614,24 @@ class _TireRowState extends State<_TireRow>
                             'serialNo': newSerial,
                           },
                         ));
+                        state.addActivity(
+                          global_models.ServiceReportActivity(
+                            id: 'tire-change-${DateTime.now().microsecondsSinceEpoch}',
+                            vehicleCode: vehicle.name,
+                            date: DateTime.now(),
+                            reportType: 'Lastik Değişimi',
+                            description: 'Lastik #${widget.record.tireNumber} değiştirildi ($newSerial)',
+                            imagePaths: [],
+                          ),
+                        );
+                        state.addNotification(
+                          global_models.NotificationItem(
+                            title: 'Lastik değişimi kaydedildi',
+                            message: '${vehicle.name} aracı Lastik #${widget.record.tireNumber} yeni seri numarası ile değiştirildi.',
+                            date: DateTime.now(),
+                            kind: global_models.NotificationKind.tire,
+                          ),
+                        );
                       }
                       _controller.clear();
                     },
@@ -657,6 +681,7 @@ class _TireRowState extends State<_TireRow>
                       Expanded( // Kontrol butonuna kalan boşluğu doldurt ki taşma olmasın
                         child: ElevatedButton(
                           onPressed: () {
+                            FocusManager.instance.primaryFocus?.unfocus();
                             showTireActionSheet(context, provider, widget.record, 'Lastik #${widget.record.tireNumber}');
                           },
                           style: ElevatedButton.styleFrom(
@@ -754,6 +779,27 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
   bool _sending = false;
 
   Future<void> _sendPending(BuildContext context, AppState state, VehicleModel? vehicle) async {
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Emin misiniz?'),
+          content: const Text('Bekleyen tüm işlemleri göndermek istediğinize emin misiniz?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Hayır', style: TextStyle(color: Colors.grey)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF198754)),
+              child: const Text('Evet, Gönder'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
     final List<PendingOperation> pending = state.pendingOf(PendingKind.tire);
     if (pending.isEmpty) return;
 
@@ -775,6 +821,17 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
     if (!context.mounted) return;
     setState(() => _sending = false);
 
+    if (result.success) {
+      state.addNotification(
+        global_models.NotificationItem(
+          title: 'Lastik işlemleri gönderildi',
+          message: '${pending.length} işlem${vehicle != null ? ' – ${vehicle.name}' : ''}',
+          date: DateTime.now(),
+          kind: global_models.NotificationKind.tire,
+        ),
+      );
+    }
+
     if (!result.success) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -787,11 +844,43 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
 
     final int count = pending.length;
     state.clearPending(PendingKind.tire);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('$count lastik işlemi başarıyla gönderildi.'),
-      ));
+    
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
+        title: const Text('İşlemler gönderildi'),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('$count işlem gönderildi:',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                for (final PendingOperation p in pending)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Text('• ${p.vehicleCode} — ${p.label}',
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              Navigator.of(context).pop();
+            },
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -828,6 +917,18 @@ class _VehicleDisplay extends StatelessWidget {
             fit: BoxFit.contain,
           ),
         ),
+        const SizedBox(height: 16),
+        Text(
+          vehicle.name,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${vehicle.typeLabel} • ${vehicle.tireCount} lastik',
+          style: TextStyle(fontSize: 13, color: context.mutedColor),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
@@ -841,6 +942,7 @@ void showTireActionSheet(BuildContext context, TireChangeProvider provider, Tire
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    constraints: const BoxConstraints(maxWidth: 800),
     builder: (BuildContext sheetContext) {
       return _TireActionSheetContent(
         provider: provider,
@@ -848,7 +950,9 @@ void showTireActionSheet(BuildContext context, TireChangeProvider provider, Tire
         label: label,
       );
     },
-  );
+  ).then((_) {
+    FocusManager.instance.primaryFocus?.unfocus();
+  });
 }
 
 class _TireActionSheetContent extends StatefulWidget {
@@ -893,8 +997,27 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
             'items': actions,
           },
         ));
+        state.addActivity(
+          global_models.ServiceReportActivity(
+            id: 'tire-check-${DateTime.now().microsecondsSinceEpoch}',
+            vehicleCode: vehicle.name,
+            date: DateTime.now(),
+            reportType: 'Lastik Kontrolü',
+            description: actions.join('\n'),
+            imagePaths: [],
+          ),
+        );
+        state.addNotification(
+          global_models.NotificationItem(
+            title: 'Lastik kontrolü eklendi',
+            message: '${vehicle.name} aracı Lastik #${widget.record.tireNumber} kontrol edildi.',
+            date: DateTime.now(),
+            kind: global_models.NotificationKind.tire,
+          ),
+        );
       }
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     Navigator.pop(context);
   }
 
@@ -907,7 +1030,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -928,7 +1051,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
             '${widget.label} Kontrolü',
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: FontWeight.w800,
               color: Color(0xFF1A1D2E),
             ),
@@ -938,7 +1061,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
           // Tarihçe Kartı — her aksiyon kendi tarihiyle ayrı satırda
           if (widget.record.actionHistory.isNotEmpty)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               margin: const EdgeInsets.only(bottom: 24),
               decoration: BoxDecoration(
                 color: const Color(0xFFF0F4FF),
@@ -950,12 +1073,12 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.history, size: 18, color: Color(0xFF2B5CE6)),
+                      Icon(Icons.history, size: 22, color: Color(0xFF2B5CE6)),
                       SizedBox(width: 8),
                       Text(
                         'Kontrol Geçmişi',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF2B5CE6),
                         ),
@@ -975,7 +1098,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
                             child: Text(
                               entry.action,
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF1A1D2E),
                               ),
@@ -985,7 +1108,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
                           Text(
                             entryDate,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 14,
                               color: Color(0xFF7B8094),
                             ),
                           ),
@@ -1001,7 +1124,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
           const Text(
             'Yeni İşlem Ekle',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: Color(0xFF7B8094),
             ),
@@ -1038,7 +1161,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
               backgroundColor: const Color(0xFF2B5CE6),
               foregroundColor: Colors.white,
               disabledBackgroundColor: const Color(0xFF2B5CE6).withValues(alpha: 0.5),
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 20),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -1046,7 +1169,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
             child: const Text(
               'Tamamla',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1079,13 +1202,13 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
         activeColor: color,
         title: Row(
           children: [
-            Icon(icon, size: 24, color: value ? color : const Color(0xFF7B8094)),
-            const SizedBox(width: 12),
+            Icon(icon, size: 28, color: value ? color : const Color(0xFF7B8094)),
+            const SizedBox(width: 16),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 18,
                   fontWeight: value ? FontWeight.w700 : FontWeight.w600,
                   color: value ? color : const Color(0xFF1A1D2E),
                 ),
@@ -1094,7 +1217,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
           ],
         ),
         controlAffinity: ListTileControlAffinity.leading,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );

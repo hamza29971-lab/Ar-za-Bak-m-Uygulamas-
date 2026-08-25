@@ -82,27 +82,43 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (AuthApiService.useRealApi) {
       // Gerçek API ile Login
-      // Yükleniyor dialogu gösterilebilir (basitlik için bekleme süresince UI bloklanmıyor)
-      final otpRequestId = await AuthApiService.loginWithPhone(loginId, password);
-      
-      if (!mounted) return;
-      
-      if (otpRequestId != null) {
-        // OTP Ekranına yönlendir
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                OtpScreen(phoneNumber: loginId, correctCode: '', otpRequestId: otpRequestId),
-            transitionsBuilder: (context, anim, secondaryAnim, child) {
-              return FadeTransition(opacity: anim, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Giriş başarısız. Bilgilerinizi kontrol ediniz.')),
-        );
+      try {
+        final otpRequestId = await AuthApiService.loginWithPhone(loginId, password);
+        
+        if (!mounted) return;
+        
+        if (otpRequestId != null) {
+          // OTP Ekranına yönlendir
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  OtpScreen(phoneNumber: loginId, correctCode: '', otpRequestId: otpRequestId, password: password),
+              transitionsBuilder: (context, anim, secondaryAnim, child) {
+                return FadeTransition(opacity: anim, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 500),
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        String errorMsg = e.toString();
+        if (errorMsg.startsWith('Exception: ')) {
+          errorMsg = errorMsg.substring(11);
+        }
+        showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Giriş Hatası'),
+              content: Text(errorMsg),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tamam'),
+                ),
+              ],
+            ),
+          );
       }
       return;
     }
@@ -327,10 +343,9 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                       const SizedBox(height: 30),
 
-                      // Araç Görseli
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 80),
                           child: Image.asset(
                             'assets/images/truck_damper.png',
                             fit: BoxFit.contain,
@@ -471,7 +486,7 @@ class _PhoneInput extends StatelessWidget {
         TextField(
           controller: controller,
           onChanged: onChanged,
-          keyboardType: TextInputType.phone,
+          keyboardType: TextInputType.number,
           inputFormatters: [PhoneInputFormatter()],
           decoration: InputDecoration(
             hintText: '(05XX) XXX XX XX',
@@ -713,20 +728,29 @@ class _PasswordInputState extends State<_PasswordInput> {
 class PhoneInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length > 11) {
-      return oldValue; // 11 haneden fazla girmesin
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+    ) {
+      String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+      
+      // Silme (Backspace) kilitlenmesi cozumu
+      if (oldValue.text.length > newValue.text.length && 
+          oldValue.text.replaceAll(RegExp(r'\D'), '') == digits) {
+        if (digits.isNotEmpty) {
+          digits = digits.substring(0, digits.length - 1);
+        }
+      }
+      
+      if (digits.length > 11) {
+        return oldValue; // 11 haneden fazla girmesin
+      }
+      
+      final String formatted = _formatPhone(digits);
+      return TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
     }
-    
-    final String formatted = _formatPhone(digits);
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
 
   String _formatPhone(String digits) {
     if (digits.isEmpty) return '';

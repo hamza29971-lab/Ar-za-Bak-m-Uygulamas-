@@ -14,6 +14,7 @@ class AppColors {
   static const Color tire = Color(0xFF3F8A24); // Lastik Değişimi
   static const Color oil = Color(0xFFD98A0B); // Yağ Takviyesi
   static const Color form = Color(0xFF2F6FED); // Servis Raporu
+  static const Color mechanic = Color(0xFF6D3FBF); // Mekanik Operasyon
   static const Color emergency = Color(0xFFD64545);
   static const Color stop = Color(0xFF7B2D9E);
   static const Color fault = Color(0xFFF26522);

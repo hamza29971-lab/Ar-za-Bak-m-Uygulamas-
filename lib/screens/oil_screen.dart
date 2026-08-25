@@ -55,7 +55,7 @@ class _OilScreenState extends State<OilScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
-              flex: 55,
+              flex: 50,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -65,14 +65,36 @@ class _OilScreenState extends State<OilScreen> {
                   ),
                   const SizedBox(height: 16),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: <Widget>[
-                      VehicleSelector(
-                        selected: vehicle,
-                        accentColor: accent,
-                        onSelected: state.selectVehicle,
+                      Expanded(
+                        child: VehicleSelector(
+                          selected: vehicle,
+                          accentColor: accent,
+                          onSelected: state.selectVehicle,
+                        ),
                       ),
                       const SizedBox(width: 16),
-                      if (vehicle != null) _OilSummary(records: records),
+                      PrimaryActionButton(
+                        label: _category == OilCategory.refill
+                            ? 'Takviye Yap'
+                            : 'Yağlama Yap',
+                        accent: accent,
+                        onPressed: vehicle == null || records.isEmpty
+                            ? null
+                            : () => _newRefillDialog(context, state, vehicle, records),
+                      ),
+                      const SizedBox(width: 16),
+                      PrimaryActionButton(
+                        label: 'Gönder',
+                        icon: Icons.send_rounded,
+                        accent: AppColors.form,
+                        badge: pendingCount,
+                        compact: true,
+                        onPressed: pendingCount == 0 || _sending
+                            ? null
+                            : () => _sendPending(context, state, vehicle),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -87,38 +109,6 @@ class _OilScreenState extends State<OilScreen> {
                         scrollDirection: Axis.horizontal,
                         child: _buildCategoryTabs(context),
                       ),
-                      // Takviye yalnızca buradan yapılır; tabloda satır başına
-                      // "Takviye Yap" butonu yoktur.
-                      PrimaryActionButton(
-                        label: _category == OilCategory.refill
-                            ? 'Takviye Yap'
-                            : 'Yağlama Yap',
-                        accent: accent,
-                        onPressed: vehicle == null || records.isEmpty
-                            ? null
-                            : () =>
-                                _newRefillDialog(context, state, vehicle, records),
-                      ),
-                      PrimaryActionButton(
-                        label: 'Tümünü Kontrol Et',
-                        icon: Icons.fact_check_outlined,
-                        accent: AppColors.form,
-                        filled: false,
-                        compact: true,
-                        onPressed: vehicle == null || records.isEmpty
-                            ? null
-                            : () => _checkAll(context, state, vehicle, records),
-                      ),
-                      PrimaryActionButton(
-                        label: 'Gönder',
-                        icon: Icons.send_rounded,
-                        accent: AppColors.form,
-                        badge: pendingCount,
-                        compact: true,
-                        onPressed: pendingCount == 0 || _sending
-                            ? null
-                            : () => _sendPending(context, state, vehicle),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -128,8 +118,23 @@ class _OilScreenState extends State<OilScreen> {
             ),
             const SizedBox(width: 20),
             Expanded(
-              flex: 45,
-              child: SizedBox.expand(child: VehiclePhoto(vehicle: vehicle)),
+              flex: 50,
+              child: SizedBox.expand(
+                  child: vehicle == null 
+                    ? const Center(
+                        child: Text(
+                          'Fotoğrafı görmek için bir araç seçin',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ) 
+                    : AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        child: _VehicleDisplay(
+                          key: ValueKey(vehicle.code),
+                          vehicle: vehicle,
+                        ),
+                      )
+                ),
             ),
           ],
         ),
@@ -186,12 +191,12 @@ class _OilScreenState extends State<OilScreen> {
         return <Widget>[
           CellText(r.oilType, subtitle: r.areaId, bold: true),
           CellText(
-            formatDate(r.lastOilDate),
-            subtitle: '${daysSince(r.lastOilDate)} gün önce',
+            r.lastOilDate != null ? formatDate(r.lastOilDate!) : '-',
+            subtitle: r.lastOilDate != null ? '${daysSince(r.lastOilDate!)} gün önce' : 'Henüz işlem yok',
           ),
           CellText(
-            formatDate(r.lastCheckDate),
-            subtitle: '${daysSince(r.lastCheckDate)} gün önce',
+            r.lastCheckDate != null ? formatDate(r.lastCheckDate!) : '-',
+            subtitle: r.lastCheckDate != null ? '${daysSince(r.lastCheckDate!)} gün önce' : 'Henüz kontrol yok',
           ),
           // Takviye yalnızca tablonun üstündeki butondan yapılır; satırda
           // sadece kontrol kalır.
@@ -254,11 +259,17 @@ class _OilScreenState extends State<OilScreen> {
         ),
         actions: <Widget>[
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              Navigator.of(context).pop(false);
+            },
             child: const Text('Vazgeç'),
           ),
           FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              Navigator.of(context).pop(true);
+            },
             style: FilledButton.styleFrom(backgroundColor: AppColors.form),
             icon: const Icon(Icons.fact_check_outlined, size: 18),
             label: const Text('Kontrol Et'),
@@ -284,6 +295,27 @@ class _OilScreenState extends State<OilScreen> {
     AppState state,
     Vehicle? vehicle,
   ) async {
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Emin misiniz?'),
+          content: const Text('Bekleyen tüm işlemleri göndermek istediğinize emin misiniz?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Hayır', style: TextStyle(color: Colors.grey)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF198754)),
+              child: const Text('Evet, Gönder'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
     final List<PendingOperation> pending = state.pendingOf(PendingKind.oil);
     if (pending.isEmpty) return;
 
@@ -347,19 +379,16 @@ class _OilScreenState extends State<OilScreen> {
                     child: Text('• ${p.vehicleCode} — ${p.label}',
                         style: const TextStyle(fontSize: 13)),
                   ),
-                const SizedBox(height: 12),
-                InfoLine(
-                  label: 'MQTT konusu',
-                  value: result.topic,
-                  labelWidth: 110,
-                ),
               ],
             ),
           ),
         ),
         actions: <Widget>[
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              FocusManager.instance.primaryFocus?.unfocus();
+              Navigator.of(context).pop();
+            },
             child: const Text('Tamam'),
           ),
         ],
@@ -451,6 +480,7 @@ class _OilTypePickerDialogState extends State<_OilTypePickerDialog> {
       setState(() => _showErrors = true);
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     Navigator.of(context).pop(_RefillRequest(record, value, product));
   }
 
@@ -577,6 +607,54 @@ class _OilSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VehicleDisplay extends StatelessWidget {
+  final Vehicle vehicle;
+  const _VehicleDisplay({required this.vehicle, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    String imagePath = 'assets/images/vehicle_default.png';
+    final lower = vehicle.code.toLowerCase();
+    
+    if (lower.startsWith('euclid')) {
+      imagePath = 'assets/images/euclid_truck.png';
+    } else if (lower.startsWith('xcmg')) {
+      imagePath = 'assets/images/xcmg_truck.png';
+    } else if (lower.startsWith('liugong')) {
+      if (vehicle.tireCount <= 4) {
+        imagePath = 'assets/images/loader.png';
+      } else {
+        imagePath = 'assets/images/green_truck.png';
+      }
+    }
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 320),
+          child: Image.asset(
+            imagePath,
+            fit: BoxFit.contain,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          vehicle.code,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${vehicle.typeLabel} • ${vehicle.tireCount} lastik',
+          style: TextStyle(fontSize: 13, color: context.mutedColor),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

@@ -25,6 +25,8 @@ class _ShellScreenState extends State<ShellScreen> {
     _NavItem('Yağ Takviyesi', Icons.water_drop_outlined, Icons.water_drop, AppColors.oil),
     _NavItem('Servis Raporu', Icons.description_outlined, Icons.description,
         AppColors.form),
+    _NavItem('Mekanik Operasyon', Icons.build_outlined, Icons.build,
+        AppColors.mechanic),
   ];
 
   void _go(int index) => setState(() => _index = index);
@@ -37,10 +39,15 @@ class _ShellScreenState extends State<ShellScreen> {
         child: IndexedStack(
           index: _index,
           children: <Widget>[
-            HomeScreen(onNavigate: _go),
+            const HomeScreen(),
             const TireChangeScreen(),
             const OilScreen(),
             const ServiceReportScreen(),
+            const ServiceReportScreen(
+              title: 'Mekanik Operasyon',
+              types: ReportType.mechanicalTypes,
+              accent: AppColors.mechanic,
+            ),
           ],
         ),
       ),
@@ -55,7 +62,13 @@ class _ShellScreenState extends State<ShellScreen> {
             height: 74,
             child: Row(
               children: <Widget>[
-                for (int i = 0; i < _items.length; i++)
+                for (int i = 0; i < _items.length; i++) ...[
+                  if (i > 0)
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: context.borderColor,
+                    ),
                   Expanded(
                     child: _NavButton(
                       item: _items[i],
@@ -63,6 +76,7 @@ class _ShellScreenState extends State<ShellScreen> {
                       onTap: () => _go(i),
                     ),
                   ),
+                ],
               ],
             ),
           ),

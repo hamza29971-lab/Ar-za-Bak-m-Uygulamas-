@@ -26,4 +26,28 @@ class AppConfig {
 
   /// Sahte modda üretilen doğrulama kodu ekranda gösterilsin mi?
   static const bool showMockCode = useMockAuth;
+
+  /// Nimo Fleet API adresi.
+  static const String fleetEventUrl = String.fromEnvironment(
+    'NIMO_FLEET_URL',
+    defaultValue: 'https://nimo-fleet-panel.vercel.app/api/event',
+  );
+
+  /// Nimo Fleet Health URL.
+  static const String fleetHealthUrl = String.fromEnvironment(
+    'NIMO_FLEET_HEALTH_URL',
+    defaultValue: 'https://nimo-fleet-panel.vercel.app/api/health',
+  );
+
+  /// Nimo Fleet API anahtarı.
+  static const String fleetApiKey = String.fromEnvironment(
+    'NIMO_FLEET_KEY',
+    defaultValue: 'nimo-fleet-test-tablet-key',
+  );
+
+  /// Nimo Fleet Source.
+  static const String fleetSource = String.fromEnvironment(
+    'NIMO_FLEET_SOURCE',
+    defaultValue: 'tablet',
+  );
 }
