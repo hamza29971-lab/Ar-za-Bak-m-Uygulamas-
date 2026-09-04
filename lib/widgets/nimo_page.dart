@@ -88,8 +88,8 @@ class NimoTopBar extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           _CircleAction(
-            icon: Icons.notifications_none,
-            tooltip: 'Bildirimler',
+            icon: Icons.history,
+            tooltip: 'Geçmiş',
             badge: state.unreadCount,
             onTap: () => showNotificationsDialog(context),
           ),
@@ -233,54 +233,25 @@ class _ProfileButton extends StatelessWidget {
           ),
         ),
         child: Container(
+          width: 46,
           height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: context.borderColor),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              CircleAvatar(
-                radius: 15,
-                backgroundColor: AppColors.brandSoft,
-                child: Text(
-                  user?.initials ?? '?',
-                  style: const TextStyle(
-                    color: AppColors.brand,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
+          child: Center(
+            child: CircleAvatar(
+              radius: 15,
+              backgroundColor: AppColors.brandSoft,
+              child: Text(
+                user?.initials ?? '?',
+                style: const TextStyle(
+                  color: AppColors.brand,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
                 ),
               ),
-              if (!compact) ...<Widget>[
-                const SizedBox(width: 10),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 150),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        user?.fullName ?? 'Profil',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        user?.role ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11, color: context.mutedColor),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Icon(Icons.chevron_right, size: 18, color: context.mutedColor),
-              ],
-            ],
+            ),
           ),
         ),
       ),

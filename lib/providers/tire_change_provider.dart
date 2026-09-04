@@ -236,4 +236,14 @@ class TireChangeProvider extends ChangeNotifier {
     _sendSuccess = false;
     notifyListeners();
   }
+
+  /// Gönderim sonrasında seri numaralarını '---' haline getir
+  Future<void> resetChangedTires() async {
+    _tireRecords = _tireRecords.map((r) => r.copyWith(
+      isChanged: false,
+      serialNumber: r.isChanged ? '---' : r.serialNumber,
+    )).toList();
+    await _saveTireRecords();
+    notifyListeners();
+  }
 }

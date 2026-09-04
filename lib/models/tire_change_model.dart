@@ -48,7 +48,7 @@ class VehicleModel {
         id: 'euclid_${i + 1}',
         name: 'Euclid-${i + 1}',
         tireCount: 6,
-        imagePath: 'assets/images/euclid_truck.png',
+        imagePath: 'assets/images/yesil_arac.png',
         topDownImagePath: 'assets/images/truck_6_top_down.jpg',
       )),
       // Liugong 16-20 (10 Lastik)
@@ -64,7 +64,7 @@ class VehicleModel {
         id: 'xcmg_${i + 13}',
         name: 'XCMG-${i + 13}',
         tireCount: 10,
-        imagePath: 'assets/images/xcmg_truck.png',
+        imagePath: 'assets/images/yesil_excavator.png',
         topDownImagePath: 'assets/images/truck_10_top_down.jpg',
       )),
       // Liugong 33-39 — Loder tipi (4 Lastik)

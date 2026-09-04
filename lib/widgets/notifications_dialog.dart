@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../state/app_state.dart';
@@ -42,7 +42,7 @@ class _NotificationsDialog extends StatelessWidget {
                       color: AppColors.brandSoft,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.notifications_none,
+                    child: const Icon(Icons.history,
                         color: AppColors.brand, size: 24),
                   ),
                   const SizedBox(width: 14),
@@ -50,11 +50,11 @@ class _NotificationsDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text('Bildirimler',
+                        const Text('Geçmiş',
                             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 2),
                         Text(
-                          unread == 0 ? 'Hepsi güncel' : '$unread okunmamış bildirim',
+                          unread == 0 ? 'Hepsi güncel' : '$unread yeni işlem',
                           style: TextStyle(fontSize: 13, color: context.mutedColor),
                         ),
                       ],
@@ -74,7 +74,7 @@ class _NotificationsDialog extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
-                  const Text('Tüm bildirimler',
+                  const Text('Tüm geçmiş',
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   Text('${items.length} kayıt',
                       style: TextStyle(fontSize: 13, color: context.mutedColor)),
@@ -91,7 +91,7 @@ class _NotificationsDialog extends StatelessWidget {
                         children: <Widget>[
                           Icon(Icons.inbox_outlined, size: 42, color: context.mutedColor),
                           const SizedBox(height: 14),
-                          Text('Henüz bildirim yok.',
+                          Text('Henüz geçmiş kaydı yok.',
                               style: TextStyle(color: context.mutedColor, fontSize: 15)),
                         ],
                       ),

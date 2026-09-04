@@ -205,13 +205,23 @@ class _OilScreenState extends State<OilScreen> {
             icon: Icons.fact_check_outlined,
             color: AppColors.form,
             filled: false,
-            onPressed: () {
+            onPressed: () async {
               state.checkOil(vehicle!, r);
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(content: Text('Kontroller Tamamlandı')),
-                );
+              if (!context.mounted) return;
+              await showDialog<void>(
+                context: context,
+                builder: (BuildContext context) => AlertDialog(
+                  icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
+                  title: const Text('Kontrol Tamamlandı'),
+                  content: Text('${r.oilType} alanı kontrol edilmiş olarak işaretlendi.'),
+                  actions: <Widget>[
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Tamam'),
+                    ),
+                  ],
+                ),
+              );
             },
           ),
         ];
@@ -237,7 +247,7 @@ class _OilScreenState extends State<OilScreen> {
     );
 
     if (request == null || !context.mounted) return;
-    _commitRefill(context, state, vehicle, request.record, request.amount,
+    await _commitRefill(context, state, vehicle, request.record, request.amount,
         request.product);
   }
 
@@ -282,11 +292,21 @@ class _OilScreenState extends State<OilScreen> {
     for (final OilRecord r in records) {
       state.checkOil(vehicle, r);
     }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('${records.length} alan kontrol edildi.')),
-      );
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
+        title: const Text('Kontrol Tamamlandı'),
+        content: Text('${records.length} alan kontrol edildi.'),
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// "Gönder": bu ekranda yapılıp bekleyen işlemleri tek mesajda yollar.
@@ -348,6 +368,7 @@ class _OilScreenState extends State<OilScreen> {
 
     final int count = pending.length;
     state.clearPending(PendingKind.oil);
+    state.selectVehicle(null);
     state.addNotification(
       NotificationItem(
         title: 'Yağ işlemleri gönderildi',
@@ -397,21 +418,30 @@ class _OilScreenState extends State<OilScreen> {
   }
 
   /// Takviyeyi kaydeder ve kullanıcıya bilgi verir.
-  void _commitRefill(
+  Future<void> _commitRefill(
     BuildContext context,
     AppState state,
     Vehicle vehicle,
     OilRecord record,
     double amount,
     String product,
-  ) {
+  ) async {
     state.refillOil(vehicle, record, amount, product: product);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('${record.oilType} için ${amount.toStringAsFixed(1)} L'
-            ' kaydedildi ($product).'),
-      ));
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
+        title: const Text('Takviye Kaydedildi'),
+        content: SizedBox(width: 460, child: Text('${record.oilType} için ${amount.toStringAsFixed(1)} L kaydedildi.\n\nKullanılan Ürün:\n$product', style: const TextStyle(fontSize: 16))),
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -621,9 +651,9 @@ class _VehicleDisplay extends StatelessWidget {
     final lower = vehicle.code.toLowerCase();
     
     if (lower.startsWith('euclid')) {
-      imagePath = 'assets/images/euclid_truck.png';
+      imagePath = 'assets/images/yesil_arac.png';
     } else if (lower.startsWith('xcmg')) {
-      imagePath = 'assets/images/xcmg_truck.png';
+      imagePath = 'assets/images/yesil_excavator.png';
     } else if (lower.startsWith('liugong')) {
       if (vehicle.tireCount <= 4) {
         imagePath = 'assets/images/loader.png';

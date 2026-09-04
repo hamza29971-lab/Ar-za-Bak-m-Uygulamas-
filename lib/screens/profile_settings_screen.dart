@@ -219,55 +219,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             ],
           ),
           const SizedBox(height: 22),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(AppTheme.radius),
-              border: Border.all(color: context.borderColor),
-            ),
-            child: Row(
-              children: <Widget>[
-                CircleAvatar(
-                  radius: 34,
-                  backgroundColor: AppColors.brandSoft,
-                  child: Text(
-                    user?.initials ?? '?',
-                    style: const TextStyle(
-                        color: AppColors.brand,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700),
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(user?.fullName ?? '-',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text(user?.email ?? '-',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: context.mutedColor, fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text('DETAYLAR',
-              style: TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w700,
-                  color: context.mutedColor)),
-          const SizedBox(height: 12),
           _DetailRow(
               icon: Icons.person_outline, label: 'AD SOYAD', value: user?.fullName ?? '-'),
           _DetailRow(

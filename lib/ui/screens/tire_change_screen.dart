@@ -167,6 +167,18 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
   }
 
   @override
+  void didUpdateWidget(covariant _VehicleSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.provider.selectedVehicle?.name != _controller.text) {
+      if (widget.provider.selectedVehicle == null) {
+        _controller.clear();
+      } else if (!_isOpen) {
+        _controller.text = widget.provider.selectedVehicle!.name;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -844,6 +856,8 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
 
     final int count = pending.length;
     state.clearPending(PendingKind.tire);
+    await widget.provider.resetChangedTires();
+    widget.provider.clearSelectedVehicle();
     
     await showDialog<void>(
       context: context,
@@ -935,19 +949,22 @@ class _VehicleDisplay extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// BOTTOM SHEET (KONTROL MENÜSÜ)
+// POPUP (KONTROL MENÜSÜ)
 // ─────────────────────────────────────────────
 void showTireActionSheet(BuildContext context, TireChangeProvider provider, TireRecord record, String label) {
-  showModalBottomSheet(
+  showDialog(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    constraints: const BoxConstraints(maxWidth: 800),
     builder: (BuildContext sheetContext) {
-      return _TireActionSheetContent(
-        provider: provider,
-        record: record,
-        label: label,
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 700,
+          child: _TireActionSheetContent(
+            provider: provider,
+            record: record,
+            label: label,
+          ),
+        ),
       );
     },
   ).then((_) {
@@ -1026,11 +1043,11 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
 
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.circular(24),
       ),
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(40),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

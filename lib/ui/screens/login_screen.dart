@@ -321,28 +321,35 @@ class _LoginScreenState extends State<LoginScreen>
                   padding: const EdgeInsets.symmetric(vertical: 40),
                   child: Column(
                     children: [
-                      // Hoşgeldiniz Metni
+                      Image.asset(
+                        'assets/images/çimnak_logo.png',
+                        height: 60,
+                      ),
+                      const SizedBox(height: 16),
+                      // Sadece yeni başlık yazısı
                       const Text(
-                        'NUH ÇİMENTO',
+                        'Nuh Intelligent Mining Operations',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF1A1D2E),
-                          letterSpacing: 1.5,
+                          letterSpacing: 0.5,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 12),
+                      // Büyütülmüş Hoşgeldiniz Yazısı
                       const Text(
                         'BAKIM SİSTEMİNE HOŞGELDİNİZ',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
                           color: Color(0xFF2E7D32),
                           letterSpacing: 1.2,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 30),
-
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 80),
