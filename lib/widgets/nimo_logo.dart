@@ -29,7 +29,7 @@ class NimoLogo extends StatelessWidget {
       errorBuilder: (BuildContext context, Object error, StackTrace? stack) => Icon(
         Icons.smart_toy_outlined,
         size: size * 0.55,
-        color: AppColors.brand,
+        color: context.brandColor,
       ),
     );
 
@@ -40,7 +40,7 @@ class NimoLogo extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.brandSoft,
+        color: context.brandSoftColor,
         borderRadius: BorderRadius.circular(size * 0.27),
       ),
       child: image,

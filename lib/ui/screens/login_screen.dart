@@ -2,6 +2,7 @@
 
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../screens/shell_screen.dart';
@@ -108,15 +109,21 @@ class _LoginScreenState extends State<LoginScreen>
         }
         showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Giriş Hatası'),
-              content: Text(errorMsg),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Tamam'),
-                ),
-              ],
+            // Giriş ekranı hep açık temada olduğu için diyalogu da açık
+            // temaya sabitliyoruz; aksi halde uygulama koyu moddayken
+            // pencere koyu gelirdi.
+            builder: (context) => Theme(
+              data: AppTheme.light(),
+              child: AlertDialog(
+                title: const Text('Giriş Hatası'),
+                content: Text(errorMsg),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Tamam'),
+                  ),
+                ],
+              ),
             ),
           );
       }
@@ -210,8 +217,17 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Giriş ekranı, uygulamanın tema tercihi ne olursa olsun her zaman açık
+    // temada gösterilir. Builder, alt ağacın bu yeni temayı görmesini sağlar.
+    return Theme(
+      data: AppTheme.light(),
+      child: Builder(builder: _buildContent),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.authBg,
       body: Row(
         children: [
           // ── Sol Panel: Login Formu ────────────────────────────────
@@ -236,21 +252,21 @@ class _LoginScreenState extends State<LoginScreen>
                         const SizedBox(height: 16),
 
                         // Başlık
-                        const Text(
+                        Text(
                           'Giriş Yap',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1D2E),
+                            color: context.authTitle,
                           ),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
+                        Text(
                           'Telefon veya e-posta ile giriş yapın.\nDoğrulama kodu gönderilecektir.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF7B8094),
+                            color: context.authMuted,
                             height: 1.5,
                           ),
                         ),
@@ -309,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen>
           ),
 
           // Dikey ayırıcı
-          Container(width: 1, color: const Color(0xFFEEF0F5)),
+          Container(width: 1, color: context.authDivider),
 
           // ── Sağ Panel: Karşılama + Araç Görseli ──────────────────
           Expanded(
@@ -323,28 +339,28 @@ class _LoginScreenState extends State<LoginScreen>
                     children: [
                       Image.asset(
                         'assets/images/çimnak_logo.png',
-                        height: 60,
+                        height: 110,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 22),
                       // Sadece yeni başlık yazısı
-                      const Text(
+                      Text(
                         'Nuh Intelligent Mining Operations',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 32,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1D2E),
+                          color: context.authTitle,
                           letterSpacing: 0.5,
                         ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
                       // Büyütülmüş Hoşgeldiniz Yazısı
-                      const Text(
-                        'BAKIM SİSTEMİNE HOŞGELDİNİZ',
+                      Text(
+                        'ARIZA BAKIM SİSTEMİNE HOŞGELDİNİZ',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 34,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF2E7D32),
+                          color: context.authGreen,
                           letterSpacing: 1.2,
                         ),
                         textAlign: TextAlign.center,
@@ -387,9 +403,9 @@ class _TabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F8),
+        color: context.authSoft,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDDE1EA)),
+        border: Border.all(color: context.authBorder),
       ),
       child: Row(
         children: [
@@ -437,7 +453,7 @@ class _TabItem extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF2E7D32) : Colors.transparent,
+            color: isSelected ? context.authGreenFill : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -446,7 +462,7 @@ class _TabItem extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isSelected ? Colors.white : const Color(0xFF7B8094),
+                color: isSelected ? Colors.white : context.authMuted,
               ),
               const SizedBox(width: 6),
               Text(
@@ -454,7 +470,7 @@ class _TabItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : const Color(0xFF7B8094),
+                  color: isSelected ? Colors.white : context.authMuted,
                 ),
               ),
             ],
@@ -481,12 +497,12 @@ class _PhoneInput extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Telefon',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF7B8094),
+            color: context.authMuted,
           ),
         ),
         const SizedBox(height: 6),
@@ -497,37 +513,37 @@ class _PhoneInput extends StatelessWidget {
           inputFormatters: [PhoneInputFormatter()],
           decoration: InputDecoration(
             hintText: '(05XX) XXX XX XX',
-            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-            prefixIcon: const Icon(Icons.phone_outlined,
-                color: Color(0xFF7B8094), size: 20),
+            hintStyle: TextStyle(color: context.authHint),
+            prefixIcon: Icon(Icons.phone_outlined,
+                color: context.authMuted, size: 20),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: context.authField,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+              borderSide: BorderSide(color: context.authGreen, width: 2),
             ),
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1D2E),
+            color: context.authTitle,
             letterSpacing: 1.2,
           ),
         ),
@@ -550,12 +566,12 @@ class _EmailInput extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'E-posta',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF7B8094),
+            color: context.authMuted,
           ),
         ),
         const SizedBox(height: 6),
@@ -565,30 +581,30 @@ class _EmailInput extends StatelessWidget {
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
             hintText: 'ornek@email.com',
-            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-            prefixIcon: const Icon(Icons.email_outlined,
-                color: Color(0xFF7B8094), size: 20),
+            hintStyle: TextStyle(color: context.authHint),
+            prefixIcon: Icon(Icons.email_outlined,
+                color: context.authMuted, size: 20),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFDDE1EA), width: 1.5),
+              borderSide: BorderSide(color: context.authBorder, width: 1.5),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFDDE1EA), width: 1.5),
+              borderSide: BorderSide(color: context.authBorder, width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                  BorderSide(color: context.authGreen, width: 2),
             ),
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1D2E),
+            color: context.authTitle,
           ),
         ),
       ],
@@ -619,9 +635,9 @@ class _LoginButton extends StatelessWidget {
         child: ElevatedButton.icon(
           onPressed: canLogin ? onLogin : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2E7D32),
+            backgroundColor: context.authGreenFill,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: const Color(0xFF2E7D32),
+            disabledBackgroundColor: context.authGreenFill,
             disabledForegroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
@@ -666,12 +682,12 @@ class _PasswordInputState extends State<_PasswordInput> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Şifre',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF7B8094),
+            color: context.authMuted,
           ),
         ),
         const SizedBox(height: 6),
@@ -681,13 +697,13 @@ class _PasswordInputState extends State<_PasswordInput> {
           obscureText: _obscureText,
           decoration: InputDecoration(
             hintText: '••••••••',
-            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-            prefixIcon: const Icon(Icons.lock_outline,
-                color: Color(0xFF7B8094), size: 20),
+            hintStyle: TextStyle(color: context.authHint),
+            prefixIcon: Icon(Icons.lock_outline,
+                color: context.authMuted, size: 20),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscureText ? Icons.visibility_off : Icons.visibility,
-                color: const Color(0xFF7B8094),
+                color: context.authMuted,
                 size: 20,
               ),
               onPressed: () {
@@ -697,24 +713,24 @@ class _PasswordInputState extends State<_PasswordInput> {
               },
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: context.authField,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+              borderSide: BorderSide(color: context.authGreen, width: 2),
             ),
             isDense: true,
             contentPadding:
@@ -723,7 +739,7 @@ class _PasswordInputState extends State<_PasswordInput> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF1A1D2E),
+            color: context.authTitle,
             letterSpacing: _obscureText ? 2.0 : 1.0,
           ),
         ),

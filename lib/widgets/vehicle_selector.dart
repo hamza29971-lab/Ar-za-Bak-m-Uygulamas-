@@ -138,7 +138,8 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                 child: Container(
                   constraints: const BoxConstraints(maxHeight: 300),
                   decoration: BoxDecoration(
-                    color: context.pageColor,
+                    color:
+                        context.isDark ? context.elevatedColor : context.pageColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: context.borderColor),
                     boxShadow: <BoxShadow>[

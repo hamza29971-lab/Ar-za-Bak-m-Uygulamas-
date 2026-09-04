@@ -44,6 +44,8 @@ class FleetEventMapper {
     required String? vehicleLabel,
     required String? operatorLabel,
     required DateTime occurredAt,
+    String? startTime,
+    String? endTime,
   }) {
     return FleetEvent(
       title: reportType,
@@ -59,6 +61,9 @@ class FleetEventMapper {
         // Uç nokta dosya yüklemiyor; yalnızca hangi dosyaların eklendiği
         // bilgisi taşınabiliyor (bkz. docs/fleet-entegrasyon-plani.md).
         if (imageNames.isNotEmpty) 'gorseller': imageNames,
+        // Servis raporunda kullanıcı servisin başlangıç/bitiş saatini seçer.
+        'baslangicSaati': ?startTime,
+        'bitisSaati': ?endTime,
       },
     );
   }

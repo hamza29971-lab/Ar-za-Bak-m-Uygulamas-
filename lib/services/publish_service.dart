@@ -17,6 +17,8 @@ class PublishService {
     List<Map<String, Object?>> items = const <Map<String, Object?>>[],
     String? vehicleCode,
     String? userRegistryNo,
+    String? startTime,
+    String? endTime,
   }) async {
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
@@ -27,6 +29,8 @@ class PublishService {
       vehicleLabel: vehicleCode,
       operatorLabel: userRegistryNo,
       occurredAt: DateTime.now(),
+      startTime: startTime,
+      endTime: endTime,
     );
 
     final FleetResult result = await _client.send(event);

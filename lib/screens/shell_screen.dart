@@ -42,11 +42,15 @@ class _ShellScreenState extends State<ShellScreen> {
             const HomeScreen(),
             const TireChangeScreen(),
             const OilScreen(),
-            const ServiceReportScreen(),
+            // Servis raporunda görsel yalnızca kamerayla eklenir ve servisin
+            // başlangıç / bitiş saati seçilir.
+            const ServiceReportScreen(allowGallery: false),
             const ServiceReportScreen(
               title: 'Mekanik Operasyon',
               types: ReportType.mechanicalTypes,
               accent: AppColors.mechanic,
+              allowGallery: false,
+              showServiceHours: false,
             ),
           ],
         ),
@@ -108,7 +112,8 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = selected ? item.color : context.mutedColor;
+    final Color color =
+        selected ? context.accent(item.color) : context.mutedColor;
     return InkWell(
       onTap: onTap,
       child: Column(

@@ -152,12 +152,22 @@ class NotificationItem {
     required this.date,
     this.kind = NotificationKind.info,
     this.read = false,
+    this.vehicleCode,
+    this.details = const <String, String>{},
   });
 
   final String title;
   final String message;
   final DateTime date;
   final NotificationKind kind;
+
+  /// İşlemin yapıldığı araç; geçmiş penceresinde ayrı satırda gösterilir.
+  final String? vehicleCode;
+
+  /// İşlemin ayrıntıları (alan adı -> değer). Geçmiş penceresinde kayda
+  /// tıklanınca eklendiği sırayla listelenir; boşsa yalnızca [message] görünür.
+  final Map<String, String> details;
+
   bool read;
 }
 
@@ -313,8 +323,8 @@ class OilRefillActivity extends ActivityRecord {
   final String area;
   final String oilType;
 
-  /// Litre.
-  final double amount;
+  /// Litre. Gönderilmeyi bekleyen takviye düzeltilirse güncellenir.
+  double amount;
 
   @override
   ActivityType get type => ActivityType.oilRefill;

@@ -181,7 +181,7 @@ class _ActivitiesDialog extends StatelessWidget {
     return AlertDialog(
       title: Row(
         children: <Widget>[
-          const Icon(Icons.history, size: 22, color: AppColors.brand),
+          Icon(Icons.history, size: 22, color: context.brandColor),
           const SizedBox(width: 10),
           const Expanded(child: Text('Son İşlemler')),
           Text(
@@ -248,7 +248,7 @@ class _InfoTile extends StatelessWidget {
     final Widget tile = Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: context.pageColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
         border: Border.all(color: context.borderColor),
       ),
@@ -315,6 +315,7 @@ class _ActivityRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ({IconData icon, Color color}) visual = activityVisual(activity.type);
+    final Color tone = context.accent(visual.color);
 
     return InkWell(
       onTap: () => showActivityDetails(context, activity),
@@ -326,10 +327,10 @@ class _ActivityRow extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: visual.color.withValues(alpha: 0.12),
+                color: tone.withValues(alpha: context.isDark ? 0.18 : 0.12),
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(visual.icon, size: 18, color: visual.color),
+              child: Icon(visual.icon, size: 18, color: tone),
             ),
             const SizedBox(width: 14),
             Expanded(

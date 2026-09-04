@@ -131,6 +131,7 @@ class _SegmentedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color tone = context.accent(accent);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(9),
@@ -138,23 +139,25 @@ class _SegmentedTab extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? accent.withValues(alpha: 0.12) : Colors.transparent,
+          color: selected
+              ? tone.withValues(alpha: context.isDark ? 0.18 : 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
           border: Border.all(
-            color: selected ? accent.withValues(alpha: 0.35) : Colors.transparent,
+            color: selected ? tone.withValues(alpha: 0.35) : Colors.transparent,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 17, color: selected ? accent : context.mutedColor),
+            Icon(icon, size: 17, color: selected ? tone : context.mutedColor),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? accent : context.mutedColor,
+                color: selected ? tone : context.mutedColor,
               ),
             ),
           ],
@@ -179,24 +182,25 @@ class InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color tone = context.accent(color);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: tone.withValues(alpha: context.isDark ? 0.14 : 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        border: Border.all(color: tone.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: 16, color: tone),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: tone),
             ),
           ),
         ],
@@ -264,11 +268,12 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = accent ?? Theme.of(context).colorScheme.primary;
+    final Color color =
+        context.accent(accent ?? Theme.of(context).colorScheme.primary);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: context.pageColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
         border: Border.all(color: context.borderColor),
       ),
@@ -284,7 +289,7 @@ class SectionCard extends StatelessWidget {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.10),
+                      color: color.withValues(alpha: context.isDark ? 0.16 : 0.10),
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Icon(icon, size: 18, color: color),
@@ -344,7 +349,9 @@ class PrimaryActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool enabled = onPressed != null;
-    final Color base = enabled ? accent : context.mutedColor.withValues(alpha: 0.35);
+    final Color base = enabled
+        ? (filled ? context.accentFill(accent) : context.accent(accent))
+        : context.mutedColor.withValues(alpha: 0.35);
     final Color fg = filled ? Colors.white : base;
     final BorderRadius radius = BorderRadius.circular(12);
 

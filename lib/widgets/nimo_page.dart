@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/models.dart';
-import '../screens/profile_settings_screen.dart';
+import '../screens/settings_screen.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../ui/screens/login_screen.dart';
@@ -10,9 +9,10 @@ import 'notifications_dialog.dart';
 
 /// Tüm sayfalarda kullanılan üst bar.
 ///
-/// Solda robot logosu ve uygulamanın adı, sağ kenarda tema anahtarı,
-/// "Bildirimler" zili ve "Profil" yer alır. Sayfa adı üst barda değil,
-/// sayfanın kendi içeriğinin üstünde [PageHeading] ile gösterilir.
+/// Solda robot logosu ve uygulamanın adı; sağ kenarda tema anahtarı, "Geçmiş"
+/// zili, "Ayarlar" ve "Çıkış" yer alır. Uygulamada profil bölümü yoktur.
+/// Sayfa adı üst barda değil, sayfanın kendi içeriğinin üstünde [PageHeading]
+/// ile gösterilir.
 class NimoTopBar extends StatelessWidget {
   const NimoTopBar({super.key, this.leading});
 
@@ -23,24 +23,10 @@ class NimoTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final AppState state = AppScope.of(context);
-    final UserProfile? user = state.user;
-
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        // Dar tabletlerde profil adı gizlenir.
-        final bool compactProfile = constraints.maxWidth < 1080;
-        return _bar(context, state, user, compactProfile);
-      },
-    );
+    return _bar(context, AppScope.of(context));
   }
 
-  Widget _bar(
-    BuildContext context,
-    AppState state,
-    UserProfile? user,
-    bool compactProfile,
-  ) {
+  Widget _bar(BuildContext context, AppState state) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       decoration: BoxDecoration(
@@ -94,7 +80,13 @@ class NimoTopBar extends StatelessWidget {
             onTap: () => showNotificationsDialog(context),
           ),
           const SizedBox(width: 10),
-          _ProfileButton(user: user, compact: compactProfile),
+          _CircleAction(
+            icon: Icons.settings_outlined,
+            tooltip: 'Ayarlar',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            ),
+          ),
           const SizedBox(width: 10),
           _LogoutButton(),
         ],
@@ -129,7 +121,7 @@ class _LogoutButton extends StatelessWidget {
                     );
                   },
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
+                    foregroundColor: context.accent(AppColors.emergency),
                   ),
                   child: const Text('Çıkış Yap', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
@@ -141,8 +133,9 @@ class _LogoutButton extends StatelessWidget {
       icon: const Icon(Icons.logout, size: 18),
       label: const Text('Çıkış', style: TextStyle(fontWeight: FontWeight.w600)),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFFDE8E8),
-        foregroundColor: Colors.red,
+        backgroundColor: context.accentSoft(AppColors.emergency,
+            light: 0.10, dark: 0.16),
+        foregroundColor: context.accent(AppColors.emergency),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
@@ -193,7 +186,7 @@ class _CircleAction extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   constraints: const BoxConstraints(minWidth: 18),
                   decoration: BoxDecoration(
-                    color: AppColors.emergency,
+                    color: context.accent(AppColors.emergency),
                     borderRadius: BorderRadius.circular(9),
                     border: Border.all(color: context.pageColor, width: 2),
                   ),
@@ -209,50 +202,6 @@ class _CircleAction extends StatelessWidget {
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileButton extends StatelessWidget {
-  const _ProfileButton({required this.user, this.compact = false});
-
-  final UserProfile? user;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Profil',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const ProfileSettingsScreen(),
-          ),
-        ),
-        child: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Center(
-            child: CircleAvatar(
-              radius: 15,
-              backgroundColor: AppColors.brandSoft,
-              child: Text(
-                user?.initials ?? '?',
-                style: const TextStyle(
-                  color: AppColors.brand,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );
