@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
@@ -53,7 +53,7 @@ class NimoTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(color), width: 2.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

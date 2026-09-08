@@ -95,7 +95,10 @@ class SegmentedTabs<T> extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: context.moduleBorderColor(accent),
+          width: 2.0,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -275,7 +278,7 @@ class SectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(color), width: 2.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,12 +369,15 @@ class PrimaryActionButton extends StatelessWidget {
             horizontal: compact ? 18 : 22,
             vertical: compact ? 12 : 14,
           ),
-          decoration: filled
-              ? null
-              : BoxDecoration(
-                  borderRadius: radius,
-                  border: Border.all(color: base.withValues(alpha: 0.55), width: 1.5),
-                ),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: enabled
+                  ? context.moduleBorderColor(accent)
+                  : context.moduleBorderColor(accent).withValues(alpha: 0.40),
+              width: 2.5,
+            ),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[

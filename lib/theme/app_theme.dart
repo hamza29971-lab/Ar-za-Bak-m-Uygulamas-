@@ -118,6 +118,14 @@ extension AppThemeX on BuildContext {
       isDark ? AppColors.darkElevated : AppColors.lightElevated;
   Color get borderColor => isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
+  /// Modül ekranlarındaki kart ve form kenarlıkları için özel renk. Açık temada
+  /// standart gri kenarlık dönerken, koyu temada verilen modül renginin (accent)
+  /// yarı saydam bir tonunu dönerek kartların ekran rengiyle parlamasını sağlar.
+  Color moduleBorderColor(Color moduleAccent) {
+    if (!isDark) return AppColors.lightBorder;
+    return accent(moduleAccent).withValues(alpha: 1.0);
+  }
+
   /// Normal kenarlıktan daha belirgin ayırıcı çizgi. Alt sekme çubuğundaki
   /// dikey ayraçlar gibi, sekmelerin birbirinden net ayrılması gereken
   /// yerlerde kullanılır.

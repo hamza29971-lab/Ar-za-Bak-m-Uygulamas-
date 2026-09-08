@@ -141,7 +141,12 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                     color:
                         context.isDark ? context.elevatedColor : context.pageColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.borderColor),
+                    border: Border.all(
+                      color: widget.accentColor != null
+                          ? context.moduleBorderColor(widget.accentColor!)
+                          : context.borderColor,
+                      width: 2.5,
+                    ),
                     boxShadow: <BoxShadow>[
                       BoxShadow(
                         color: Colors.black.withValues(
@@ -176,7 +181,10 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                           itemCount: items.length,
                           separatorBuilder: (_, _) => Divider(
                             height: 1,
-                            color: context.borderColor.withValues(alpha: 0.6),
+                            color: (widget.accentColor != null
+                                    ? context.moduleBorderColor(widget.accentColor!)
+                                    : context.borderColor)
+                                .withValues(alpha: 0.6),
                           ),
                           itemBuilder: (BuildContext context, int i) {
                             final Vehicle v = items[i];
@@ -281,6 +289,24 @@ class _VehicleSelectorState extends State<VehicleSelector> {
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 20,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: widget.accentColor != null
+                    ? context.moduleBorderColor(widget.accentColor!)
+                    : context.borderColor,
+                width: 2.5,
+              ),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: widget.accentColor != null
+                    ? context.moduleBorderColor(widget.accentColor!)
+                    : context.borderColor,
+                width: 2.5,
+              ),
             ),
           ),
         ),

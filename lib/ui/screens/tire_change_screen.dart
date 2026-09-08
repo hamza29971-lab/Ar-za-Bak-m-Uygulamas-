@@ -99,6 +99,7 @@ class _LeftPanel extends StatelessWidget {
               decoration: BoxDecoration(
                 color: context.isDark ? context.cardColor : context.pageColor,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.06),
@@ -233,6 +234,20 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
               ),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: context.moduleBorderColor(AppColors.tire),
+                  width: 1.5,
+                ),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: context.moduleBorderColor(AppColors.tire),
+                  width: 1.5,
+                ),
+              ),
             ),
             onTap: () {
               setState(() => _isOpen = true);
@@ -253,7 +268,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             decoration: BoxDecoration(
               color: context.isDark ? context.cardColor : context.pageColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.borderColor, width: 1.5),
+              border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.10),
@@ -334,7 +349,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             decoration: BoxDecoration(
               color: context.isDark ? context.cardColor : context.pageColor,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.borderColor, width: 1.5),
+              border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
             ),
             child: Row(
               children: [
@@ -642,10 +657,20 @@ class _TireRowState extends State<_TireRow>
                 ? ElevatedButton(
                     onPressed: () {
                       FocusManager.instance.primaryFocus?.unfocus();
-                      final String newSerial = _controller.text;
+                      final String newSerial = _controller.text.trim();
                       // Geçmiş kaydında "önceki seri no" gösterilebilsin diye
                       // değişiklik uygulanmadan önce okunur.
                       final String oldSerial = widget.record.serialNumber;
+
+                      // Gerçek bir değişiklik olmadan Tamam basıldıysa
+                      // (boş veya aynı seri no) sadece düzenleme modundan çık;
+                      // gereksiz yere pending kuyruğuna ekleme yapma.
+                      if (newSerial.isEmpty || newSerial == oldSerial) {
+                        provider.cancelEditing();
+                        _controller.clear();
+                        return;
+                      }
+
                       provider.confirmChange(widget.record.tireNumber, newSerial);
                       final state = AppScope.read(context);
                       final vehicle = provider.selectedVehicle;
@@ -961,7 +986,7 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
     return PrimaryActionButton(
       label: 'Gönder',
       icon: Icons.send_rounded,
-      accent: AppColors.form,
+      accent: AppColors.tire,
       badge: pendingCount,
       compact: true,
       onPressed: pendingCount == 0 || _sending
@@ -983,7 +1008,7 @@ class _VehicleDisplay extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.photoPlate,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
       ),
       padding: const EdgeInsets.all(14),
       child: Column(

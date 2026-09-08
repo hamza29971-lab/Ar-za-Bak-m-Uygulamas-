@@ -88,7 +88,7 @@ class _OilScreenState extends State<OilScreen> {
                       PrimaryActionButton(
                         label: 'Gönder',
                         icon: Icons.send_rounded,
-                        accent: AppColors.form,
+                        accent: accent,
                         badge: pendingCount,
                         compact: true,
                         onPressed: pendingCount == 0 || _sending

@@ -264,7 +264,10 @@ class _InfoTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: context.moduleBorderColor(Theme.of(context).colorScheme.primary),
+          width: 2.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -375,7 +375,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
             // Metin alanlarıyla aynı dolgu; koyu temada zeminden ayrışır.
             color: context.isDark ? context.cardColor : context.pageColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isSet ? accent : context.borderColor),
+            border: Border.all(color: isSet ? accent : context.moduleBorderColor(accent), width: 2.5),
           ),
           child: Row(
             children: <Widget>[
@@ -533,6 +533,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   Widget _buildDropHint(BuildContext context) {
     // Yer varsa ortalanır, dar ekranda (rapor tablosu da açıkken) kayar.
     return DottedBorderBox(
+      accent: accent,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           return SingleChildScrollView(
@@ -647,9 +648,10 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
 /// Kesikli çerçeveli boş alan kutusu.
 class DottedBorderBox extends StatelessWidget {
-  const DottedBorderBox({super.key, required this.child});
+  const DottedBorderBox({super.key, required this.child, required this.accent});
 
   final Widget child;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -658,7 +660,7 @@ class DottedBorderBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(accent), width: 2.5),
       ),
       child: child,
     );
@@ -783,7 +785,7 @@ class _TimeListPickerState extends State<_TimeListPicker> {
           height: _listHeight,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.borderColor),
+            border: Border.all(color: context.moduleBorderColor(widget.accent), width: 2.5),
           ),
           clipBehavior: Clip.antiAlias,
           child: Scrollbar(
