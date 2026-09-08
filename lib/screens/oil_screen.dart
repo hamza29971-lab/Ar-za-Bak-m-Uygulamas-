@@ -10,17 +10,9 @@ import '../utils/formats.dart';
 import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
 import '../widgets/nimo_table.dart';
+import '../widgets/pending_send_dialog.dart';
 import '../widgets/vehicle_photo.dart';
 import '../widgets/vehicle_selector.dart';
-
-/// "Gönder" onay penceresinden çıkan seçim; pencere kapatılırsa `null` olur.
-enum _SendChoice {
-  /// Bekleyen işlemler gönderilir.
-  send,
-
-  /// Bekleyen işlemler gönderilmeden silinir.
-  discard,
-}
 
 /// "Yağ Takviyesi" ekranı.
 /// Kayıtlar "Yağ Takviyeleri" ve "Manuel Yağlamalar" olarak iki grupta listelenir.
@@ -77,6 +69,7 @@ class _OilScreenState extends State<OilScreen> {
                   const PageHeading(
                     title: 'Yağ Takviyesi',
                     subtitle: 'Araç yağ takviyesi ve manuel yağlama kayıtları',
+                    titleSize: 32,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -404,61 +397,10 @@ class _OilScreenState extends State<OilScreen> {
     final List<PendingOperation> pending = state.pendingOf(PendingKind.oil);
     if (pending.isEmpty) return;
 
-    final _SendChoice? choice = await showDialog<_SendChoice>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Emin misiniz?'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Bekleyen tüm işlemleri göndermek istediğinize emin misiniz?'),
-              const SizedBox(height: 12),
-              for (final p in pending)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text('• ${p.vehicleCode} — ${p.label}', style: const TextStyle(fontSize: 13)),
-                ),
-            ],
-          ),
-        ),
-        actions: <Widget>[
-          SizedBox(
-            width: double.maxFinite,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(_SendChoice.discard),
-                  style: TextButton.styleFrom(
-                      foregroundColor: context.accent(AppColors.emergency)),
-                  child: const Text('İptal Et'),
-                ),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('Geri Dön', style: TextStyle(color: context.mutedColor)),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(_SendChoice.send),
-                      style: FilledButton.styleFrom(
-                          backgroundColor: context.accentFill(const Color(0xFF198754))),
-                      child: const Text('Evet, Gönder'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    final PendingSendChoice? choice =
+        await showPendingSendDialog(context: context, pending: pending);
 
-    if (choice == _SendChoice.discard) {
+    if (choice == PendingSendChoice.discard) {
       final int discarded = state.discardPendingOil();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
@@ -468,7 +410,7 @@ class _OilScreenState extends State<OilScreen> {
         ));
       return;
     }
-    if (choice != _SendChoice.send) return;
+    if (choice != PendingSendChoice.send) return;
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishOperations(
@@ -615,14 +557,14 @@ class _RefillDialogState extends State<_RefillDialog> {
   void initState() {
     super.initState();
     final PendingOperation? pending = widget.pending;
-    // Düzenlemede bekleyen kaydın değerleri, yeni girişte kaydın son
-    // kullanılan miktarı gelir.
-    final double amount = pending == null
-        ? widget.record.amount
-        : (pending.payload['amount'] as num?)?.toDouble() ?? widget.record.amount;
-    if (amount > 0) _amount.text = amount.toStringAsFixed(1);
-    final String product = (pending?.payload['product'] as String?) ?? '';
-    if (product.isNotEmpty) _product = product;
+    // Yeni girişte miktar alanı boş gelir; kullanıcı kendisi girmeli.
+    // Yalnızca gönderilmemiş bir kayıt düzenlenirken önceki girdi geri gelir.
+    if (pending != null) {
+      final double amount = (pending.payload['amount'] as num?)?.toDouble() ?? 0;
+      if (amount > 0) _amount.text = amount.toStringAsFixed(1);
+      final String product = (pending.payload['product'] as String?) ?? '';
+      if (product.isNotEmpty) _product = product;
+    }
   }
 
   @override

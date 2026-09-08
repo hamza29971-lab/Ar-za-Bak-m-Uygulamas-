@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
-import '../screens/settings_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/tire_change_provider.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../ui/screens/login_screen.dart';
+import 'battery_indicator.dart';
 import 'nimo_logo.dart';
 import 'notifications_dialog.dart';
 
 /// Tüm sayfalarda kullanılan üst bar.
 ///
 /// Solda robot logosu ve uygulamanın adı; sağ kenarda tema anahtarı, "Geçmiş"
-/// zili, "Ayarlar" ve "Çıkış" yer alır. Uygulamada profil bölümü yoktur.
+/// zili, tabletin pil göstergesi ve "Çıkış" yer alır.
+/// Uygulamada profil bölümü yoktur.
 /// Sayfa adı üst barda değil, sayfanın kendi içeriğinin üstünde [PageHeading]
 /// ile gösterilir.
 class NimoTopBar extends StatelessWidget {
@@ -80,13 +83,8 @@ class NimoTopBar extends StatelessWidget {
             onTap: () => showNotificationsDialog(context),
           ),
           const SizedBox(width: 10),
-          _CircleAction(
-            icon: Icons.settings_outlined,
-            tooltip: 'Ayarlar',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-            ),
-          ),
+          // Tabletin şarj durumu; "Geçmiş" ile "Çıkış" arasında.
+          const BatteryIndicator(),
           const SizedBox(width: 10),
           _LogoutButton(),
         ],
@@ -114,6 +112,8 @@ class _LogoutButton extends StatelessWidget {
                 TextButton(
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
+                    AppScope.read(context).signOut();
+                    context.read<TireChangeProvider>().clearSelectedVehicle();
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(
                         builder: (_) => const LoginScreen(),
@@ -219,7 +219,14 @@ class NimoPage extends StatelessWidget {
     return Column(
       children: <Widget>[
         const NimoTopBar(),
-        Expanded(child: child),
+        // İçerik alanı açık temada hafif gri; tablolar, paneller ve kartlar
+        // bunun üzerinde beyaz kalarak ayrışır.
+        Expanded(
+          child: ColoredBox(
+            color: context.contentColor,
+            child: child,
+          ),
+        ),
       ],
     );
   }
@@ -228,10 +235,11 @@ class NimoPage extends StatelessWidget {
 /// Sayfa içeriğinin üstünde yer alan sayfa başlığı.
 /// Ör. "Araç Seç" alanının hemen üstündeki "Lastik Değişimi" yazısı.
 class PageHeading extends StatelessWidget {
-  const PageHeading({super.key, required this.title, this.subtitle});
+  const PageHeading({super.key, required this.title, this.subtitle, this.titleSize = 26});
 
   final String title;
   final String? subtitle;
+  final double titleSize;
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +249,7 @@ class PageHeading extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.w700),
         ),
         if (subtitle != null) ...<Widget>[
           const SizedBox(height: 4),

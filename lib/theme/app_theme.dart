@@ -23,6 +23,11 @@ class AppColors {
 
   // Açık tema yüzeyleri
   static const Color lightBg = Color(0xFFFFFFFF);
+
+  /// Sayfa içeriğinin zemini. Üst bar ve alt sekme çubuğu beyaz kalır; asıl
+  /// içerik alanı hafif gri olur, böylece tablolar ve paneller beyaz kart
+  /// gibi öne çıkar.
+  static const Color lightContent = Color(0xFFECEEF1);
   static const Color lightSurface = Color(0xFFF5F6F7);
   static const Color lightElevated = Color(0xFFFFFFFF);
   static const Color lightBorder = Color(0xFFE6E8EA);
@@ -112,8 +117,19 @@ extension AppThemeX on BuildContext {
   Color get elevatedColor =>
       isDark ? AppColors.darkElevated : AppColors.lightElevated;
   Color get borderColor => isDark ? AppColors.darkBorder : AppColors.lightBorder;
+
+  /// Normal kenarlıktan daha belirgin ayırıcı çizgi. Alt sekme çubuğundaki
+  /// dikey ayraçlar gibi, sekmelerin birbirinden net ayrılması gereken
+  /// yerlerde kullanılır.
+  Color get strongBorderColor =>
+      isDark ? const Color(0xFF6B7A86) : const Color(0xFF9AA1A9);
   Color get mutedColor => isDark ? AppColors.darkMuted : AppColors.lightMuted;
   Color get pageColor => isDark ? AppColors.darkBg : AppColors.lightBg;
+
+  /// Üst bar ile alt sekme çubuğu arasında kalan içerik alanının zemini.
+  /// Açık temada hafif gri; kartlar, tablolar ve paneller bunun üzerinde
+  /// beyaz kalarak ayrışır.
+  Color get contentColor => isDark ? AppColors.darkBg : AppColors.lightContent;
 
   /// Marka yeşilinin aktif temadaki okunabilir tonu.
   Color get brandColor => isDark ? AppColors.brandDark : AppColors.brand;
@@ -172,7 +188,7 @@ extension AppThemeX on BuildContext {
   /// koyu temada kart tonu bile yetmiyor; aracın koyu bölgeleri zemine
   /// karışıyor. Bu yüzden fotoğraf tablası kartlardan bir kademe daha açık.
   Color get photoPlate =>
-      isDark ? const Color(0xFF262E37) : AppColors.lightSurface;
+      isDark ? const Color(0xFF262E37) : AppColors.lightBg;
 
   /// Bilgi kutularının soluk mavi zemini.
   Color get infoSoft =>

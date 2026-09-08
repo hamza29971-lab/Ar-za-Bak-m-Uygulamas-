@@ -261,9 +261,10 @@ class _VehicleSelectorState extends State<VehicleSelector> {
           },
           onTap: _showOverlay,
           textInputAction: TextInputAction.search,
+          style: const TextStyle(fontSize: 18),
           decoration: InputDecoration(
             hintText: 'Araç Seç',
-            prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
+            prefixIcon: const Icon(Icons.local_shipping_outlined, size: 24),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
@@ -278,8 +279,8 @@ class _VehicleSelectorState extends State<VehicleSelector> {
               ],
             ),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
+              horizontal: 16,
+              vertical: 20,
             ),
           ),
         ),

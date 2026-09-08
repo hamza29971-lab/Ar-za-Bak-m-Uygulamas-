@@ -356,7 +356,7 @@ class _LoginScreenState extends State<LoginScreen>
                       const SizedBox(height: 12),
                       // Büyütülmüş Hoşgeldiniz Yazısı
                       Text(
-                        'ARIZA BAKIM SİSTEMİNE HOŞGELDİNİZ',
+                        'ARIZA VE BAKIM SİSTEMİNE HOŞGELDİNİZ',
                         style: TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w800,

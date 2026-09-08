@@ -93,7 +93,7 @@ class SegmentedTabs<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: context.cardColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: context.borderColor),
       ),
@@ -137,7 +137,7 @@ class _SegmentedTab extends StatelessWidget {
       borderRadius: BorderRadius.circular(9),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         decoration: BoxDecoration(
           color: selected
               ? tone.withValues(alpha: context.isDark ? 0.18 : 0.12)
@@ -150,12 +150,12 @@ class _SegmentedTab extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 17, color: selected ? tone : context.mutedColor),
-            const SizedBox(width: 8),
+            Icon(icon, size: 20, color: selected ? tone : context.mutedColor),
+            const SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: selected ? tone : context.mutedColor,
               ),
@@ -351,7 +351,7 @@ class PrimaryActionButton extends StatelessWidget {
     final bool enabled = onPressed != null;
     final Color base = enabled
         ? (filled ? context.accentFill(accent) : context.accent(accent))
-        : context.mutedColor.withValues(alpha: 0.35);
+        : context.mutedColor.withValues(alpha: 0.65);
     final Color fg = filled ? Colors.white : base;
     final BorderRadius radius = BorderRadius.circular(12);
 
@@ -363,8 +363,8 @@ class PrimaryActionButton extends StatelessWidget {
         borderRadius: radius,
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 11 : 14,
-            vertical: compact ? 9 : 9,
+            horizontal: compact ? 18 : 22,
+            vertical: compact ? 12 : 14,
           ),
           decoration: filled
               ? null
@@ -376,24 +376,24 @@ class PrimaryActionButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               if (compact)
-                Icon(icon, size: 16, color: fg)
+                Icon(icon, size: 20, color: fg)
               else
                 Container(
-                  width: 21,
-                  height: 21,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     color: filled
                         ? Colors.white.withValues(alpha: 0.22)
                         : base.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, size: 15, color: fg),
+                  child: Icon(icon, size: 18, color: fg),
                 ),
-              SizedBox(width: compact ? 6 : 7),
+              SizedBox(width: compact ? 8 : 10),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: compact ? 15 : 16,
                   fontWeight: FontWeight.w700,
                   color: fg,
                 ),

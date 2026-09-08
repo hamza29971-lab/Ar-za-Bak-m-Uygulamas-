@@ -12,6 +12,7 @@ import '../../state/app_state.dart';
 import '../../services/publish_service.dart';
 import '../../models/models.dart' as global_models;
 import '../../utils/formats.dart';
+import '../../widgets/pending_send_dialog.dart';
 import '../../widgets/vehicle_photo.dart';
 
 class TireChangeScreen extends StatelessWidget {
@@ -73,6 +74,7 @@ class _LeftPanel extends StatelessWidget {
           const PageHeading(
             title: 'Lastik Değişimi',
             subtitle: 'Araç lastik kontrol ve değişim kayıtları',
+            titleSize: 32,
           ),
           const SizedBox(height: 16),
           Row(
@@ -95,7 +97,7 @@ class _LeftPanel extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: context.cardColor,
+                color: context.isDark ? context.cardColor : context.pageColor,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
@@ -206,9 +208,10 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
           // Arama kutusu
           TextField(
             controller: _controller,
+            style: const TextStyle(fontSize: 18),
             decoration: InputDecoration(
               hintText: 'Araç Seç',
-              prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
+              prefixIcon: const Icon(Icons.local_shipping_outlined, size: 24),
               suffixIcon: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -229,7 +232,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
                 ],
               ),
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             ),
             onTap: () {
               setState(() => _isOpen = true);
@@ -248,7 +251,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             margin: const EdgeInsets.only(top: 4),
             constraints: const BoxConstraints(maxHeight: 200),
             decoration: BoxDecoration(
-              color: context.cardColor,
+              color: context.isDark ? context.cardColor : context.pageColor,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: context.borderColor, width: 1.5),
               boxShadow: [
@@ -329,7 +332,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             margin: const EdgeInsets.only(top: 4),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: context.cardColor,
+              color: context.isDark ? context.cardColor : context.pageColor,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: context.borderColor, width: 1.5),
             ),
@@ -827,9 +830,6 @@ class _RightPanel extends StatelessWidget {
   }
 }
 
-/// "Gönder" onay penceresinin sonucu; yağ ekranıyla aynı üç seçenek.
-enum _SendChoice { send, discard }
-
 class _PendingSubmitButton extends StatefulWidget {
   final TireChangeProvider provider;
   const _PendingSubmitButton({required this.provider});
@@ -845,61 +845,10 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
     final List<PendingOperation> pending = state.pendingOf(PendingKind.tire);
     if (pending.isEmpty) return;
 
-    final _SendChoice? choice = await showDialog<_SendChoice>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Emin misiniz?'),
-        content: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Bekleyen tüm işlemleri göndermek istediğinize emin misiniz?'),
-              const SizedBox(height: 12),
-              for (final p in pending)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text('• ${p.vehicleCode} — ${p.label}', style: const TextStyle(fontSize: 13)),
-                ),
-            ],
-          ),
-        ),
-        actions: <Widget>[
-          SizedBox(
-            width: double.maxFinite,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(_SendChoice.discard),
-                  style: TextButton.styleFrom(
-                      foregroundColor: context.accent(AppColors.emergency)),
-                  child: const Text('İptal Et'),
-                ),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text('Geri Dön', style: TextStyle(color: context.mutedColor)),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(_SendChoice.send),
-                      style: FilledButton.styleFrom(
-                          backgroundColor: context.accentFill(const Color(0xFF198754))),
-                      child: const Text('Evet, Gönder'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    final PendingSendChoice? choice =
+        await showPendingSendDialog(context: context, pending: pending);
 
-    if (choice == _SendChoice.discard) {
+    if (choice == PendingSendChoice.discard) {
       final int discarded = state.discardPendingTire();
       await widget.provider.discardChanges();
       if (!context.mounted) return;
@@ -910,7 +859,7 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
         ));
       return;
     }
-    if (choice != _SendChoice.send) return;
+    if (choice != PendingSendChoice.send) return;
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishOperations(

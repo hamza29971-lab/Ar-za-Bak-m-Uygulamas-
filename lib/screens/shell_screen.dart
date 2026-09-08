@@ -63,15 +63,17 @@ class _ShellScreenState extends State<ShellScreen> {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 74,
+            height: 86,
             child: Row(
               children: <Widget>[
                 for (int i = 0; i < _items.length; i++) ...[
                   if (i > 0)
+                    // Sekmeler arasındaki ayraç; normal kenarlıktan daha
+                    // koyu ve uzun olsun ki sınır net görünsün.
                     Container(
-                      width: 1,
-                      height: 40,
-                      color: context.borderColor,
+                      width: 2,
+                      height: 56,
+                      color: context.strongBorderColor,
                     ),
                   Expanded(
                     child: _NavButton(
@@ -119,12 +121,12 @@ class _NavButton extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          Icon(selected ? item.activeIcon : item.icon, size: 24, color: color),
+          Icon(selected ? item.activeIcon : item.icon, size: 28, color: color),
           const SizedBox(height: 6),
           Text(
             item.label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 15,
               color: color,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             ),
