@@ -11,6 +11,7 @@ import '../theme/app_theme.dart';
 import '../utils/formats.dart';
 import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
+import '../widgets/result_dialog.dart';
 import '../widgets/vehicle_selector.dart';
 
 /// Gönderilebilecek rapor türleri. İkisi de araç kaydı okumaz: raporda
@@ -234,40 +235,17 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       ),
     );
 
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        icon: Icon(Icons.check_circle, color: context.brandColor, size: 42),
-        title: const Text('Rapor gönderildi'),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              InfoLine(label: 'Rapor türü', value: _type.label, labelWidth: 110),
-              InfoLine(label: 'Araç', value: vehicle?.code ?? '-', labelWidth: 110),
-              if (widget.showServiceHours)
-                InfoLine(
-                  label: 'Servis saati',
-                  value: hours.isEmpty ? '-' : hours,
-                  labelWidth: 110,
-                ),
-              InfoLine(
-                label: 'Görsel',
-                value: '${imagePaths.length} adet',
-                labelWidth: 110,
-              ),
-            ],
-          ),
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
+    await showResultDialog(
+      context,
+      title: 'Rapor gönderildi',
+      subtitle: formatDateTime(sentAt),
+      details: <String, String>{
+        'Rapor türü': _type.label,
+        'Araç': vehicle?.code ?? '-',
+        if (widget.showServiceHours)
+          'Servis saati': hours.isEmpty ? '-' : hours,
+        'Gönderilen görsel': '${imagePaths.length} adet',
+      },
     );
 
     if (!mounted) return;
@@ -389,14 +367,14 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                   children: <Widget>[
                     Text(label,
                         style: TextStyle(
-                            fontSize: 11, color: context.mutedColor)),
+                            fontSize: 11, color: context.isDark ? Colors.white : context.mutedColor)),
                     const SizedBox(height: 2),
                     Text(
                       isSet ? _formatTime(value) : 'Saat seçin',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: isSet ? null : context.mutedColor,
+                        color: context.isDark ? Colors.white : (isSet ? null : context.mutedColor),
                       ),
                     ),
                   ],

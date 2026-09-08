@@ -136,7 +136,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
+                  constraints: const BoxConstraints(maxHeight: 420),
                   decoration: BoxDecoration(
                     color:
                         context.isDark ? context.elevatedColor : context.pageColor,
@@ -196,19 +196,19 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                     ? accent.withValues(alpha: 0.08)
                                     : Colors.transparent,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
+                                  horizontal: 16,
+                                  vertical: 16,
                                 ),
                                 child: Row(
                                   children: <Widget>[
                                     Icon(
                                       Icons.local_shipping_outlined,
-                                      size: 20,
+                                      size: 24,
                                       color: isSelected
                                           ? accent
                                           : context.mutedColor,
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -217,15 +217,16 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                           Text(
                                             v.code,
                                             style: TextStyle(
+                                              fontSize: 16,
                                               fontWeight: FontWeight.w600,
                                               color: isSelected ? accent : null,
                                             ),
                                           ),
-                                          const SizedBox(height: 2),
+                                          const SizedBox(height: 3),
                                           Text(
                                             '${v.typeLabel} • ${v.tireCount} lastik',
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 13,
                                               color: context.mutedColor,
                                             ),
                                           ),
@@ -235,7 +236,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                     if (isSelected)
                                       Icon(
                                         Icons.check_circle,
-                                        size: 18,
+                                        size: 20,
                                         color: accent,
                                       ),
                                   ],

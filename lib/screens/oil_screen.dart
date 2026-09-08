@@ -11,6 +11,7 @@ import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
 import '../widgets/nimo_table.dart';
 import '../widgets/pending_send_dialog.dart';
+import '../widgets/result_dialog.dart';
 import '../widgets/vehicle_photo.dart';
 import '../widgets/vehicle_selector.dart';
 
@@ -227,19 +228,19 @@ class _OilScreenState extends State<OilScreen> {
                 onPressed: () async {
                   state.checkOil(vehicle!, r);
                   if (!context.mounted) return;
-                  await showDialog<void>(
-                    context: context,
-                    builder: (BuildContext context) => AlertDialog(
-                      icon: Icon(Icons.check_circle, color: context.brandColor, size: 42),
-                      title: const Text('Kontrol Tamamlandı'),
-                      content: Text('${r.oilType} alanı kontrol edilmiş olarak işaretlendi.'),
-                      actions: <Widget>[
-                        FilledButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Tamam'),
-                        ),
-                      ],
-                    ),
+                  await showResultDialog(
+                    context,
+                    title: 'Kontrol Tamamlandı',
+                    subtitle: formatDateTime(DateTime.now()),
+                    icon: Icons.fact_check_outlined,
+                    accent: AppColors.form,
+                    details: <String, String>{
+                      'Araç': vehicle.code,
+                      _category.columnLabel: r.label,
+                      'Kontrol tarihi': formatDateTime(DateTime.now()),
+                    },
+                    note: '${r.oilType} alanı kontrol edilmiş olarak '
+                        'işaretlendi.',
                   );
                 },
               ),
@@ -274,60 +275,68 @@ class _OilScreenState extends State<OilScreen> {
 
     if (request == null || !context.mounted) return;
 
+    final String kindLabel = _manualCategory ? 'Yağlama' : 'Takviye';
+
     if (request.cancelled) {
       state.cancelOilRefill(pending!);
-      await _resultDialog(
+      await showResultDialog(
         context,
-        title: _manualCategory ? 'Yağlama İptal Edildi' : 'Takviye İptal Edildi',
-        message: '${record.label} için bekleyen kayıt silindi.',
+        title: '$kindLabel İptal Edildi',
+        subtitle: formatDateTime(DateTime.now()),
+        icon: Icons.delete_outline,
+        accent: AppColors.emergency,
+        details: <String, String>{
+          'Araç': vehicle.code,
+          _category.columnLabel: record.label,
+        },
+        note: 'Gönderilmeyi bekleyen kayıt silindi.',
       );
       return;
     }
 
     if (pending == null) {
       state.refillOil(vehicle, record, request.amount, product: request.product);
-      await _resultDialog(
+      await showResultDialog(
         context,
-        title: _manualCategory ? 'Yağlama Kaydedildi' : 'Takviye Kaydedildi',
-        message: '${record.label} için ${request.amount.toStringAsFixed(1)} L '
-            'kaydedildi.\n\nKullanılan Ürün:\n${request.product}',
+        title: '$kindLabel Kaydedildi',
+        subtitle: formatDateTime(DateTime.now()),
+        accent: accent,
+        details: _refillDetails(vehicle, record, request),
+        note: 'Kayıt gönderilmeyi bekliyor. "Gönder" ile iletebilir, '
+            'göndermeden önce düzeltebilirsiniz.',
       );
       return;
     }
 
     state.updateOilRefill(pending, request.amount, product: request.product);
-    await _resultDialog(
+    await showResultDialog(
       context,
-      title: _manualCategory ? 'Yağlama Güncellendi' : 'Takviye Güncellendi',
-      message: '${record.label} için ${request.amount.toStringAsFixed(1)} L '
-          'olarak güncellendi.\n\nKullanılan Ürün:\n${request.product}',
+      title: '$kindLabel Güncellendi',
+      subtitle: formatDateTime(DateTime.now()),
+      icon: Icons.edit_outlined,
+      accent: accent,
+      details: _refillDetails(vehicle, record, request),
+      note: 'Kayıt hâlâ gönderilmeyi bekliyor.',
     );
   }
 
   bool get _manualCategory => _category == OilCategory.manual;
 
-  Future<void> _resultDialog(
-    BuildContext context, {
-    required String title,
-    required String message,
-  }) async {
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        icon: Icon(Icons.check_circle, color: context.brandColor, size: 42),
-        title: Text(title),
-        content: SizedBox(
-          width: 460,
-          child: Text(message, style: const TextStyle(fontSize: 16)),
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
-    );
+  /// Sonuç penceresinde gösterilen etiket/değer satırları.
+  Map<String, String> _refillDetails(
+    Vehicle vehicle,
+    OilRecord record,
+    _RefillRequest request,
+  ) {
+    return <String, String>{
+      'Araç': vehicle.code,
+      _category.columnLabel: record.label,
+      _manualCategory ? 'Kullanılan yağ miktarı' : 'Takviye miktarı':
+          '${request.amount.toStringAsFixed(1)} L',
+      'Kullanılan ürün': request.product,
+      _manualCategory ? 'Yağlama tarihi' : 'Takviye tarihi':
+          formatDateTime(DateTime.now()),
+    };
   }
 
   /// "Tümünü Kontrol Et": listelenen alanların tamamını kontrol edilmiş olarak
@@ -415,17 +424,8 @@ class _OilScreenState extends State<OilScreen> {
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishOperations(
       topic: PendingKind.oil.topic,
-      group: PendingKind.oil.label,
-      operations: <Map<String, Object?>>[
-        for (final PendingOperation p in pending)
-          <String, Object?>{
-            ...p.payload,
-            'vehicle': p.vehicleCode,
-            'date': p.date.toIso8601String(),
-          },
-      ],
-      vehicleCode: vehicle?.code,
-      userRegistryNo: state.user?.registryNo,
+      pending: pending,
+      user: state.user,
     );
     if (!context.mounted) return;
     setState(() => _sending = false);
@@ -461,43 +461,7 @@ class _OilScreenState extends State<OilScreen> {
       ),
     );
 
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        icon: Icon(Icons.check_circle, color: context.brandColor, size: 42),
-        title: const Text('İşlemler gönderildi'),
-        content: SizedBox(
-          width: 460,
-          // Uzun listede pencere taşmasın diye içerik kaydırılır.
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('$count işlem gönderildi:',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                for (final PendingOperation p in pending)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text('• ${p.vehicleCode} — ${p.label}',
-                        style: const TextStyle(fontSize: 13)),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: () {
-              FocusManager.instance.primaryFocus?.unfocus();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
-    );
+    await showPendingSentDialog(context: context, sent: pending);
   }
 }
 
@@ -750,7 +714,7 @@ class _VehicleDisplay extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.photoPlate,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(OilScreen.accent)),
       ),
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -762,7 +726,7 @@ class _VehicleDisplay extends StatelessWidget {
           // gösterilir.
           Text(
             vehicle.code,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),
         ],

@@ -162,6 +162,12 @@ class _VehicleSearchField extends StatefulWidget {
 
 class _VehicleSearchFieldState extends State<_VehicleSearchField> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final LayerLink _link = LayerLink();
+  OverlayEntry? _entry;
+
+  /// Liste açık mı? Odaklanınca açılır, seçim yapılınca veya odak
+  /// kaybedilince kapanır.
   bool _isOpen = false;
 
   @override
@@ -169,6 +175,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
     super.initState();
     // Başlangıçta seçili araç adını göster
     _controller.text = widget.provider.selectedVehicle?.name ?? '';
+    _focusNode.addListener(_onFocusChanged);
   }
 
   @override
@@ -185,8 +192,37 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
 
   @override
   void dispose() {
+    _removeOverlay();
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (_focusNode.hasFocus) {
+      // Odaklanınca tüm liste görünsün.
+      setState(() => _isOpen = true);
+      _controller.clear();
+      widget.provider.clearSearch();
+      _showOverlay();
+    } else {
+      setState(() => _isOpen = false);
+      _removeOverlay();
+      final VehicleModel? selected = widget.provider.selectedVehicle;
+      _controller.text = selected?.name ?? '';
+    }
+  }
+
+  void _showOverlay() {
+    if (_entry != null) return;
+    _entry = OverlayEntry(builder: _buildOverlay);
+    Overlay.of(context).insert(_entry!);
+  }
+
+  void _removeOverlay() {
+    _entry?.remove();
+    _entry = null;
   }
 
   void _selectVehicle(VehicleModel vehicle) {
@@ -194,179 +230,220 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
     widget.provider.clearSearch();
     _controller.text = vehicle.name;
     setState(() => _isOpen = false);
+    _removeOverlay();
     FocusScope.of(context).unfocus();
+  }
+
+  /// Metin alanının hemen altında, sayfa akışını itmeden açılan yüzen liste.
+  /// Diğer araç seçim alanlarıyla ([VehicleSelector]) aynı yaklaşım: liste
+  /// tabloyu aşağı kaydırmaz, üstüne biner.
+  Widget _buildOverlay(BuildContext overlayContext) {
+    return Stack(
+      children: <Widget>[
+        // Dışarı tıklayınca listeyi kapat.
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => _focusNode.unfocus(),
+          ),
+        ),
+        Positioned(
+          width: 420,
+          child: CompositedTransformFollower(
+            link: _link,
+            showWhenUnlinked: false,
+            offset: const Offset(0, 60),
+            // Liste, metin alanının dokunma bölgesinin parçası sayılır; aksi
+            // halde fare tuşuna basıldığı anda alan odağı kaybeder ve tıklama
+            // tamamlanmadan satır ağaçtan silinir.
+            child: TextFieldTapRegion(
+              child: Material(
+                color: Colors.transparent,
+                // Liste kendini sağlayıcıyı dinleyerek tazeler. Elle
+                // markNeedsBuild() çağırmak, yapım (build) aşamasında
+                // tetiklenirse Flutter hata veriyor.
+                child: ListenableBuilder(
+                  listenable: widget.provider,
+                  builder: (BuildContext context, Widget? _) {
+                    final List<VehicleModel> filtered =
+                        widget.provider.filteredVehicles;
+                    return filtered.isEmpty
+                        ? _buildEmptyResult(context)
+                        : _buildResultsList(context, filtered);
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResultsList(BuildContext context, List<VehicleModel> filtered) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      constraints: const BoxConstraints(maxHeight: 320),
+      decoration: BoxDecoration(
+        color: context.isDark ? context.cardColor : context.pageColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final vehicle = filtered[index];
+          final isSelected =
+              widget.provider.selectedVehicle?.id == vehicle.id;
+          return InkWell(
+            onTap: () => _selectVehicle(vehicle),
+            child: Container(
+              color: isSelected
+                  ? context.accent(const Color(0xFF2B3252)).withValues(alpha: 0.08)
+                  : Colors.transparent,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.local_shipping_outlined,
+                    size: 24,
+                    color: isSelected
+                        ? context.accent(const Color(0xFF2B3252))
+                        : context.mutedColor,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          vehicle.name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: context.text.bodyMedium?.color,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${vehicle.typeLabel} • ${vehicle.tireCount} lastik',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: context.mutedColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check_circle,
+                      size: 20,
+                      color: context.accent(const Color(0xFF2B3252)),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyResult(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.isDark ? context.cardColor : context.pageColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search_off_rounded,
+              size: 16, color: context.mutedColor),
+          const SizedBox(width: 8),
+          Text(
+            'Araç bulunamadı',
+            style: TextStyle(
+              fontSize: 14,
+              color: context.mutedColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = widget.provider.filteredVehicles;
-
     return SizedBox(
       width: 420,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Arama kutusu
-          TextField(
-            controller: _controller,
-            style: const TextStyle(fontSize: 18),
-            decoration: InputDecoration(
-              hintText: 'Araç Seç',
-              prefixIcon: const Icon(Icons.local_shipping_outlined, size: 24),
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_controller.text.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 18),
-                      tooltip: 'Temizle',
-                      onPressed: () {
-                        _controller.clear();
-                        widget.provider.clearSearch();
-                        widget.provider.clearSelectedVehicle();
-                        setState(() => _isOpen = false);
-                        FocusScope.of(context).unfocus();
-                      },
-                    ),
-                  const Icon(Icons.keyboard_arrow_down),
-                  const SizedBox(width: 8),
-                ],
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: context.moduleBorderColor(AppColors.tire),
-                  width: 1.5,
-                ),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: context.moduleBorderColor(AppColors.tire),
-                  width: 1.5,
-                ),
-              ),
-            ),
-            onTap: () {
-              setState(() => _isOpen = true);
-              _controller.clear();
-              widget.provider.clearSearch();
-            },
-            onChanged: (val) {
-              widget.provider.updateSearch(val);
-              setState(() => _isOpen = true);
-            },
-          ),
-
-        // Filtreli liste (açıkken görünür)
-        if (_isOpen && filtered.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            constraints: const BoxConstraints(maxHeight: 200),
-            decoration: BoxDecoration(
-              color: context.isDark ? context.cardColor : context.pageColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ListView.builder(
-              shrinkWrap: true,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final vehicle = filtered[index];
-                final isSelected =
-                    widget.provider.selectedVehicle?.id == vehicle.id;
-                return InkWell(
-                  onTap: () => _selectVehicle(vehicle),
-                  child: Container(
-                    color: isSelected
-                        ? context.accent(const Color(0xFF2B3252)).withValues(alpha: 0.08)
-                        : Colors.transparent,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Icon(
-                          Icons.local_shipping_outlined,
-                          size: 20,
-                          color: isSelected
-                              ? context.accent(const Color(0xFF2B3252))
-                              : context.mutedColor,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-                                vehicle.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: context.text.bodyMedium?.color,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${vehicle.typeLabel} • ${vehicle.tireCount} lastik',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.mutedColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isSelected)
-                          Icon(
-                            Icons.check_circle,
-                            size: 18,
-                            color: context.accent(const Color(0xFF2B3252)),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-        // Sonuç bulunamadı
-        if (_isOpen && filtered.isEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: context.isDark ? context.cardColor : context.pageColor,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
-            ),
-            child: Row(
+      child: CompositedTransformTarget(
+        link: _link,
+        child: TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          style: const TextStyle(fontSize: 18),
+          decoration: InputDecoration(
+            hintText: 'Araç Seç',
+            prefixIcon: const Icon(Icons.local_shipping_outlined, size: 24),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.search_off_rounded,
-                    size: 16, color: context.mutedColor),
-                SizedBox(width: 8),
-                Text(
-                  'Araç bulunamadı',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: context.mutedColor,
+                if (_controller.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Temizle',
+                    onPressed: () {
+                      _controller.clear();
+                      widget.provider.clearSearch();
+                      widget.provider.clearSelectedVehicle();
+                      setState(() => _isOpen = false);
+                      _removeOverlay();
+                      FocusScope.of(context).unfocus();
+                    },
                   ),
-                ),
+                const Icon(Icons.keyboard_arrow_down),
+                const SizedBox(width: 8),
               ],
             ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: context.moduleBorderColor(AppColors.tire),
+                width: 1.5,
+              ),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: context.moduleBorderColor(AppColors.tire),
+                width: 1.5,
+              ),
+            ),
           ),
-      ],
+          onChanged: (val) {
+            widget.provider.updateSearch(val);
+            setState(() => _isOpen = true);
+            _showOverlay();
+          },
+        ),
       ),
     );
   }
@@ -687,10 +764,14 @@ class _TireRowState extends State<_TireRow>
                           date: now,
                           activityId: activityId,
                           payload: <String, Object?>{
-                            'op': 'lastik_degisim',
+                            'op': 'degisim',
                             'tireId': 'Lastik #${widget.record.tireNumber}',
-                            'position': 'Lastik ${widget.record.tireNumber}',
+                            // Tabloda gösterilen konum adının aynısı
+                            // ("Ön sağ", "Arka sol dış" ...).
+                            'position': _getTireName(
+                                vehicle.id, widget.record.tireNumber),
                             'serialNo': newSerial,
+                            'previousSerialNo': oldSerial,
                           },
                         ));
                         state.addActivity(
@@ -889,17 +970,8 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishOperations(
       topic: PendingKind.tire.topic,
-      group: PendingKind.tire.label,
-      operations: <Map<String, Object?>>[
-        for (final PendingOperation p in pending)
-          <String, Object?>{
-            ...p.payload,
-            'vehicle': p.vehicleCode,
-            'date': p.date.toIso8601String(),
-          },
-      ],
-      vehicleCode: vehicle?.name,
-      userRegistryNo: state.user?.registryNo,
+      pending: pending,
+      user: state.user,
     );
     if (!context.mounted) return;
     setState(() => _sending = false);
@@ -935,47 +1007,11 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
       return;
     }
 
-    final int count = pending.length;
     state.clearPending(PendingKind.tire);
     await widget.provider.resetChangedTires();
     widget.provider.clearSelectedVehicle();
     
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        icon: Icon(Icons.check_circle, color: context.brandColor, size: 42),
-        title: const Text('İşlemler gönderildi'),
-        content: SizedBox(
-          width: 460,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('$count işlem gönderildi:',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                for (final PendingOperation p in pending)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text('• ${p.vehicleCode} — ${p.label}',
-                        style: const TextStyle(fontSize: 13)),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: () {
-              FocusManager.instance.primaryFocus?.unfocus();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
-    );
+    await showPendingSentDialog(context: context, sent: pending);
   }
 
   @override
@@ -1020,13 +1056,13 @@ class _VehicleDisplay extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             vehicle.name,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             '${vehicle.typeLabel} • ${vehicle.tireCount} lastik',
-            style: TextStyle(fontSize: 13, color: context.mutedColor),
+            style: TextStyle(fontSize: 16, color: context.mutedColor),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1100,10 +1136,13 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
           date: now,
           activityId: activityId,
           payload: <String, Object?>{
-            'op': 'lastik_kontrol',
+            'op': 'kontrol',
             'tireId': 'Lastik #${widget.record.tireNumber}',
-            'position': 'Lastik ${widget.record.tireNumber}',
-            'items': actions,
+            'position': _getTireName(vehicle.id, widget.record.tireNumber),
+            // İki kontrol türü ayrı ayrı gönderilir; işaretlenmeyen de
+            // `false` olarak gider ki panelde ikisinin durumu da görünsün.
+            'airCompleted': _airChecked,
+            'repairDone': _repairChecked,
           },
         ));
         state.addActivity(

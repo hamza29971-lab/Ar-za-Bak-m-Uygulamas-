@@ -236,41 +236,44 @@ class _LoginScreenState extends State<LoginScreen>
             child: FadeTransition(
               opacity: _fadeAnim,
               child: SizedBox(
-                width: 460,
+                // Form sütunu ekranın yaklaşık %42'sini kaplar; dar ekranlarda
+                // eski genişliğin altına inmez, çok geniş ekranlarda taşmaz.
+                width: (MediaQuery.sizeOf(context).width * 0.42)
+                    .clamp(460.0, 760.0),
                 child: SingleChildScrollView(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 32),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Robot Karakter
                         Image.asset(
                           'assets/images/robot_yenii.png',
-                          height: 100,
+                          height: 124,
                           fit: BoxFit.contain,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
 
                         // Başlık
                         Text(
                           'Giriş Yap',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 30,
                             fontWeight: FontWeight.w800,
                             color: context.authTitle,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Text(
                           'Telefon veya e-posta ile giriş yapın.\nDoğrulama kodu gönderilecektir.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 16,
                             color: context.authMuted,
                             height: 1.5,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
 
                         // Tab Bar
                         _TabBar(
@@ -296,6 +299,7 @@ class _LoginScreenState extends State<LoginScreen>
                           _PasswordInput(
                             controller: _passwordController,
                             onChanged: (val) => setState(() {}),
+                            onSubmitted: _login,
                           ),
                         ] else ...[
                           _EmailInput(
@@ -306,6 +310,7 @@ class _LoginScreenState extends State<LoginScreen>
                           _PasswordInput(
                             controller: _passwordController,
                             onChanged: (val) => setState(() {}),
+                            onSubmitted: _login,
                           ),
                         ],
 
@@ -451,7 +456,7 @@ class _TabItem extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
             color: isSelected ? context.authGreenFill : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
@@ -461,14 +466,14 @@ class _TabItem extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 16,
+                size: 20,
                 color: isSelected ? Colors.white : context.authMuted,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 17,
                   fontWeight: FontWeight.w600,
                   color: isSelected ? Colors.white : context.authMuted,
                 ),
@@ -500,22 +505,24 @@ class _PhoneInput extends StatelessWidget {
         Text(
           'Telefon',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
             color: context.authMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         TextField(
           controller: controller,
           onChanged: onChanged,
-          keyboardType: TextInputType.number,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+          autofillHints: const <String>[AutofillHints.telephoneNumber],
           inputFormatters: [PhoneInputFormatter()],
           decoration: InputDecoration(
             hintText: '(05XX) XXX XX XX',
             hintStyle: TextStyle(color: context.authHint),
             prefixIcon: Icon(Icons.phone_outlined,
-                color: context.authMuted, size: 20),
+                color: context.authMuted, size: 24),
             filled: true,
             fillColor: context.authField,
             border: OutlineInputBorder(
@@ -538,10 +545,10 @@ class _PhoneInput extends StatelessWidget {
             ),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 19),
           ),
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 21,
             fontWeight: FontWeight.w600,
             color: context.authTitle,
             letterSpacing: 1.2,
@@ -569,21 +576,23 @@ class _EmailInput extends StatelessWidget {
         Text(
           'E-posta',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
             color: context.authMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         TextField(
           controller: controller,
           onChanged: onChanged,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const <String>[AutofillHints.email],
           decoration: InputDecoration(
             hintText: 'ornek@email.com',
             hintStyle: TextStyle(color: context.authHint),
             prefixIcon: Icon(Icons.email_outlined,
-                color: context.authMuted, size: 20),
+                color: context.authMuted, size: 24),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(color: context.authBorder, width: 1.5),
@@ -599,10 +608,10 @@ class _EmailInput extends StatelessWidget {
             ),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 19),
           ),
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 19,
             fontWeight: FontWeight.w600,
             color: context.authTitle,
           ),
@@ -639,17 +648,17 @@ class _LoginButton extends StatelessWidget {
             foregroundColor: Colors.white,
             disabledBackgroundColor: context.authGreenFill,
             disabledForegroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 20),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: canLogin ? 2 : 0,
           ),
-          icon: const Icon(Icons.login_rounded, size: 20),
+          icon: const Icon(Icons.login_rounded, size: 24),
           label: const Text(
             'Giriş Yap',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 19,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -666,7 +675,14 @@ class _PasswordInput extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
-  const _PasswordInput({required this.controller, required this.onChanged});
+  /// Klavyedeki "bitti" tusuna basildiginda calisir.
+  final VoidCallback? onSubmitted;
+
+  const _PasswordInput({
+    required this.controller,
+    required this.onChanged,
+    this.onSubmitted,
+  });
 
   @override
   State<_PasswordInput> createState() => _PasswordInputState();
@@ -685,26 +701,31 @@ class _PasswordInputState extends State<_PasswordInput> {
         Text(
           'Şifre',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
             color: context.authMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         TextField(
           controller: widget.controller,
           onChanged: widget.onChanged,
           obscureText: _obscureText,
+          keyboardType: TextInputType.visiblePassword,
+          textInputAction: TextInputAction.done,
+          autofillHints: const <String>[AutofillHints.password],
+          // Tablette klavyedeki "bitti" tusu dogrudan girisi baslatir.
+          onSubmitted: (_) => widget.onSubmitted?.call(),
           decoration: InputDecoration(
             hintText: '••••••••',
             hintStyle: TextStyle(color: context.authHint),
             prefixIcon: Icon(Icons.lock_outline,
-                color: context.authMuted, size: 20),
+                color: context.authMuted, size: 24),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscureText ? Icons.visibility_off : Icons.visibility,
                 color: context.authMuted,
-                size: 20,
+                size: 24,
               ),
               onPressed: () {
                 setState(() {
@@ -734,10 +755,10 @@ class _PasswordInputState extends State<_PasswordInput> {
             ),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 19),
           ),
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 21,
             fontWeight: FontWeight.w600,
             color: context.authTitle,
             letterSpacing: _obscureText ? 2.0 : 1.0,

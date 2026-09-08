@@ -25,6 +25,20 @@ Future<PendingSendChoice?> showPendingSendDialog({
   );
 }
 
+/// Gönderim tamamlandıktan sonra açılan sonuç penceresi. Onay penceresiyle
+/// aynı düzen ve satır stili kullanılır; farkı yeşil onay simgesi ve tek
+/// "Tamam" butonudur.
+Future<void> showPendingSentDialog({
+  required BuildContext context,
+  required List<PendingOperation> sent,
+}) {
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.35),
+    builder: (BuildContext context) => _PendingSentDialog(sent: sent),
+  );
+}
+
 /// Kayıt türünün simgesi ve rengi.
 ({IconData icon, Color color}) _visual(PendingKind kind) => switch (kind) {
       PendingKind.tire => (icon: Icons.trip_origin, color: AppColors.tire),
@@ -42,38 +56,38 @@ class _PendingSendDialog extends StatelessWidget {
     return Dialog(
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
+        constraints: const BoxConstraints(maxWidth: 920, maxHeight: 820),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             // Başlık
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 16, 18),
+              padding: const EdgeInsets.fromLTRB(32, 30, 24, 26),
               child: Row(
                 children: <Widget>[
                   Container(
-                    width: 46,
-                    height: 46,
+                    width: 66,
+                    height: 66,
                     decoration: BoxDecoration(
                       color: context.brandSoftColor,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(Icons.send_rounded,
-                        color: context.brandColor, size: 22),
+                        color: context.brandColor, size: 34),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         const Text('Emin misiniz?',
                             style: TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 2),
+                                fontSize: 27, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
                         Text(
                           '${pending.length} işlem gönderilecek',
                           style:
-                              TextStyle(fontSize: 13, color: context.mutedColor),
+                              TextStyle(fontSize: 17, color: context.mutedColor),
                         ),
                       ],
                     ),
@@ -101,7 +115,7 @@ class _PendingSendDialog extends StatelessWidget {
             Divider(height: 1, color: context.borderColor),
             // Alt eylemler
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: <Widget>[
@@ -109,26 +123,140 @@ class _PendingSendDialog extends StatelessWidget {
                     onPressed: () =>
                         Navigator.of(context).pop(PendingSendChoice.discard),
                     style: TextButton.styleFrom(
-                        foregroundColor: context.accent(AppColors.emergency)),
-                    child: const Text('İptal Et'),
+                      foregroundColor: context.accent(AppColors.emergency),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 20),
+                    ),
+                    child:
+                        const Text('İptal Et', style: TextStyle(fontSize: 17)),
                   ),
                   Row(
                     children: <Widget>[
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 20),
+                        ),
                         child: Text('Geri Dön',
-                            style: TextStyle(color: context.mutedColor)),
+                            style: TextStyle(
+                                fontSize: 17, color: context.mutedColor)),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       FilledButton(
                         onPressed: () => Navigator.of(context)
                             .pop(PendingSendChoice.send),
                         style: FilledButton.styleFrom(
-                            backgroundColor:
-                                context.accentFill(const Color(0xFF198754))),
-                        child: const Text('Evet, Gönder'),
+                          backgroundColor:
+                              context.accentFill(const Color(0xFF198754)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 38, vertical: 20),
+                        ),
+                        child: const Text('Evet, Gönder',
+                            style: TextStyle(fontSize: 17)),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Gönderim tamamlandığında gösterilen sonuç penceresi.
+class _PendingSentDialog extends StatelessWidget {
+  const _PendingSentDialog({required this.sent});
+
+  final List<PendingOperation> sent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 920, maxHeight: 820),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            // Başlık
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 30, 24, 26),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: context.brandSoftColor,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.check_circle,
+                        color: context.brandColor, size: 36),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text('İşlemler Gönderildi',
+                            style: TextStyle(
+                                fontSize: 27, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${sent.length} işlem gönderildi • '
+                          '${formatDateTime(DateTime.now())}',
+                          style:
+                              TextStyle(fontSize: 17, color: context.mutedColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton.outlined(
+                    onPressed: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: context.borderColor),
+            // Gönderilen işlemler
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: sent.length,
+                separatorBuilder: (BuildContext context, int _) =>
+                    Divider(height: 1, color: context.borderColor),
+                itemBuilder: (BuildContext context, int i) =>
+                    _PendingTile(item: sent[i]),
+              ),
+            ),
+            Divider(height: 1, color: context.borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  FilledButton(
+                    onPressed: () {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      Navigator.of(context).pop();
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor:
+                          context.accentFill(const Color(0xFF198754)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 38, vertical: 20),
+                    ),
+                    child: const Text('Tamam',
+                        style: TextStyle(fontSize: 17)),
                   ),
                 ],
               ),
@@ -153,35 +281,45 @@ class _PendingTile extends StatelessWidget {
     final Color color = context.accent(visual.color);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Container(
-            width: 36,
-            height: 36,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
               color: color.withValues(alpha: context.isDark ? 0.18 : 0.12),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(visual.icon, size: 18, color: color),
+            child: Icon(visual.icon, size: 28, color: color),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 18),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(item.vehicleCode,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 7),
                 Text(item.label,
-                    style: TextStyle(fontSize: 13, color: context.mutedColor)),
+                    style: TextStyle(
+                        fontSize: 17, height: 1.4, color: context.mutedColor)),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Text(relativeTime(item.date),
-              style: TextStyle(fontSize: 12, color: context.mutedColor)),
+          const SizedBox(width: 18),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: <Widget>[
+              Text(relativeTime(item.date),
+                  style: TextStyle(fontSize: 15, color: context.mutedColor)),
+              const SizedBox(height: 4),
+              Text(formatDateTime(item.date),
+                  style: TextStyle(fontSize: 14, color: context.mutedColor)),
+            ],
+          ),
         ],
       ),
     );

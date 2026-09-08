@@ -154,6 +154,9 @@ class AppState extends ChangeNotifier {
   void changeTire(Vehicle vehicle, TireRecord record, {String? newSerialNo}) {
     final DateTime now = DateTime.now();
     final String serial = (newSerialNo ?? '').trim();
+    // Sökülen lastiğin seri numarası da gönderildiği için değişiklik
+    // uygulanmadan önce okunur.
+    final String previousSerialNo = record.serialNo;
     if (serial.isNotEmpty) record.serialNo = serial;
     record
       ..lastChangeDate = now
@@ -165,10 +168,11 @@ class AppState extends ChangeNotifier {
       label: '${record.tireId} değiştirildi (${record.serialNo})',
       date: now,
       payload: <String, Object?>{
-        'op': 'lastik_degisim',
+        'op': 'degisim',
         'tireId': record.tireId,
         'position': record.position,
         'serialNo': record.serialNo,
+        'previousSerialNo': previousSerialNo,
       },
     ));
     addNotification(
@@ -207,7 +211,7 @@ class AppState extends ChangeNotifier {
       label: '${record.tireId} kontrol edildi',
       date: now,
       payload: <String, Object?>{
-        'op': 'lastik_kontrol',
+        'op': 'kontrol',
         'tireId': record.tireId,
         'position': record.position,
         'items': items,
@@ -267,8 +271,10 @@ class AppState extends ChangeNotifier {
       label: _refillLabel(record, amount, product),
       date: now,
       payload: <String, Object?>{
-        'op': 'yag_takviye',
-        'areaId': record.areaId,
+        // Manuel yağlama / yağ takviyesi ayrımını `category` (panelde
+        // `subtitle`) taşır; `op` yalnızca işlemin türünü söyler.
+        'op': 'takviye',
+        'category': record.category.pluralLabel,
         'oilType': record.oilType,
         'amount': amount,
         'product': product,
@@ -440,8 +446,8 @@ class AppState extends ChangeNotifier {
       label: '${record.label} kontrol edildi',
       date: now,
       payload: <String, Object?>{
-        'op': 'yag_kontrol',
-        'areaId': record.areaId,
+        'op': 'kontrol',
+        'category': record.category.pluralLabel,
         'oilType': record.oilType,
       },
     );

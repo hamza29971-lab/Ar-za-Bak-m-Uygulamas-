@@ -219,25 +219,36 @@ class InfoLine extends StatelessWidget {
     required this.label,
     required this.value,
     this.labelWidth = 150,
+    this.labelSize = 13,
+    this.valueSize,
+    this.verticalPadding = 4,
   });
 
   final String label;
   final String value;
   final double labelWidth;
+  final double labelSize;
+
+  /// Boşsa gövde metninin varsayılan boyutu kullanılır.
+  final double? valueSize;
+  final double verticalPadding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           SizedBox(
             width: labelWidth,
-            child: Text(label, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+            child: Text(label,
+                style: TextStyle(color: context.mutedColor, fontSize: labelSize)),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(value,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: valueSize)),
           ),
         ],
       ),

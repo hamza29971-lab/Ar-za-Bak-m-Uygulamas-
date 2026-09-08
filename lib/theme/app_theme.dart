@@ -37,19 +37,19 @@ class AppColors {
   // ---------------------------------------------------------------- koyu tema
   /// Sayfa zemini. Tam siyah yerine hafif mavi-gri nötr; uzun süreli
   /// kullanımda göz yormaz ve yüzey katmanları ayırt edilebilir kalır.
-  static const Color darkBg = Color(0xFF0F1216);
+  static const Color darkBg = Color(0xFF2C2F40);
 
   /// Kart / girdi zemini (zeminin bir kademe üstü). Tablo, araç görseli ve
   /// form alanları bu renktedir; zeminden açık seçik ayrışsın diye sayfa
   /// zemininin belirgin biçimde üstünde tutulur.
-  static const Color darkSurface = Color(0xFF1E262E);
+  static const Color darkSurface = Color(0xFF373B50);
 
   /// Diyalog, menü, tablo başlığı gibi bir kademe daha yüksek yüzeyler.
-  static const Color darkElevated = Color(0xFF2A333D);
+  static const Color darkElevated = Color(0xFF41465D);
 
   /// Yüzey sınırları; koyu temada kart kenarının seçilebilmesi için
   /// yüzeyden bir kademe daha açıktır.
-  static const Color darkBorder = Color(0xFF3D4A57);
+  static const Color darkBorder = Color(0xFF8A94BA);
   static const Color darkText = Color(0xFFE7ECF1);
   static const Color darkMuted = Color(0xFF97A3AE);
 
@@ -130,7 +130,7 @@ extension AppThemeX on BuildContext {
   /// dikey ayraçlar gibi, sekmelerin birbirinden net ayrılması gereken
   /// yerlerde kullanılır.
   Color get strongBorderColor =>
-      isDark ? const Color(0xFF6B7A86) : const Color(0xFF9AA1A9);
+      isDark ? const Color(0xFF9CA5CA) : const Color(0xFF9AA1A9);
   Color get mutedColor => isDark ? AppColors.darkMuted : AppColors.lightMuted;
   Color get pageColor => isDark ? AppColors.darkBg : AppColors.lightBg;
 
@@ -196,11 +196,11 @@ extension AppThemeX on BuildContext {
   /// koyu temada kart tonu bile yetmiyor; aracın koyu bölgeleri zemine
   /// karışıyor. Bu yüzden fotoğraf tablası kartlardan bir kademe daha açık.
   Color get photoPlate =>
-      isDark ? const Color(0xFF262E37) : AppColors.lightBg;
+      isDark ? const Color(0xFF484D67) : AppColors.lightBg;
 
   /// Bilgi kutularının soluk mavi zemini.
   Color get infoSoft =>
-      isDark ? const Color(0xFF17202E) : const Color(0xFFF0F4FF);
+      isDark ? const Color(0xFF252737) : const Color(0xFFF0F4FF);
 
   /// Kaydetme animasyonunda kısa süre yanıp sönen yeşil zemin.
   Color get successFlash =>

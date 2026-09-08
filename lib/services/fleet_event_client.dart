@@ -14,6 +14,7 @@ import '../config/app_config.dart';
 class FleetEvent {
   const FleetEvent({
     required this.title,
+    this.subtitle = '',
     this.type = 'genel',
     this.note = '',
     this.deviceId,
@@ -25,6 +26,10 @@ class FleetEvent {
 
   /// Zorunlu. Sunucu 2–200 karakter bekler.
   final String title;
+
+  /// Başlığın hemen altındaki ikincil satır, ör. "Manuel Yağlamalar".
+  /// Boşsa hiç gönderilmez.
+  final String subtitle;
 
   /// `bakim`, `lastik`, `yakit`, `ariza`, `genel`.
   final String type;
@@ -49,6 +54,8 @@ class FleetEvent {
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'title': _clamp(title, maxTitle),
+      if (subtitle.trim().isNotEmpty)
+        'subtitle': _clamp(subtitle.trim(), maxTitle),
       'type': type,
       if (note.trim().isNotEmpty) 'note': _clamp(note.trim(), maxNote),
       if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,

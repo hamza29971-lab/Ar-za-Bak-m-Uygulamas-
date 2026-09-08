@@ -98,36 +98,21 @@ class _LogoutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
       onPressed: () {
-        showDialog(
+        showDialog<void>(
           context: context,
-          builder: (BuildContext dialogContext) {
-            return AlertDialog(
-              title: const Text('Çıkış Yap'),
-              content: const Text('Çıkış yapmak istediğinize emin misiniz?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('İptal'),
+          barrierColor: Colors.black.withValues(alpha: 0.35),
+          builder: (BuildContext dialogContext) => _LogoutDialog(
+            onConfirm: () {
+              Navigator.of(dialogContext).pop();
+              AppScope.read(context).signOut();
+              context.read<TireChangeProvider>().clearSelectedVehicle();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LoginScreen(),
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    AppScope.read(context).signOut();
-                    context.read<TireChangeProvider>().clearSelectedVehicle();
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => const LoginScreen(),
-                      ),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: context.accent(AppColors.emergency),
-                  ),
-                  child: const Text('Çıkış Yap', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
+              );
+            },
+          ),
         );
       },
       icon: const Icon(Icons.logout, size: 18),
@@ -140,6 +125,110 @@ class _LogoutButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+}
+
+/// Çıkış onayı. Uygulamadaki diğer pencerelerle (bkz. [pending_send_dialog.dart],
+/// [result_dialog.dart]) aynı düzen: renkli simge + başlık, altında mesaj ve
+/// alt sırada eylemler.
+class _LogoutDialog extends StatelessWidget {
+  const _LogoutDialog({required this.onConfirm});
+
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color tone = context.accent(AppColors.emergency);
+
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 30, 24, 26),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: tone.withValues(alpha: context.isDark ? 0.18 : 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.logout, color: tone, size: 34),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text('Çıkış Yap',
+                            style: TextStyle(
+                                fontSize: 27, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text('Oturumunuz kapatılacak',
+                            style: TextStyle(
+                                fontSize: 17, color: context.mutedColor)),
+                      ],
+                    ),
+                  ),
+                  IconButton.outlined(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: context.borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 26, 32, 26),
+              child: const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Çıkış yapmak istediğinize emin misiniz? '
+                  'Gönderilmeyi bekleyen işlemler varsa önce onları gönderin.',
+                  style: TextStyle(fontSize: 17, height: 1.5),
+                ),
+              ),
+            ),
+            Divider(height: 1, color: context.borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 20),
+                    ),
+                    child: Text('İptal',
+                        style: TextStyle(
+                            fontSize: 17, color: context.mutedColor)),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: onConfirm,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: context.accentFill(AppColors.emergency),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 34, vertical: 20),
+                    ),
+                    icon: const Icon(Icons.logout, size: 20),
+                    label: const Text('Çıkış Yap',
+                        style: TextStyle(fontSize: 17)),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
