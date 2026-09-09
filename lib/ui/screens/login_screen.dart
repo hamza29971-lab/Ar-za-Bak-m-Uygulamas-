@@ -3,6 +3,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/numeric_keypad.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../screens/shell_screen.dart';
@@ -489,14 +490,84 @@ class _TabItem extends StatelessWidget {
 // ─────────────────────────────────────────────
 // TELEFON GİRİŞ ALANI
 // ─────────────────────────────────────────────
-class _PhoneInput extends StatelessWidget {
+class _PhoneInput extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
   const _PhoneInput({required this.controller, required this.onChanged});
 
   @override
+  State<_PhoneInput> createState() => _PhoneInputState();
+}
+
+class _PhoneInputState extends State<_PhoneInput> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Panel yalnizca alan odaktayken durur; baska bir alana gecilince
+    // kendiliginden kapanir.
+    _focus.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocusChanged);
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    setState(() {});
+    if (!_focus.hasFocus) return;
+    // Panel alanin altinda aciliyor; form kaydirilabilir oldugu icin
+    // ikisini birden gorunur alana getir.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  /// Alandaki ham rakamlar.
+  String get _digits => widget.controller.text.replaceAll(RegExp(r'\D'), '');
+
+  void _setDigits(String digits) {
+    final String formatted = formatPhoneDigits(digits);
+    // Alan readOnly oldugu icin inputFormatters calismaz; bicimlendirme
+    // burada elle yapilir.
+    widget.controller.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+    widget.onChanged(formatted);
+  }
+
+  void _appendDigit(String digit) {
+    final String digits = _digits;
+    if (digits.length >= kPhoneMaxDigits) return;
+    _setDigits(digits + digit);
+  }
+
+  void _backspace() {
+    final String digits = _digits;
+    if (digits.isEmpty) return;
+    _setDigits(digits.substring(0, digits.length - 1));
+  }
+
+  void _clear() {
+    if (_digits.isEmpty) return;
+    _setDigits('');
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final TextEditingController controller = widget.controller;
     final bool hasValue = controller.text.isNotEmpty;
 
     return Column(
@@ -513,11 +584,12 @@ class _PhoneInput extends StatelessWidget {
         const SizedBox(height: 10),
         TextField(
           controller: controller,
-          onChanged: onChanged,
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.next,
-          autofillHints: const <String>[AutofillHints.telephoneNumber],
-          inputFormatters: [PhoneInputFormatter()],
+          focusNode: _focus,
+          // Tabletin sistem klavyesi ACILMAZ: alan salt okunur, rakamlar
+          // asagidaki uygulama ici panelden girilir. Imlec yine gorunur.
+          readOnly: true,
+          showCursor: true,
+          onTap: () => _focus.requestFocus(),
           decoration: InputDecoration(
             hintText: '(05XX) XXX XX XX',
             hintStyle: TextStyle(color: context.authHint),
@@ -554,6 +626,20 @@ class _PhoneInput extends StatelessWidget {
             letterSpacing: 1.2,
           ),
         ),
+        // Sayi paneli yalnizca alan odaktayken gorunur.
+        if (_focus.hasFocus) ...<Widget>[
+          const SizedBox(height: 14),
+          NumericKeypad(
+            stretch: true,
+            keyHeight: 54,
+            accent: AppColors.brand,
+            doneLabel: 'Tamam',
+            onDigit: _appendDigit,
+            onBackspace: _backspace,
+            onClear: _clear,
+            onDone: _focus.unfocus,
+          ),
+        ],
       ],
     );
   }
@@ -769,42 +855,24 @@ class _PasswordInputState extends State<_PasswordInput> {
   }
 }
 
-class PhoneInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue,
-    ) {
-      String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-      
-      // Silme (Backspace) kilitlenmesi cozumu
-      if (oldValue.text.length > newValue.text.length && 
-          oldValue.text.replaceAll(RegExp(r'\D'), '') == digits) {
-        if (digits.isNotEmpty) {
-          digits = digits.substring(0, digits.length - 1);
-        }
-      }
-      
-      if (digits.length > 11) {
-        return oldValue; // 11 haneden fazla girmesin
-      }
-      
-      final String formatted = _formatPhone(digits);
-      return TextEditingValue(
-        text: formatted,
-        selection: TextSelection.collapsed(offset: formatted.length),
-      );
-    }
-
-  String _formatPhone(String digits) {
-    if (digits.isEmpty) return '';
-    if (digits.length <= 4) {
-      return digits.length == 4 ? '($digits) ' : '($digits';
-    }
-    if (digits.length <= 7) return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
-    if (digits.length <= 9) {
-      return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
-    }
-    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
+/// Ham rakamlari "(05XX) XXX XX XX" bicimine cevirir.
+///
+/// Telefon alani salt okunurdur; rakamlar uygulama ici sayi klavyesinden
+/// gelir ve bicimlendirme burada yapilir.
+String formatPhoneDigits(String digits) {
+  if (digits.isEmpty) return '';
+  if (digits.length <= 4) {
+    return digits.length == 4 ? '($digits) ' : '($digits';
   }
+  if (digits.length <= 7) {
+    return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
+  }
+  if (digits.length <= 9) {
+    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
+  }
+  return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} '
+      '${digits.substring(7, 9)} ${digits.substring(9)}';
 }
+
+/// Telefon alanina girilebilecek en fazla hane.
+const int kPhoneMaxDigits = 11;

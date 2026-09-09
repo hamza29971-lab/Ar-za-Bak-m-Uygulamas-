@@ -6,6 +6,7 @@ import 'ui/screens/login_screen.dart';
 import 'providers/tire_change_provider.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
+import 'widgets/kiosk_exit_gate.dart';
 
 class NimoApp extends StatefulWidget {
   const NimoApp({super.key});
@@ -16,6 +17,10 @@ class NimoApp extends StatefulWidget {
 
 class _NimoAppState extends State<NimoApp> {
   final AppState _state = AppState();
+
+  /// Kiosk parola penceresi bu anahtar uzerinden acilir; [MaterialApp.builder]
+  /// icindeki context Navigator'un ustunde kalir.
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void dispose() {
@@ -37,6 +42,13 @@ class _NimoAppState extends State<NimoApp> {
             return MaterialApp(
               title: 'NIMO Bakım',
               debugShowCheckedModeBanner: false,
+              navigatorKey: _navigatorKey,
+              // Kiosk modunda uygulamadan yalnizca parola ile cikilabilir.
+              // Kapi tum sayfalarin uzerinde durur.
+              builder: (BuildContext context, Widget? child) => KioskExitGate(
+                navigatorKey: _navigatorKey,
+                child: child ?? const SizedBox.shrink(),
+              ),
               theme: AppTheme.light(),
               darkTheme: AppTheme.dark(),
               themeMode: _state.themeMode,
