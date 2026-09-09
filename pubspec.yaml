@@ -19,6 +19,9 @@ dependencies:
   image_picker: ^1.2.3
   http: ^1.6.0
   battery_plus: ^7.1.1
+  path_provider: ^2.1.6
+  open_file: ^4.0.0
+  connectivity_plus: ^7.3.1
 
 dev_dependencies:
   flutter_test:
@@ -33,5 +36,6 @@ flutter:
     - assets/images/anasayfa/
     - assets/images/sol/
     - assets/images/sag/
+    - assets/version.txt
 
 

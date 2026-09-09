@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../state/app_state.dart' show PendingOperation;
@@ -22,11 +24,25 @@ class PublishService {
     String? startTime,
     String? endTime,
   }) async {
+    // 1. Resimleri Base64 formatına çevir (eğer resim varsa)
+    List<String> base64Images = [];
+    if (imagePaths.isNotEmpty) {
+      for (String path in imagePaths) {
+        try {
+          final bytes = File(path).readAsBytesSync();
+          final base64String = base64Encode(bytes);
+          base64Images.add('data:image/jpeg;base64,$base64String');
+        } catch (e) {
+          debugPrint('Base64 dönüştürme hatası: $e');
+        }
+      }
+    }
+
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
       description: description,
-      imageCount: imagePaths.length,
-      imageNames: imagePaths,
+      imageCount: base64Images.length,
+      imageNames: base64Images, // Base64 verilerini API'ye gönder
       deviceId: null,
       vehicleLabel: vehicleCode,
       operatorLabel: userRegistryNo,

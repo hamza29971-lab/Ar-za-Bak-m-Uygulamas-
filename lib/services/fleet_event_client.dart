@@ -86,8 +86,13 @@ class FleetEvent {
       if (v is num || v is bool) {
         out[e.key] = v;
       } else if (v is Iterable<Object?>) {
-        final String joined = v.map((Object? x) => '$x').join(', ');
-        if (joined.isNotEmpty) out[e.key] = _clamp(joined, maxNote);
+        if (e.key == 'gorseller') {
+          // Base64 görselleri kırpmadan listeye çevirip ekle
+          out[e.key] = v.toList();
+        } else {
+          final String joined = v.map((Object? x) => '$x').join(', ');
+          if (joined.isNotEmpty) out[e.key] = _clamp(joined, maxNote);
+        }
       } else {
         final String text = '$v'.trim();
         if (text.isNotEmpty) out[e.key] = _clamp(text, maxNote);
