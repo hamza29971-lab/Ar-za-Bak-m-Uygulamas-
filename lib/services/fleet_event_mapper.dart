@@ -14,6 +14,7 @@ class FleetEventMapper {
     PendingOperation operation, {
     required String? deviceId,
     required UserProfile? user,
+    required String? vehicleUUID,
   }) {
     final Map<String, Object?> payload = operation.payload;
     final String op = '${payload['op'] ?? ''}';
@@ -25,7 +26,7 @@ class FleetEventMapper {
       subtitle: '${payload['category'] ?? ''}',
       type: _typeFor(operation.kind),
       deviceId: deviceId,
-      vehicleLabel: operation.vehicleCode,
+      vehicleUUID: vehicleUUID,
       operatorLabel: operatorLabel(user),
       occurredAt: operation.date,
       // `op` başlıkta ve türde zaten temsil ediliyor; alan olarak da gönderilir
@@ -61,7 +62,7 @@ class FleetEventMapper {
     required int imageCount,
     required List<String> imageNames,
     required String? deviceId,
-    required String? vehicleLabel,
+    required String? vehicleUUID,
     required String? operatorLabel,
     required DateTime occurredAt,
     String? startTime,
@@ -72,7 +73,7 @@ class FleetEventMapper {
       type: _reportTypes[reportType] ?? 'genel',
       note: description,
       deviceId: deviceId,
-      vehicleLabel: vehicleLabel,
+      vehicleUUID: vehicleUUID,
       operatorLabel: operatorLabel,
       occurredAt: occurredAt,
       fields: <String, Object?>{

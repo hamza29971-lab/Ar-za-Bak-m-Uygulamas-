@@ -969,6 +969,7 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishOperations(
+      state: state,
       topic: PendingKind.tire.topic,
       pending: pending,
       user: state.user,

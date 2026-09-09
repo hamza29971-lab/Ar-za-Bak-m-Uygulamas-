@@ -18,7 +18,7 @@ class FleetEvent {
     this.type = 'genel',
     this.note = '',
     this.deviceId,
-    this.vehicleLabel,
+    this.vehicleUUID,
     this.operatorLabel,
     this.occurredAt,
     this.fields = const <String, Object?>{},
@@ -38,7 +38,7 @@ class FleetEvent {
   final String note;
 
   final String? deviceId;
-  final String? vehicleLabel;
+  final String? vehicleUUID;
   final String? operatorLabel;
   final DateTime? occurredAt;
 
@@ -59,8 +59,8 @@ class FleetEvent {
       'type': type,
       if (note.trim().isNotEmpty) 'note': _clamp(note.trim(), maxNote),
       if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
-      if (vehicleLabel != null && vehicleLabel!.isNotEmpty)
-        'vehicleLabel': vehicleLabel,
+      if (vehicleUUID != null && vehicleUUID!.isNotEmpty)
+        'vehicleUUID': vehicleUUID,
       if (operatorLabel != null && operatorLabel!.isNotEmpty)
         'operatorLabel': operatorLabel,
       // Yerel saatin ISO çıktısında dilim eki olmadığı için UTC gönderilir.
@@ -139,6 +139,8 @@ class HttpFleetEventClient implements FleetEventClient {
 
   @override
   Future<FleetResult> send(FleetEvent event) async {
+    final String payload = jsonEncode(event.toJson());
+    debugPrint('[Fleet] gönderim: $payload');
     try {
       final http.Response response = await _client
           .post(
@@ -147,7 +149,7 @@ class HttpFleetEventClient implements FleetEventClient {
               'Content-Type': 'application/json',
               'X-Fleet-Key': AppConfig.fleetApiKey,
             },
-            body: jsonEncode(event.toJson()),
+            body: payload,
           )
           .timeout(AppConfig.requestTimeout);
 
@@ -155,8 +157,10 @@ class HttpFleetEventClient implements FleetEventClient {
         final Object? body = jsonDecode(utf8.decode(response.bodyBytes));
         final String? id =
             body is Map<String, Object?> ? body['id'] as String? : null;
+        debugPrint('[Fleet] gönderim başarılı, kayıt id: $id');
         return FleetResult.success(id);
       }
+      debugPrint('[Fleet] gönderim reddedildi: HTTP ${response.statusCode} ${response.body}');
       return FleetResult.failure(_messageFor(response.statusCode));
     } on Object catch (e) {
       debugPrint('[Fleet] gönderim hatası: $e');

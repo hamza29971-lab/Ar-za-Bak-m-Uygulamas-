@@ -423,6 +423,7 @@ class _OilScreenState extends State<OilScreen> {
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishOperations(
+      state: state,
       topic: PendingKind.oil.topic,
       pending: pending,
       user: state.user,

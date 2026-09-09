@@ -172,15 +172,22 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     }
 
     final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
-    final String? startText =
-        _startTime == null ? null : _formatTime(_startTime!);
-    final String? endText = _endTime == null ? null : _formatTime(_endTime!);
+    // Servis saatleri yalnızca alanların gösterildiği ekranda anlamlıdır.
+    // Mekanik Operasyon'da bu alanlar kapalı olduğu için saat bilgisi hiç
+    // gönderilmez; koşul bunu yerleşimden bağımsız olarak garanti eder.
+    final String? startText = widget.showServiceHours && _startTime != null
+        ? _formatTime(_startTime!)
+        : null;
+    final String? endText = widget.showServiceHours && _endTime != null
+        ? _formatTime(_endTime!)
+        : null;
     final String hours = startText == null && endText == null
         ? ''
         : '${startText ?? '-'} - ${endText ?? '-'}';
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishReport(
+      state: state,
       reportType: widget.type.label,
       description: _description.text.trim(),
       imagePaths: imagePaths,

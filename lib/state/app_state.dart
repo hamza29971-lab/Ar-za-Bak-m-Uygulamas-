@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/auth_models.dart';
+import '../services/vehicle_directory_service.dart';
 import '../utils/formats.dart';
 import '../services/service_locator.dart';
 
@@ -53,6 +55,10 @@ class AppState extends ChangeNotifier {
     
     await ServiceLocator.tokens.save(session);
     notifyListeners();
+
+    // Giriş akışını bloklamaz; hata olursa vehicleUuidFor eşleşme bulamaz
+    // ve loadVehicleDirectory'nin kendi debugPrint'i sebebi gösterir.
+    unawaited(loadVehicleDirectory());
   }
 
   /// Eksik profil bilgilerini elle girildiğinde kaydetmek için kullanılır.
@@ -147,6 +153,50 @@ class AppState extends ChangeNotifier {
 
   List<OilRecord> oilsOf(Vehicle vehicle) =>
       _oils.putIfAbsent(vehicle.id, () => MockData.oilsFor(vehicle));
+
+  // ------------------------------------------------------ araç UUID dizini
+  final VehicleDirectoryService _vehicleDirectoryService = VehicleDirectoryService();
+  Map<String, String> _vehicleUuidByCode = <String, String>{};
+
+  /// `Vehicle.code`'u mining-be'deki araç UUID'sine çevirir. Dizin henüz
+  /// yüklenmemişse ya da eşleşme bulunamazsa `null` döner.
+  String? vehicleUuidFor(String? vehicleCode) {
+    if (vehicleCode == null || vehicleCode.trim().isEmpty) return null;
+    return _vehicleUuidByCode[_normalizeVehicleKey(vehicleCode)];
+  }
+
+  static String _normalizeVehicleKey(String value) =>
+      value.trim().toUpperCase().replaceAll(RegExp(r'[\s\-_]+'), '');
+
+  /// Testler için: dizini ağdan çekmeden UUID önbelleğini doldurur.
+  @visibleForTesting
+  void seedVehicleDirectory(Map<String, String> uuidByCode) {
+    _vehicleUuidByCode = <String, String>{
+      for (final MapEntry<String, String> e in uuidByCode.entries)
+        _normalizeVehicleKey(e.key): e.value,
+    };
+  }
+
+  /// mining-be'den araç listesini çekip yerel filoyla eşleştirir.
+  /// `applySession` içinde girişten hemen sonra tetiklenir.
+  Future<void> loadVehicleDirectory() async {
+    final String? accessToken = await ServiceLocator.tokens.readAccessToken();
+    final List<VehicleDirectoryEntry> entries =
+        await _vehicleDirectoryService.fetchAll(accessToken: accessToken);
+    if (entries.isEmpty) return;
+
+    final Map<String, String> byCode = <String, String>{};
+    for (final VehicleDirectoryEntry entry in entries) {
+      byCode[_normalizeVehicleKey(entry.label)] = entry.id;
+    }
+    _vehicleUuidByCode = byCode;
+
+    for (final Vehicle vehicle in _vehicles) {
+      if (!byCode.containsKey(_normalizeVehicleKey(vehicle.code))) {
+        debugPrint('[FleetUUID] eşleşmedi: ${vehicle.code}');
+      }
+    }
+  }
 
   // -------------------------------------------------------------- işlemler
   /// Lastik değişimi: [newSerialNo] verilirse takılan yeni lastiğin seri
@@ -251,9 +301,11 @@ class AppState extends ChangeNotifier {
     // saklanır; bkz. [cancelOilRefill].
     final double previousAmount = record.amount;
     final DateTime? previousOilDate = record.lastOilDate;
+    final String previousProduct = record.lastProduct;
     record
       ..amount = amount
-      ..lastOilDate = now;
+      ..lastOilDate = now
+      ..lastProduct = product;
     final String activityId = 'oil-${now.microsecondsSinceEpoch}';
     addActivity(
       OilRefillActivity(
@@ -285,6 +337,7 @@ class AppState extends ChangeNotifier {
       activityId: activityId,
       previousAmount: previousAmount,
       previousOilDate: previousOilDate,
+      previousProduct: previousProduct,
     );
     addPending(pending);
     addNotification(
@@ -346,7 +399,8 @@ class AppState extends ChangeNotifier {
     final DateTime now = DateTime.now();
     context.record
       ..amount = amount
-      ..lastOilDate = now;
+      ..lastOilDate = now
+      ..lastProduct = product;
     for (final ActivityRecord activity in _activities) {
       if (activity.id == context.activityId && activity is OilRefillActivity) {
         activity
@@ -375,7 +429,8 @@ class AppState extends ChangeNotifier {
     if (context != null) {
       context.record
         ..amount = context.previousAmount
-        ..lastOilDate = context.previousOilDate;
+        ..lastOilDate = context.previousOilDate
+        ..lastProduct = context.previousProduct;
       _activities
           .removeWhere((ActivityRecord a) => a.id == context.activityId);
     }
@@ -397,7 +452,8 @@ class AppState extends ChangeNotifier {
       if (refill != null) {
         refill.record
           ..amount = refill.previousAmount
-          ..lastOilDate = refill.previousOilDate;
+          ..lastOilDate = refill.previousOilDate
+          ..lastProduct = refill.previousProduct;
         _activities
             .removeWhere((ActivityRecord a) => a.id == refill.activityId);
       }
@@ -449,6 +505,11 @@ class AppState extends ChangeNotifier {
         'op': 'kontrol',
         'category': record.category.pluralLabel,
         'oilType': record.oilType,
+        // Kontrolde yeni bir miktar/ürün girilmez; kayıttaki son takviye
+        // bilgisi bildirilir. Hiç takviye yapılmamışsa gönderilmez.
+        if (record.amount > 0) 'amount': record.amount,
+        if (record.lastProduct.trim().isNotEmpty)
+          'product': record.lastProduct.trim(),
       },
     );
     _pendingChecks[pending.id] = _PendingCheck(
@@ -669,12 +730,16 @@ class _PendingRefill {
     required this.activityId,
     required this.previousAmount,
     required this.previousOilDate,
+    required this.previousProduct,
   });
 
   final OilRecord record;
   final String activityId;
   final double previousAmount;
   final DateTime? previousOilDate;
+
+  /// Takviyeden önceki ürün; iptal edilirse kayda geri yazılır.
+  final String previousProduct;
 }
 
 /// Bekleyen bir seviye kontrolünün iptal edilebilmesi için gereken bağlam:

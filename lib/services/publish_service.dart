@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
-import '../state/app_state.dart' show PendingOperation;
+import '../state/app_state.dart' show AppState, PendingOperation;
 import 'fleet_event_client.dart';
 import 'fleet_event_mapper.dart';
 
@@ -15,6 +15,7 @@ class PublishService {
   static const String baseTopic = 'nimo/bakim';
 
   Future<PublishResult> publishReport({
+    required AppState state,
     required String reportType,
     required String description,
     required List<String> imagePaths,
@@ -44,7 +45,7 @@ class PublishService {
       imageCount: base64Images.length,
       imageNames: base64Images, // Base64 verilerini API'ye gönder
       deviceId: null,
-      vehicleLabel: vehicleCode,
+      vehicleUUID: state.vehicleUuidFor(vehicleCode),
       operatorLabel: userRegistryNo,
       occurredAt: DateTime.now(),
       startTime: startTime,
@@ -68,6 +69,7 @@ class PublishService {
   /// ancak ekran yalnızca tamamı başarılı olursa kuyruğu temizler — böylece
   /// kullanıcı "Gönder"e tekrar basarak kalanları yeniden dener.
   Future<PublishResult> publishOperations({
+    required AppState state,
     required String topic,
     required List<PendingOperation> pending,
     UserProfile? user,
@@ -78,6 +80,7 @@ class PublishService {
         operation,
         deviceId: null,
         user: user,
+        vehicleUUID: state.vehicleUuidFor(operation.vehicleCode),
       );
       final FleetResult result = await _client.send(event);
       if (!result.ok) {

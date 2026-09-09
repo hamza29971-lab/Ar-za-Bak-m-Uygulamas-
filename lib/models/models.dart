@@ -136,6 +136,10 @@ class OilRecord {
   double amount;
   DateTime? lastOilDate;
 
+  /// Son takviyede kullanılan ürün. Seviye kontrolü gönderilirken de
+  /// bildirilir; hiç takviye yapılmamışsa boştur.
+  String lastProduct = '';
+
   /// Seviye kontrolünün yapıldığı son tarih ("Kontrol Et").
   DateTime? lastCheckDate;
 
