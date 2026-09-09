@@ -14,42 +14,29 @@ import '../widgets/nimo_page.dart';
 import '../widgets/result_dialog.dart';
 import '../widgets/vehicle_selector.dart';
 
-/// Gönderilebilecek rapor türleri. İkisi de araç kaydı okumaz: raporda
-/// yalnızca görsel ve açıklama gönderilir, araç seçimi isteğe bağlıdır.
+/// Gönderilen raporun türü. Ekran başına sabittir; kullanıcı seçmez.
 enum ReportType {
-  /// Sahada yapılan ve arıza sayılmayan işler için serbest form.
-  serviceForm('Servis Formu', Icons.assignment_outlined),
+  /// "Servis Raporu" ekranının tek türü.
+  general('Servis Raporu', Icons.assignment_outlined),
 
-  /// Arıza bildirimi.
-  fault('Arıza Raporu', Icons.report_gmailerrorred_outlined),
-
-  /// Mekanik Operasyon ekranının tek türü.
+  /// "Mekanik Operasyon" ekranının tek türü.
   mechanical('Mekanik Operasyon', Icons.build_outlined);
 
   const ReportType(this.label, this.icon);
 
   final String label;
   final IconData icon;
-
-  /// "Servis Raporu" sekmesinde seçilebilen türler.
-  static const List<ReportType> serviceTypes = <ReportType>[
-    serviceForm,
-    fault,
-  ];
-
-  /// "Mekanik Operasyon" sekmesinin tek türü.
-  static const List<ReportType> mechanicalTypes = <ReportType>[mechanical];
 }
 
-/// "Servis Raporu" ekranı: rapor türü + araç seçimi + görsel(ler) + açıklama.
+/// "Servis Raporu" ekranı: araç seçimi + görsel(ler) + açıklama.
 ///
-/// Aynı ekran "Mekanik Operasyon" sekmesinde de kullanılır; tek fark rapor
-/// türü listesinin [types] ile daraltılması ve başlıktır.
+/// Aynı ekran "Mekanik Operasyon" sekmesinde de kullanılır; tek fark [type]
+/// ve başlıktır.
 class ServiceReportScreen extends StatefulWidget {
   const ServiceReportScreen({
     super.key,
     this.title = 'Servis Raporu',
-    this.types = ReportType.serviceTypes,
+    this.type = ReportType.general,
     this.accent = AppColors.form,
     this.allowGallery = true,
     this.showServiceHours = true,
@@ -58,9 +45,8 @@ class ServiceReportScreen extends StatefulWidget {
   /// Sayfa başlığı.
   final String title;
 
-  /// "Rapor türü" listesinde gösterilecek türler; ilki varsayılan seçimdir.
-  /// Boş verilmemelidir.
-  final List<ReportType> types;
+  /// Bu ekrandan gönderilen raporun türü.
+  final ReportType type;
 
   /// Ekranın vurgu rengi; sekme rengiyle aynı olmalıdır.
   final Color accent;
@@ -82,7 +68,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _description = TextEditingController();
   final List<XFile> _images = <XFile>[];
-  late ReportType _type = widget.types.first;
 
   /// Servisin başlangıç ve bitiş saati; seçilmemişse null.
   TimeOfDay? _startTime;
@@ -91,6 +76,11 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   bool _sending = false;
 
   Color get accent => widget.accent;
+
+  /// Kenarlıklar her iki rapor ekranında da aynı mavi tonda. Modül rengi
+  /// (Mekanik Operasyon'da mor) yalnızca simge, başlık ve butonlarda
+  /// kullanılır; kenarlıklar Servis Raporu ile aynı görünür.
+  Color get borderAccent => AppColors.form;
 
   @override
   void dispose() {
@@ -191,7 +181,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishReport(
-      reportType: _type.label,
+      reportType: widget.type.label,
       description: _description.text.trim(),
       imagePaths: imagePaths,
       items: const <Map<String, Object?>>[],
@@ -209,7 +199,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         id: 'rapor-${sentAt.microsecondsSinceEpoch}',
         vehicleCode: vehicle?.code ?? '',
         date: sentAt,
-        reportType: _type.label,
+        reportType: widget.type.label,
         description: _description.text.trim(),
         imagePaths: imagePaths,
         itemCount: 0,
@@ -218,14 +208,14 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     state.addNotification(
       NotificationItem(
         title: 'Servis raporu gönderildi',
-        message: '${_type.label} • ${imagePaths.length} görsel'
+        message: '${widget.type.label} • ${imagePaths.length} görsel'
             '${vehicle != null ? ' • ${vehicle.code}' : ''}'
             '${hours.isEmpty ? '' : ' • $hours'}',
         date: sentAt,
         kind: NotificationKind.form,
         vehicleCode: vehicle?.code,
         details: <String, String>{
-          'Rapor türü': _type.label,
+          'Rapor türü': widget.type.label,
           'Başlangıç saati': ?startText,
           'Bitiş saati': ?endText,
           'Gönderilen görsel': '${imagePaths.length}',
@@ -240,7 +230,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       title: 'Rapor gönderildi',
       subtitle: formatDateTime(sentAt),
       details: <String, String>{
-        'Rapor türü': _type.label,
+        'Rapor türü': widget.type.label,
         'Araç': vehicle?.code ?? '-',
         if (widget.showServiceHours)
           'Servis saati': hours.isEmpty ? '-' : hours,
@@ -273,8 +263,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
             children: <Widget>[
               PageHeading(
                 title: widget.title,
-                subtitle:
-                    'Rapor türünü ve aracı seçin, görsel ve açıklama ile gönderin',
+                subtitle: 'Aracı seçin, görsel ve açıklama ile gönderin',
               ),
               const SizedBox(height: 16),
               // Araç listeden seçilir; seçim diğer ekranlarla ortaktır.
@@ -291,6 +280,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                     VehicleSelector(
                       selected: vehicle,
                       accentColor: accent,
+                      borderAccent: borderAccent,
                       width: 360,
                       onSelected: state.selectVehicle,
                     ),
@@ -450,6 +440,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       title: 'Rapor Görselleri',
       icon: Icons.image_outlined,
       accent: accent,
+      borderAccent: borderAccent,
       expandChild: true,
       trailing: Text('${_images.length} görsel',
           style: TextStyle(fontSize: 13, color: context.mutedColor)),
@@ -511,7 +502,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   Widget _buildDropHint(BuildContext context) {
     // Yer varsa ortalanır, dar ekranda (rapor tablosu da açıkken) kayar.
     return DottedBorderBox(
-      accent: accent,
+      accent: borderAccent,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           return SingleChildScrollView(
@@ -598,6 +589,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       title: 'Açıklama',
       icon: Icons.edit_note_outlined,
       accent: accent,
+      borderAccent: borderAccent,
       expandChild: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -47,7 +47,7 @@ class _ShellScreenState extends State<ShellScreen> {
             const ServiceReportScreen(allowGallery: false),
             const ServiceReportScreen(
               title: 'Mekanik Operasyon',
-              types: ReportType.mechanicalTypes,
+              type: ReportType.mechanical,
               accent: AppColors.mechanic,
               allowGallery: false,
               showServiceHours: false,

@@ -14,12 +14,18 @@ class VehicleSelector extends StatefulWidget {
     required this.selected,
     required this.onSelected,
     this.accentColor,
+    this.borderAccent,
     this.width = 420,
   });
 
   final Vehicle? selected;
   final ValueChanged<Vehicle?> onSelected;
   final Color? accentColor;
+
+  /// Kenarlık rengi. Verilmezse [accentColor] kullanılır; modül renginden
+  /// farklı bir kenarlık isteniyorsa (ör. Mekanik Operasyon'da mavi
+  /// kenarlık) buradan verilir.
+  final Color? borderAccent;
   final double width;
 
   @override
@@ -105,6 +111,9 @@ class _VehicleSelectorState extends State<VehicleSelector> {
     _entry?.markNeedsBuild();
   }
 
+  /// Kenarlıklarda kullanılan renk; verilmemişse vurgu rengine düşer.
+  Color? get _edge => widget.borderAccent ?? widget.accentColor;
+
   Widget _buildOverlay(BuildContext overlayContext) {
     final AppState state = AppScope.read(context);
     final List<Vehicle> items = state.filterVehicles(
@@ -142,8 +151,8 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                         context.isDark ? context.elevatedColor : context.pageColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: widget.accentColor != null
-                          ? context.moduleBorderColor(widget.accentColor!)
+                      color: _edge != null
+                          ? context.moduleBorderColor(_edge!)
                           : context.borderColor,
                       width: 2.5,
                     ),
@@ -181,8 +190,8 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                           itemCount: items.length,
                           separatorBuilder: (_, _) => Divider(
                             height: 1,
-                            color: (widget.accentColor != null
-                                    ? context.moduleBorderColor(widget.accentColor!)
+                            color: (_edge != null
+                                    ? context.moduleBorderColor(_edge!)
                                     : context.borderColor)
                                 .withValues(alpha: 0.6),
                           ),
@@ -294,8 +303,8 @@ class _VehicleSelectorState extends State<VehicleSelector> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: widget.accentColor != null
-                    ? context.moduleBorderColor(widget.accentColor!)
+                color: _edge != null
+                    ? context.moduleBorderColor(_edge!)
                     : context.borderColor,
                 width: 2.5,
               ),
@@ -303,8 +312,8 @@ class _VehicleSelectorState extends State<VehicleSelector> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: widget.accentColor != null
-                    ? context.moduleBorderColor(widget.accentColor!)
+                color: _edge != null
+                    ? context.moduleBorderColor(_edge!)
                     : context.borderColor,
                 width: 2.5,
               ),

@@ -264,6 +264,7 @@ class SectionCard extends StatelessWidget {
     this.title,
     this.icon,
     this.accent,
+    this.borderAccent,
     this.trailing,
     this.padding = const EdgeInsets.all(20),
     this.expandChild = false,
@@ -273,6 +274,11 @@ class SectionCard extends StatelessWidget {
   final String? title;
   final IconData? icon;
   final Color? accent;
+
+  /// Kenarlık rengi. Verilmezse [accent] kullanılır; modül rengiyle aynı
+  /// olmayan bir kenarlık isteniyorsa (ör. Mekanik Operasyon'da mavi
+  /// kenarlık) buradan verilir.
+  final Color? borderAccent;
   final Widget? trailing;
   final EdgeInsets padding;
 
@@ -284,12 +290,15 @@ class SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color color =
         context.accent(accent ?? Theme.of(context).colorScheme.primary);
+    // Kenarlık, istenirse başlık/simge renginden ayrı tutulabilir.
+    final Color edge = context.accent(borderAccent ?? accent ??
+        Theme.of(context).colorScheme.primary);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
         color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.moduleBorderColor(color), width: 2.5),
+        border: Border.all(color: context.moduleBorderColor(edge), width: 2.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

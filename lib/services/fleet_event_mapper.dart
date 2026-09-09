@@ -91,8 +91,7 @@ class FleetEventMapper {
   // ------------------------------------------------------------------ eşleme
 
   static const Map<String, String> _reportTypes = <String, String>{
-    'Servis Formu': 'genel',
-    'Arıza Raporu': 'ariza',
+    'Servis Raporu': 'genel',
     'Mekanik Operasyon': 'bakim',
   };
 
