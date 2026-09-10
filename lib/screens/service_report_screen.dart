@@ -158,6 +158,42 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       ),
     );
     if (picked == null) return;
+    // Saat seçildiğinde, başlangıç ve bitiş saatinin tutarlı olup olmadığını hemen kontrol et
+    if (isStart) {
+      // Yeni başlangıç saati, mevcut bitiş saatinden sonraysa reddet
+      if (_endTime != null) {
+        final int newStartMin = picked.hour * 60 + picked.minute;
+        final int endMin = _endTime!.hour * 60 + _endTime!.minute;
+        if (newStartMin >= endMin) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Başlangıç saati, bitiş saatinden önce olmalıdır.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+      }
+    } else {
+      // Yeni bitiş saati, mevcut başlangıç saatinden önceyse reddet
+      if (_startTime != null) {
+        final int startMin = _startTime!.hour * 60 + _startTime!.minute;
+        final int newEndMin = picked.hour * 60 + picked.minute;
+        if (newEndMin <= startMin) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Bitiş saati, başlangıç saatinden sonra olmalıdır.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
     setState(() {
       if (isStart) {
         _startTime = picked;
@@ -176,16 +212,19 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         return AlertDialog(
           title: Row(
             children: <Widget>[
-              Icon(Icons.warning_amber_rounded, color: AppColors.fault, size: 28),
+              Icon(Icons.info_outline_rounded, color: accent, size: 28),
               const SizedBox(width: 10),
-              const Expanded(child: Text('Eksik veya Hatalı Alanlar', style: TextStyle(fontSize: 18))),
+              const Expanded(child: Text('Lütfen Tüm Alanları Doldurun', style: TextStyle(fontSize: 18))),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text('Lütfen formu göndermeden önce aşağıdaki hataları düzeltin:', style: TextStyle(fontSize: 14)),
+              const Text(
+                'İşlemi tamamlayıp raporu gönderebilmemiz için aşağıdaki bilgileri de seçmeniz/yazmanız gerekiyor:',
+                style: TextStyle(fontSize: 14),
+              ),
               const SizedBox(height: 16),
               ...errors.map((String e) => Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -202,7 +241,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           actions: <Widget>[
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tamam, Düzelteceğim'),
+              child: const Text('Tamam'),
             ),
           ],
         );
@@ -222,19 +261,12 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
     if (widget.showServiceHours) {
       if (_startTime == null) {
-        errors.add('Başlangıç saatini girmediniz.');
+        errors.add('Başlangıç saatini seçmediniz.');
       }
       if (_endTime == null) {
-        errors.add('Bitiş saatini girmediniz.');
+        errors.add('Bitiş saatini seçmediniz.');
       }
-      
-      if (_startTime != null && _endTime != null) {
-        final int startMin = _startTime!.hour * 60 + _startTime!.minute;
-        final int endMin = _endTime!.hour * 60 + _endTime!.minute;
-        if (startMin >= endMin) {
-          errors.add('Başlangıç saati, bitiş saatinden önce olmalıdır.');
-        }
-      }
+      // Saat mantık kontrolü seçim anında yapılıyor, burada tekrar kontrol gerekmez
     }
 
     if (_images.isEmpty) {
