@@ -18,7 +18,9 @@ class VehicleDirectoryEntry {
   final String label;
 
   static VehicleDirectoryEntry? fromJson(Map<String, Object?> json) {
+    // Sunucu UUID'yi `value`, adı `label` alanında döndürüyor.
     final String id = _firstNonEmpty(json, const <String>[
+      'value',
       'id',
       'uuid',
       'vehicleId',

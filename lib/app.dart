@@ -67,7 +67,6 @@ class _NimoAppState extends State<NimoApp> {
   }
 
   // Tek navigatorKey: OTA güncelleme diyaloğu ve Kiosk kapısı için ortaklaşa kullanılır.
-
   @override
   void dispose() {
     _updateTimer?.cancel();

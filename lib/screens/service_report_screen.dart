@@ -200,6 +200,18 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     if (!mounted) return;
     setState(() => _sending = false);
 
+    // Gönderim başarısızsa form korunur: kullanıcı düzeltip tekrar dener.
+    if (!result.success) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text(
+            'Gönderilemedi: ${result.error ?? 'bilinmeyen hata'}',
+          ),
+        ));
+      return;
+    }
+
     final DateTime sentAt = DateTime.now();
     state.addActivity(
       ServiceReportActivity(
