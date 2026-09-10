@@ -6,12 +6,14 @@ import '../state/app_state.dart' show AppState, PendingOperation;
 import 'fleet_event_client.dart';
 import 'fleet_event_mapper.dart';
 import 'service_locator.dart';
+import 'image_upload_client.dart';
 
 class PublishService {
   PublishService._();
 
   static final PublishService instance = PublishService._();
   final FleetEventClient _client = HttpFleetEventClient();
+  final ImageUploadClient _uploadClient = HttpImageUploadClient();
 
   static const String baseTopic = 'nimo/bakim';
 
@@ -32,16 +34,30 @@ class PublishService {
     String? startTime,
     String? endTime,
   }) async {
-    // 1. Resimleri Base64 formatına çevir (eğer resim varsa)
-    List<String> base64Images = [];
+    // 1. Resimleri Fleet Panel'e yükle (eğer resim varsa)
+    List<String> uploadedUrls = [];
     if (imagePaths.isNotEmpty) {
       for (String path in imagePaths) {
         try {
-          final bytes = File(path).readAsBytesSync();
-          final base64String = base64Encode(bytes);
-          base64Images.add('data:image/jpeg;base64,$base64String');
+          final UploadResult result = await _uploadClient.upload(path);
+          if (result.ok && result.url != null) {
+            uploadedUrls.add(result.url!);
+          } else {
+            return PublishResult(
+              topic: baseTopic,
+              payload: '',
+              success: false,
+              error: result.error ?? 'Görsel yüklenemedi.',
+            );
+          }
         } catch (e) {
-          debugPrint('Base64 dönüştürme hatası: $e');
+          debugPrint('Görsel yükleme hatası: $e');
+          return PublishResult(
+            topic: baseTopic,
+            payload: '',
+            success: false,
+            error: 'Görsel yüklenirken bir hata oluştu.',
+          );
         }
       }
     }
@@ -59,8 +75,8 @@ class PublishService {
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
       description: description,
-      imageCount: base64Images.length,
-      imageNames: base64Images, // Base64 verilerini API'ye gönder
+      imageCount: uploadedUrls.length,
+      imageNames: uploadedUrls, // URL'leri API'ye gönder
       deviceId: null,
       vehicleUUID: vehicleUUID,
       operatorLabel: userRegistryNo,
