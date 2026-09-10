@@ -149,6 +149,8 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   /// Kadranlı `showTimePicker` yerine saat ve dakikanın listeden seçildiği
   /// pencere açılır; saha ekipleri için okunması ve dokunması daha kolay.
   Future<void> _pickTime({required bool isStart}) async {
+    // Saat seçimi sırasında açıklama alanına odak geçmemesi için önce klavyeyi kapat
+    FocusManager.instance.primaryFocus?.unfocus();
     final TimeOfDay? picked = await showDialog<TimeOfDay>(
       context: context,
       builder: (BuildContext context) => _TimeListPicker(
@@ -158,42 +160,8 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       ),
     );
     if (picked == null) return;
-    // Saat seçildiğinde, başlangıç ve bitiş saatinin tutarlı olup olmadığını hemen kontrol et
-    if (isStart) {
-      // Yeni başlangıç saati, mevcut bitiş saatinden sonraysa reddet
-      if (_endTime != null) {
-        final int newStartMin = picked.hour * 60 + picked.minute;
-        final int endMin = _endTime!.hour * 60 + _endTime!.minute;
-        if (newStartMin >= endMin) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Başlangıç saati, bitiş saatinden önce olmalıdır.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          return;
-        }
-      }
-    } else {
-      // Yeni bitiş saati, mevcut başlangıç saatinden önceyse reddet
-      if (_startTime != null) {
-        final int startMin = _startTime!.hour * 60 + _startTime!.minute;
-        final int newEndMin = picked.hour * 60 + picked.minute;
-        if (newEndMin <= startMin) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Bitiş saati, başlangıç saatinden sonra olmalıdır.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          return;
-        }
-      }
-    }
+    // Seçim sonrasında klavyenin açılmaması için odaklamayı temizle
+    if (mounted) FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       if (isStart) {
         _startTime = picked;
@@ -208,42 +176,59 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   void _showValidationPopup(List<String> errors) {
     showDialog<void>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: <Widget>[
-              Icon(Icons.info_outline_rounded, color: accent, size: 28),
-              const SizedBox(width: 10),
-              const Expanded(child: Text('Lütfen Tüm Alanları Doldurun', style: TextStyle(fontSize: 18))),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                'İşlemi tamamlayıp raporu gönderebilmemiz için aşağıdaki bilgileri de seçmeniz/yazmanız gerekiyor:',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              ...errors.map((String e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Expanded(child: Text(e, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-                      ],
+      builder: (BuildContext ctx) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Icon(Icons.info_outline_rounded, color: accent, size: 32),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Lütfen Tüm Alanları Doldurun',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                      ),
                     ),
-                  )),
-            ],
-          ),
-          actions: <Widget>[
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tamam'),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'İşlemi tamamlayıp raporu gönderebilmemiz için aşağıdaki bilgileri de seçmeniz/yazmanız gerekiyor:',
+                  style: TextStyle(fontSize: 15),
+                ),
+                const SizedBox(height: 20),
+                ...errors.map((String e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Expanded(child: Text(e, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+                        ],
+                      ),
+                    )),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    child: const Text('Tamam'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
