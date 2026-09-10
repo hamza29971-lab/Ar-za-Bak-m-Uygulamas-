@@ -61,8 +61,7 @@ class FleetEvent {
       if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
       if (vehicleUUID != null && vehicleUUID!.isNotEmpty)
         'vehicleUUID': vehicleUUID,
-      if (operatorLabel != null && operatorLabel!.isNotEmpty)
-        'operatorLabel': operatorLabel,
+      'operatorLabel': (operatorLabel != null && operatorLabel!.trim().isNotEmpty) ? operatorLabel : '-',
       // Yerel saatin ISO çıktısında dilim eki olmadığı için UTC gönderilir.
       if (occurredAt != null)
         'occurredAt': occurredAt!.toUtc().toIso8601String(),
