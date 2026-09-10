@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 
-import '../models/models.dart';
-import '../screens/profile_settings_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/tire_change_provider.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../ui/screens/login_screen.dart';
+import 'battery_indicator.dart';
 import 'nimo_logo.dart';
 import 'notifications_dialog.dart';
 
 /// Tüm sayfalarda kullanılan üst bar.
 ///
-/// Solda robot logosu ve uygulamanın adı, sağ kenarda tema anahtarı,
-/// "Bildirimler" zili ve "Profil" yer alır. Sayfa adı üst barda değil,
-/// sayfanın kendi içeriğinin üstünde [PageHeading] ile gösterilir.
+/// Solda robot logosu ve uygulamanın adı; sağ kenarda tema anahtarı, "Geçmiş"
+/// zili, tabletin pil göstergesi ve "Çıkış" yer alır.
+/// Uygulamada profil bölümü yoktur.
+/// Sayfa adı üst barda değil, sayfanın kendi içeriğinin üstünde [PageHeading]
+/// ile gösterilir.
 class NimoTopBar extends StatelessWidget {
   const NimoTopBar({super.key, this.leading});
 
@@ -23,24 +26,10 @@ class NimoTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final AppState state = AppScope.of(context);
-    final UserProfile? user = state.user;
-
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        // Dar tabletlerde profil adı gizlenir.
-        final bool compactProfile = constraints.maxWidth < 1080;
-        return _bar(context, state, user, compactProfile);
-      },
-    );
+    return _bar(context, AppScope.of(context));
   }
 
-  Widget _bar(
-    BuildContext context,
-    AppState state,
-    UserProfile? user,
-    bool compactProfile,
-  ) {
+  Widget _bar(BuildContext context, AppState state) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       decoration: BoxDecoration(
@@ -94,7 +83,8 @@ class NimoTopBar extends StatelessWidget {
             onTap: () => showNotificationsDialog(context),
           ),
           const SizedBox(width: 10),
-          _ProfileButton(user: user, compact: compactProfile),
+          // Tabletin şarj durumu; "Geçmiş" ile "Çıkış" arasında.
+          const BatteryIndicator(),
           const SizedBox(width: 10),
           _LogoutButton(),
         ],
@@ -108,45 +98,137 @@ class _LogoutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
       onPressed: () {
-        showDialog(
+        showDialog<void>(
           context: context,
-          builder: (BuildContext dialogContext) {
-            return AlertDialog(
-              title: const Text('Çıkış Yap'),
-              content: const Text('Çıkış yapmak istediğinize emin misiniz?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('İptal'),
+          barrierColor: Colors.black.withValues(alpha: 0.35),
+          builder: (BuildContext dialogContext) => _LogoutDialog(
+            onConfirm: () {
+              Navigator.of(dialogContext).pop();
+              AppScope.read(context).signOut();
+              context.read<TireChangeProvider>().clearSelectedVehicle();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute<void>(
+                  builder: (_) => const LoginScreen(),
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => const LoginScreen(),
-                      ),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.red,
-                  ),
-                  child: const Text('Çıkış Yap', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
+              );
+            },
+          ),
         );
       },
       icon: const Icon(Icons.logout, size: 18),
       label: const Text('Çıkış', style: TextStyle(fontWeight: FontWeight.w600)),
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFFDE8E8),
-        foregroundColor: Colors.red,
+        backgroundColor: context.accentSoft(AppColors.emergency,
+            light: 0.10, dark: 0.16),
+        foregroundColor: context.accent(AppColors.emergency),
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+}
+
+/// Çıkış onayı. Uygulamadaki diğer pencerelerle (bkz. [pending_send_dialog.dart],
+/// [result_dialog.dart]) aynı düzen: renkli simge + başlık, altında mesaj ve
+/// alt sırada eylemler.
+class _LogoutDialog extends StatelessWidget {
+  const _LogoutDialog({required this.onConfirm});
+
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color tone = context.accent(AppColors.emergency);
+
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 30, 24, 26),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: tone.withValues(alpha: context.isDark ? 0.18 : 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.logout, color: tone, size: 34),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text('Çıkış Yap',
+                            style: TextStyle(
+                                fontSize: 27, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text('Oturumunuz kapatılacak',
+                            style: TextStyle(
+                                fontSize: 17, color: context.mutedColor)),
+                      ],
+                    ),
+                  ),
+                  IconButton.outlined(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: context.borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(32, 26, 32, 26),
+              child: const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Çıkış yapmak istediğinize emin misiniz? '
+                  'Gönderilmeyi bekleyen işlemler varsa önce onları gönderin.',
+                  style: TextStyle(fontSize: 17, height: 1.5),
+                ),
+              ),
+            ),
+            Divider(height: 1, color: context.borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 20),
+                    ),
+                    child: Text('İptal',
+                        style: TextStyle(
+                            fontSize: 17, color: context.mutedColor)),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: onConfirm,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: context.accentFill(AppColors.emergency),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 34, vertical: 20),
+                    ),
+                    icon: const Icon(Icons.logout, size: 20),
+                    label: const Text('Çıkış Yap',
+                        style: TextStyle(fontSize: 17)),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -193,7 +275,7 @@ class _CircleAction extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   constraints: const BoxConstraints(minWidth: 18),
                   decoration: BoxDecoration(
-                    color: AppColors.emergency,
+                    color: context.accent(AppColors.emergency),
                     borderRadius: BorderRadius.circular(9),
                     border: Border.all(color: context.pageColor, width: 2),
                   ),
@@ -215,50 +297,6 @@ class _CircleAction extends StatelessWidget {
   }
 }
 
-class _ProfileButton extends StatelessWidget {
-  const _ProfileButton({required this.user, this.compact = false});
-
-  final UserProfile? user;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Profil',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const ProfileSettingsScreen(),
-          ),
-        ),
-        child: Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Center(
-            child: CircleAvatar(
-              radius: 15,
-              backgroundColor: AppColors.brandSoft,
-              child: Text(
-                user?.initials ?? '?',
-                style: const TextStyle(
-                  color: AppColors.brand,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Üst bar + sayfa içeriğini birleştiren ortak iskelet.
 class NimoPage extends StatelessWidget {
   const NimoPage({super.key, required this.child});
@@ -270,7 +308,14 @@ class NimoPage extends StatelessWidget {
     return Column(
       children: <Widget>[
         const NimoTopBar(),
-        Expanded(child: child),
+        // İçerik alanı açık temada hafif gri; tablolar, paneller ve kartlar
+        // bunun üzerinde beyaz kalarak ayrışır.
+        Expanded(
+          child: ColoredBox(
+            color: context.contentColor,
+            child: child,
+          ),
+        ),
       ],
     );
   }
@@ -279,10 +324,11 @@ class NimoPage extends StatelessWidget {
 /// Sayfa içeriğinin üstünde yer alan sayfa başlığı.
 /// Ör. "Araç Seç" alanının hemen üstündeki "Lastik Değişimi" yazısı.
 class PageHeading extends StatelessWidget {
-  const PageHeading({super.key, required this.title, this.subtitle});
+  const PageHeading({super.key, required this.title, this.subtitle, this.titleSize = 26});
 
   final String title;
   final String? subtitle;
+  final double titleSize;
 
   @override
   Widget build(BuildContext context) {
@@ -292,7 +338,7 @@ class PageHeading extends StatelessWidget {
       children: <Widget>[
         Text(
           title,
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.w700),
         ),
         if (subtitle != null) ...<Widget>[
           const SizedBox(height: 4),

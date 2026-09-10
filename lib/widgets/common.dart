@@ -93,9 +93,12 @@ class SegmentedTabs<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: context.cardColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: context.moduleBorderColor(accent),
+          width: 2.0,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -131,30 +134,33 @@ class _SegmentedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color tone = context.accent(accent);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(9),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         decoration: BoxDecoration(
-          color: selected ? accent.withValues(alpha: 0.12) : Colors.transparent,
+          color: selected
+              ? tone.withValues(alpha: context.isDark ? 0.18 : 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
           border: Border.all(
-            color: selected ? accent.withValues(alpha: 0.35) : Colors.transparent,
+            color: selected ? tone.withValues(alpha: 0.35) : Colors.transparent,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 17, color: selected ? accent : context.mutedColor),
-            const SizedBox(width: 8),
+            Icon(icon, size: 20, color: selected ? tone : context.mutedColor),
+            const SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? accent : context.mutedColor,
+                color: selected ? tone : context.mutedColor,
               ),
             ),
           ],
@@ -179,24 +185,25 @@ class InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color tone = context.accent(color);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: tone.withValues(alpha: context.isDark ? 0.14 : 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        border: Border.all(color: tone.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: 16, color: tone),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: tone),
             ),
           ),
         ],
@@ -212,25 +219,36 @@ class InfoLine extends StatelessWidget {
     required this.label,
     required this.value,
     this.labelWidth = 150,
+    this.labelSize = 13,
+    this.valueSize,
+    this.verticalPadding = 4,
   });
 
   final String label;
   final String value;
   final double labelWidth;
+  final double labelSize;
+
+  /// Boşsa gövde metninin varsayılan boyutu kullanılır.
+  final double? valueSize;
+  final double verticalPadding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           SizedBox(
             width: labelWidth,
-            child: Text(label, style: TextStyle(color: context.mutedColor, fontSize: 13)),
+            child: Text(label,
+                style: TextStyle(color: context.mutedColor, fontSize: labelSize)),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(value,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: valueSize)),
           ),
         ],
       ),
@@ -246,6 +264,7 @@ class SectionCard extends StatelessWidget {
     this.title,
     this.icon,
     this.accent,
+    this.borderAccent,
     this.trailing,
     this.padding = const EdgeInsets.all(20),
     this.expandChild = false,
@@ -255,6 +274,11 @@ class SectionCard extends StatelessWidget {
   final String? title;
   final IconData? icon;
   final Color? accent;
+
+  /// Kenarlık rengi. Verilmezse [accent] kullanılır; modül rengiyle aynı
+  /// olmayan bir kenarlık isteniyorsa (ör. Mekanik Operasyon'da mavi
+  /// kenarlık) buradan verilir.
+  final Color? borderAccent;
   final Widget? trailing;
   final EdgeInsets padding;
 
@@ -264,13 +288,17 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = accent ?? Theme.of(context).colorScheme.primary;
+    final Color color =
+        context.accent(accent ?? Theme.of(context).colorScheme.primary);
+    // Kenarlık, istenirse başlık/simge renginden ayrı tutulabilir.
+    final Color edge = context.accent(borderAccent ?? accent ??
+        Theme.of(context).colorScheme.primary);
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: context.pageColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(edge), width: 2.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +312,7 @@ class SectionCard extends StatelessWidget {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.10),
+                      color: color.withValues(alpha: context.isDark ? 0.16 : 0.10),
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Icon(icon, size: 18, color: color),
@@ -344,7 +372,9 @@ class PrimaryActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool enabled = onPressed != null;
-    final Color base = enabled ? accent : context.mutedColor.withValues(alpha: 0.35);
+    final Color base = enabled
+        ? (filled ? context.accentFill(accent) : context.accent(accent))
+        : context.mutedColor.withValues(alpha: 0.65);
     final Color fg = filled ? Colors.white : base;
     final BorderRadius radius = BorderRadius.circular(12);
 
@@ -356,37 +386,40 @@ class PrimaryActionButton extends StatelessWidget {
         borderRadius: radius,
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 11 : 14,
-            vertical: compact ? 9 : 9,
+            horizontal: compact ? 18 : 22,
+            vertical: compact ? 12 : 14,
           ),
-          decoration: filled
-              ? null
-              : BoxDecoration(
-                  borderRadius: radius,
-                  border: Border.all(color: base.withValues(alpha: 0.55), width: 1.5),
-                ),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: enabled
+                  ? context.moduleBorderColor(accent)
+                  : context.moduleBorderColor(accent).withValues(alpha: 0.40),
+              width: 2.5,
+            ),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               if (compact)
-                Icon(icon, size: 16, color: fg)
+                Icon(icon, size: 20, color: fg)
               else
                 Container(
-                  width: 21,
-                  height: 21,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
                     color: filled
                         ? Colors.white.withValues(alpha: 0.22)
                         : base.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, size: 15, color: fg),
+                  child: Icon(icon, size: 18, color: fg),
                 ),
-              SizedBox(width: compact ? 6 : 7),
+              SizedBox(width: compact ? 8 : 10),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: compact ? 15 : 16,
                   fontWeight: FontWeight.w700,
                   color: fg,
                 ),

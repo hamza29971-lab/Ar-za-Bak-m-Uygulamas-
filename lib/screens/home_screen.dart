@@ -49,10 +49,20 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             // Üst bilgi şeridi
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: _InfoTile(
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: context.isDark
+                    ? context.cardColor.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppTheme.radius),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Expanded(
+                      child: _InfoTile(
                     icon: Icons.person_outline,
                     label: 'KULLANICI',
                     value: user?.fullName ?? '-',
@@ -64,7 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: _InfoTile(
                     icon: Icons.badge_outlined,
                     label: 'SİCİL NO',
-                    value: user?.registryNo ?? '-',
+                    value: user == null || user.registryNo.trim().isEmpty
+                        ? '-'
+                        : user.registryNo,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -91,6 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ],
+            ),
+              ),
             ),
             const SizedBox(height: 24),
             Expanded(child: _buildIntro(context)),
@@ -181,7 +195,7 @@ class _ActivitiesDialog extends StatelessWidget {
     return AlertDialog(
       title: Row(
         children: <Widget>[
-          const Icon(Icons.history, size: 22, color: AppColors.brand),
+          Icon(Icons.history, size: 22, color: context.brandColor),
           const SizedBox(width: 10),
           const Expanded(child: Text('Son İşlemler')),
           Text(
@@ -248,9 +262,12 @@ class _InfoTile extends StatelessWidget {
     final Widget tile = Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color: context.pageColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: context.moduleBorderColor(Theme.of(context).colorScheme.primary),
+          width: 2.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,6 +332,7 @@ class _ActivityRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ({IconData icon, Color color}) visual = activityVisual(activity.type);
+    final Color tone = context.accent(visual.color);
 
     return InkWell(
       onTap: () => showActivityDetails(context, activity),
@@ -326,10 +344,10 @@ class _ActivityRow extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: visual.color.withValues(alpha: 0.12),
+                color: tone.withValues(alpha: context.isDark ? 0.18 : 0.12),
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(visual.icon, size: 18, color: visual.color),
+              child: Icon(visual.icon, size: 18, color: tone),
             ),
             const SizedBox(width: 14),
             Expanded(

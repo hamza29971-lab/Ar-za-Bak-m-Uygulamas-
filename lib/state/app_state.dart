@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/auth_models.dart';
+import '../services/vehicle_directory_service.dart';
+import '../utils/formats.dart';
 import '../services/service_locator.dart';
 
 /// Uygulamanın tek merkezi durumu.
@@ -52,6 +55,10 @@ class AppState extends ChangeNotifier {
     
     await ServiceLocator.tokens.save(session);
     notifyListeners();
+
+    // Giriş akışını bloklamaz; hata olursa vehicleUuidFor eşleşme bulamaz
+    // ve loadVehicleDirectory'nin kendi debugPrint'i sebebi gösterir.
+    unawaited(loadVehicleDirectory());
   }
 
   /// Eksik profil bilgilerini elle girildiğinde kaydetmek için kullanılır.
@@ -147,12 +154,59 @@ class AppState extends ChangeNotifier {
   List<OilRecord> oilsOf(Vehicle vehicle) =>
       _oils.putIfAbsent(vehicle.id, () => MockData.oilsFor(vehicle));
 
+  // ------------------------------------------------------ araç UUID dizini
+  final VehicleDirectoryService _vehicleDirectoryService = VehicleDirectoryService();
+  Map<String, String> _vehicleUuidByCode = <String, String>{};
+
+  /// `Vehicle.code`'u mining-be'deki araç UUID'sine çevirir. Dizin henüz
+  /// yüklenmemişse ya da eşleşme bulunamazsa `null` döner.
+  String? vehicleUuidFor(String? vehicleCode) {
+    if (vehicleCode == null || vehicleCode.trim().isEmpty) return null;
+    return _vehicleUuidByCode[_normalizeVehicleKey(vehicleCode)];
+  }
+
+  static String _normalizeVehicleKey(String value) =>
+      value.trim().toUpperCase().replaceAll(RegExp(r'[\s\-_]+'), '');
+
+  /// Testler için: dizini ağdan çekmeden UUID önbelleğini doldurur.
+  @visibleForTesting
+  void seedVehicleDirectory(Map<String, String> uuidByCode) {
+    _vehicleUuidByCode = <String, String>{
+      for (final MapEntry<String, String> e in uuidByCode.entries)
+        _normalizeVehicleKey(e.key): e.value,
+    };
+  }
+
+  /// mining-be'den araç listesini çekip yerel filoyla eşleştirir.
+  /// `applySession` içinde girişten hemen sonra tetiklenir.
+  Future<void> loadVehicleDirectory() async {
+    final String? accessToken = await ServiceLocator.tokens.readAccessToken();
+    final List<VehicleDirectoryEntry> entries =
+        await _vehicleDirectoryService.fetchAll(accessToken: accessToken);
+    if (entries.isEmpty) return;
+
+    final Map<String, String> byCode = <String, String>{};
+    for (final VehicleDirectoryEntry entry in entries) {
+      byCode[_normalizeVehicleKey(entry.label)] = entry.id;
+    }
+    _vehicleUuidByCode = byCode;
+
+    for (final Vehicle vehicle in _vehicles) {
+      if (!byCode.containsKey(_normalizeVehicleKey(vehicle.code))) {
+        debugPrint('[FleetUUID] eşleşmedi: ${vehicle.code}');
+      }
+    }
+  }
+
   // -------------------------------------------------------------- işlemler
   /// Lastik değişimi: [newSerialNo] verilirse takılan yeni lastiğin seri
   /// numarası kaydedilir, değişim ve kontrol tarihleri o ana çekilir.
   void changeTire(Vehicle vehicle, TireRecord record, {String? newSerialNo}) {
     final DateTime now = DateTime.now();
     final String serial = (newSerialNo ?? '').trim();
+    // Sökülen lastiğin seri numarası da gönderildiği için değişiklik
+    // uygulanmadan önce okunur.
+    final String previousSerialNo = record.serialNo;
     if (serial.isNotEmpty) record.serialNo = serial;
     record
       ..lastChangeDate = now
@@ -164,10 +218,11 @@ class AppState extends ChangeNotifier {
       label: '${record.tireId} değiştirildi (${record.serialNo})',
       date: now,
       payload: <String, Object?>{
-        'op': 'lastik_degisim',
+        'op': 'degisim',
         'tireId': record.tireId,
         'position': record.position,
         'serialNo': record.serialNo,
+        'previousSerialNo': previousSerialNo,
       },
     ));
     addNotification(
@@ -177,6 +232,14 @@ class AppState extends ChangeNotifier {
             ' • Seri No: ${record.serialNo}',
         date: now,
         kind: NotificationKind.tire,
+        vehicleCode: vehicle.code,
+        details: <String, String>{
+          'İşlem': 'Lastik değişimi',
+          'Lastik': record.tireId,
+          'Konum': record.position,
+          'Yeni seri numarası': record.serialNo,
+          'Değişim tarihi': formatDateTime(now),
+        },
       ),
     );
   }
@@ -198,7 +261,7 @@ class AppState extends ChangeNotifier {
       label: '${record.tireId} kontrol edildi',
       date: now,
       payload: <String, Object?>{
-        'op': 'lastik_kontrol',
+        'op': 'kontrol',
         'tireId': record.tireId,
         'position': record.position,
         'items': items,
@@ -212,6 +275,15 @@ class AppState extends ChangeNotifier {
             '$detail$noteText',
         date: now,
         kind: NotificationKind.tire,
+        vehicleCode: vehicle.code,
+        details: <String, String>{
+          'İşlem': 'Lastik kontrolü',
+          'Lastik': record.tireId,
+          'Konum': record.position,
+          'Kontrol edilenler': items.isEmpty ? '-' : items.join(', '),
+          'Not': note.trim(),
+          'Kontrol tarihi': formatDateTime(now),
+        },
       ),
     );
   }
@@ -225,12 +297,19 @@ class AppState extends ChangeNotifier {
     String product = '',
   }) {
     final DateTime now = DateTime.now();
+    // Takviye gönderilmeden önce düzeltilebilsin diye kaydın önceki hâli
+    // saklanır; bkz. [cancelOilRefill].
+    final double previousAmount = record.amount;
+    final DateTime? previousOilDate = record.lastOilDate;
+    final String previousProduct = record.lastProduct;
     record
       ..amount = amount
-      ..lastOilDate = now;
+      ..lastOilDate = now
+      ..lastProduct = product;
+    final String activityId = 'oil-${now.microsecondsSinceEpoch}';
     addActivity(
       OilRefillActivity(
-        id: 'oil-${now.microsecondsSinceEpoch}',
+        id: activityId,
         vehicleCode: vehicle.code,
         date: now,
         area: record.label,
@@ -238,20 +317,29 @@ class AppState extends ChangeNotifier {
         amount: amount,
       ),
     );
-    addPending(PendingOperation(
+    final PendingOperation pending = PendingOperation(
       kind: PendingKind.oil,
       vehicleCode: vehicle.code,
-      label: '${record.label} • ${amount.toStringAsFixed(1)} L'
-          '${product.isEmpty ? '' : ' • $product'}',
+      label: _refillLabel(record, amount, product),
       date: now,
       payload: <String, Object?>{
-        'op': 'yag_takviye',
-        'areaId': record.areaId,
+        // Manuel yağlama / yağ takviyesi ayrımını `category` (panelde
+        // `subtitle`) taşır; `op` yalnızca işlemin türünü söyler.
+        'op': 'takviye',
+        'category': record.category.pluralLabel,
         'oilType': record.oilType,
         'amount': amount,
         'product': product,
       },
-    ));
+    );
+    _pendingRefills[pending.id] = _PendingRefill(
+      record: record,
+      activityId: activityId,
+      previousAmount: previousAmount,
+      previousOilDate: previousOilDate,
+      previousProduct: previousProduct,
+    );
+    addPending(pending);
     addNotification(
       NotificationItem(
         title: 'Yağ takviyesi kaydedildi',
@@ -260,32 +348,188 @@ class AppState extends ChangeNotifier {
             '${product.isEmpty ? '' : ' • $product'}',
         date: now,
         kind: NotificationKind.oil,
+        vehicleCode: vehicle.code,
+        details: <String, String>{
+          'İşlem': 'Yağ takviyesi',
+          'Takviye yapılan bölge': record.label,
+          'Yağ türü': record.category.label,
+          'Kullanılan ürün': product,
+          'Takviye miktarı': '${amount.toStringAsFixed(1)} L',
+          'Önceki miktar': '${previousAmount.toStringAsFixed(1)} L',
+          'Takviye tarihi': formatDateTime(now),
+        },
       ),
     );
+  }
+
+  // ------------------------------------------- bekleyen takviyenin düzeltilmesi
+  /// Gönderilmeyi bekleyen takviyelerin bağlamı (pending id -> kayıt + önceki hâl).
+  final Map<String, _PendingRefill> _pendingRefills = <String, _PendingRefill>{};
+
+  /// Gönderilmeyi bekleyen seviye kontrollerinin bağlamı
+  /// (pending id -> kayıt + kontrolden önceki tarih).
+  final Map<String, _PendingCheck> _pendingChecks = <String, _PendingCheck>{};
+
+  static String _refillLabel(OilRecord record, double amount, String product) =>
+      '${record.label} • ${amount.toStringAsFixed(1)} L'
+      '${product.isEmpty ? '' : ' • $product'}';
+
+  /// [record] için gönderilmeyi bekleyen takviye; yoksa `null`.
+  /// Ekran, bu kayıt varsa satırda "Takviye Yap" yerine "Düzenle" gösterir.
+  PendingOperation? pendingRefillFor(Vehicle vehicle, OilRecord record) {
+    for (final PendingOperation p in _pending) {
+      if (p.kind != PendingKind.oil || p.vehicleCode != vehicle.code) continue;
+      if (identical(_pendingRefills[p.id]?.record, record)) return p;
+    }
+    return null;
+  }
+
+  /// Bekleyen bir takviyenin miktarını / ürününü değiştirir.
+  /// Kayıt, işlem geçmişi ve MQTT yükü birlikte güncellenir.
+  void updateOilRefill(
+    PendingOperation pending,
+    double amount, {
+    String product = '',
+  }) {
+    final _PendingRefill? context = _pendingRefills[pending.id];
+    final int index =
+        _pending.indexWhere((PendingOperation p) => p.id == pending.id);
+    if (context == null || index < 0) return;
+
+    final DateTime now = DateTime.now();
+    context.record
+      ..amount = amount
+      ..lastOilDate = now
+      ..lastProduct = product;
+    for (final ActivityRecord activity in _activities) {
+      if (activity.id == context.activityId && activity is OilRefillActivity) {
+        activity
+          ..amount = amount
+          ..date = now;
+        break;
+      }
+    }
+    _pending[index] = pending.copyWith(
+      label: _refillLabel(context.record, amount, product),
+      date: now,
+      payload: <String, Object?>{
+        ...pending.payload,
+        'amount': amount,
+        'product': product,
+      },
+    );
+    notifyListeners();
+  }
+
+  /// Bekleyen takviyeyi tamamen geri alır: kuyruktan ve işlem geçmişinden
+  /// silinir, kayıt takviyeden önceki hâline döner.
+  void cancelOilRefill(PendingOperation pending) {
+    final _PendingRefill? context = _pendingRefills.remove(pending.id);
+    _pending.removeWhere((PendingOperation p) => p.id == pending.id);
+    if (context != null) {
+      context.record
+        ..amount = context.previousAmount
+        ..lastOilDate = context.previousOilDate
+        ..lastProduct = context.previousProduct;
+      _activities
+          .removeWhere((ActivityRecord a) => a.id == context.activityId);
+    }
+    notifyListeners();
+  }
+
+  /// Yağ ekranında yapılıp henüz gönderilmemiş tüm işlemleri geri alır:
+  /// takviyeler ve kontroller kuyruktan düşer, kayıtlar işlem öncesi hâline
+  /// döner ve takviyelerin işlem geçmişi satırları silinir. Bildirim geçmişi
+  /// [cancelOilRefill] ile aynı şekilde korunur.
+  ///
+  /// Geri alınan işlem sayısını döndürür.
+  int discardPendingOil() {
+    final List<PendingOperation> oil = _pending
+        .where((PendingOperation p) => p.kind == PendingKind.oil)
+        .toList();
+    for (final PendingOperation p in oil) {
+      final _PendingRefill? refill = _pendingRefills.remove(p.id);
+      if (refill != null) {
+        refill.record
+          ..amount = refill.previousAmount
+          ..lastOilDate = refill.previousOilDate
+          ..lastProduct = refill.previousProduct;
+        _activities
+            .removeWhere((ActivityRecord a) => a.id == refill.activityId);
+      }
+      final _PendingCheck? check = _pendingChecks.remove(p.id);
+      if (check != null) {
+        check.record.lastCheckDate = check.previousCheckDate;
+      }
+    }
+    _pending.removeWhere((PendingOperation p) => p.kind == PendingKind.oil);
+    notifyListeners();
+    return oil.length;
+  }
+
+  /// Lastik ekranında yapılıp gönderilmeyen işlemleri iptal eder: işlemler
+  /// kuyruktan düşer ve bunlarla eklenen işlem geçmişi satırları silinir.
+  /// Lastik kayıtlarının kendisi `TireChangeProvider.discardChanges` ile
+  /// eski hâline döner. Bildirim geçmişi [discardPendingOil] ile aynı
+  /// mantıkla korunur.
+  ///
+  /// Geri alınan işlem sayısını döndürür.
+  int discardPendingTire() {
+    final List<PendingOperation> tire = _pending
+        .where((PendingOperation p) => p.kind == PendingKind.tire)
+        .toList();
+    for (final PendingOperation p in tire) {
+      final String? activityId = p.activityId;
+      if (activityId == null) continue;
+      _activities.removeWhere((ActivityRecord a) => a.id == activityId);
+    }
+    _pending.removeWhere((PendingOperation p) => p.kind == PendingKind.tire);
+    notifyListeners();
+    return tire.length;
   }
 
   void checkOil(Vehicle vehicle, OilRecord record) {
     // Seviye kontrolü takviye tarihini değiştirmez, yalnızca kontrol tarihini
     // günceller (Servis Raporu bu tarihi kullanır).
     final DateTime now = DateTime.now();
+    // Kontrol gönderilmeden iptal edilebilsin diye önceki tarih saklanır;
+    // bkz. [discardPendingOil].
+    final DateTime? previousCheckDate = record.lastCheckDate;
     record.lastCheckDate = now;
-    addPending(PendingOperation(
+    final PendingOperation pending = PendingOperation(
       kind: PendingKind.oil,
       vehicleCode: vehicle.code,
       label: '${record.label} kontrol edildi',
       date: now,
       payload: <String, Object?>{
-        'op': 'yag_kontrol',
-        'areaId': record.areaId,
+        'op': 'kontrol',
+        'category': record.category.pluralLabel,
         'oilType': record.oilType,
+        // Kontrolde yeni bir miktar/ürün girilmez; kayıttaki son takviye
+        // bilgisi bildirilir. Hiç takviye yapılmamışsa gönderilmez.
+        if (record.amount > 0) 'amount': record.amount,
+        if (record.lastProduct.trim().isNotEmpty)
+          'product': record.lastProduct.trim(),
       },
-    ));
+    );
+    _pendingChecks[pending.id] = _PendingCheck(
+      record: record,
+      previousCheckDate: previousCheckDate,
+    );
+    addPending(pending);
     addNotification(
       NotificationItem(
         title: 'Kontroller tamamlandı',
         message: '${vehicle.code} • ${record.label}',
         date: now,
         kind: NotificationKind.oil,
+        vehicleCode: vehicle.code,
+        details: <String, String>{
+          'İşlem': 'Yağ seviyesi kontrolü',
+          'Kontrol edilen bölge': record.label,
+          'Yağ türü': record.category.label,
+          'Kontrol tarihi': formatDateTime(now),
+        },
       ),
     );
   }
@@ -359,7 +603,13 @@ class AppState extends ChangeNotifier {
 
   /// Gönderim başarılı olunca kuyruk boşaltılır.
   void clearPending(PendingKind kind) {
-    _pending.removeWhere((PendingOperation p) => p.kind == kind);
+    _pending.removeWhere((PendingOperation p) {
+      if (p.kind != kind) return false;
+      // Gönderilen işlem artık düzenlenemez; geri alma bağlamı da düşer.
+      _pendingRefills.remove(p.id);
+      _pendingChecks.remove(p.id);
+      return true;
+    });
     notifyListeners();
   }
 
@@ -371,6 +621,13 @@ class AppState extends ChangeNotifier {
 
   void addNotification(NotificationItem item) {
     _notifications.insert(0, item);
+    notifyListeners();
+  }
+
+  /// Tek bir kaydı okundu işaretler; geçmiş penceresinde kayda tıklanınca.
+  void markRead(NotificationItem item) {
+    if (item.read) return;
+    item.read = true;
     notifyListeners();
   }
 
@@ -407,13 +664,30 @@ enum PendingKind {
 /// saha çalışanı birkaç işlemi arka arkaya yapıp tek seferde gönderebilir.
 @immutable
 class PendingOperation {
-  const PendingOperation({
+  PendingOperation({
     required this.kind,
     required this.vehicleCode,
     required this.label,
     required this.date,
     required this.payload,
+    this.activityId,
+  }) : id = 'pnd-${_sequence++}';
+
+  /// [copyWith] için; kimliği korur.
+  const PendingOperation._({
+    required this.id,
+    required this.kind,
+    required this.vehicleCode,
+    required this.label,
+    required this.date,
+    required this.payload,
+    this.activityId,
   });
+
+  static int _sequence = 0;
+
+  /// Kuyruktaki kaydı gönderilmeden önce bulup güncellemeye yarar.
+  final String id;
 
   final PendingKind kind;
   final String vehicleCode;
@@ -425,6 +699,56 @@ class PendingOperation {
 
   /// MQTT yüküne eklenecek alanlar.
   final Map<String, Object?> payload;
+
+  /// Bu işlemle birlikte eklenen işlem geçmişi satırının kimliği; işlem
+  /// gönderilmeden iptal edilirse o satır da silinir.
+  final String? activityId;
+
+  PendingOperation copyWith({
+    String? label,
+    DateTime? date,
+    Map<String, Object?>? payload,
+  }) {
+    return PendingOperation._(
+      id: id,
+      kind: kind,
+      vehicleCode: vehicleCode,
+      label: label ?? this.label,
+      date: date ?? this.date,
+      payload: payload ?? this.payload,
+      activityId: activityId,
+    );
+  }
+}
+
+/// Bekleyen bir yağ takviyesinin, gönderilmeden önce düzeltilebilmesi için
+/// gereken bağlamı: hangi kayda yapıldığı, hangi işlem geçmişi satırını
+/// oluşturduğu ve kaydın takviyeden önceki hâli.
+class _PendingRefill {
+  const _PendingRefill({
+    required this.record,
+    required this.activityId,
+    required this.previousAmount,
+    required this.previousOilDate,
+    required this.previousProduct,
+  });
+
+  final OilRecord record;
+  final String activityId;
+  final double previousAmount;
+  final DateTime? previousOilDate;
+
+  /// Takviyeden önceki ürün; iptal edilirse kayda geri yazılır.
+  final String previousProduct;
+}
+
+/// Bekleyen bir seviye kontrolünün iptal edilebilmesi için gereken bağlam:
+/// hangi kayda yapıldığı ve kaydın kontrolden önceki tarihi.
+class _PendingCheck {
+  const _PendingCheck({required this.record, required this.previousCheckDate});
+
+  final OilRecord record;
+  final DateTime? previousCheckDate;
 }
 
 /// [AppState]'i widget ağacına dağıtan kapsayıcı.

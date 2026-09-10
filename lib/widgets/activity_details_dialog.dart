@@ -32,6 +32,7 @@ class _ActivityDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ({IconData icon, Color color}) visual = activityVisual(activity.type);
+    final Color tone = context.accent(visual.color);
 
     return Dialog(
       clipBehavior: Clip.antiAlias,
@@ -49,10 +50,10 @@ class _ActivityDialog extends StatelessWidget {
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: visual.color.withValues(alpha: 0.12),
+                      color: tone.withValues(alpha: context.isDark ? 0.18 : 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(visual.icon, color: visual.color, size: 24),
+                    child: Icon(visual.icon, color: tone, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -135,7 +136,7 @@ class _TireDetails extends StatelessWidget {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Icon(Icons.trip_origin, size: 18, color: AppColors.tire),
+                    Icon(Icons.trip_origin, size: 18, color: context.accent(AppColors.tire)),
                     const SizedBox(width: 10),
                     Text(tire.tireId,
                         style: const TextStyle(fontWeight: FontWeight.w700)),

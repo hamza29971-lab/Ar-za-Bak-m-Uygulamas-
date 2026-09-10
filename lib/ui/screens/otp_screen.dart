@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 import '../../screens/shell_screen.dart';
 import 'login_screen.dart';
 import '../../services/auth_api_service.dart';
@@ -155,69 +156,80 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Doğrulama ekranı da giriş akışının parçası; o da hep açık temada.
+    return Theme(
+      data: AppTheme.light(),
+      child: Builder(builder: _buildContent),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.authBg,
       body: Row(
         children: [
           // ── Sol Panel: OTP Formu ────────────────────────────────
           SizedBox(
-            width: 460,
+            // Giriş ekranıyla aynı oran: ekran genişliğinin %42'si, 460-760
+            // arasında sınırlı.
+            width: (MediaQuery.sizeOf(context).width * 0.42)
+                .clamp(460.0, 760.0),
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Başlıklar
-                    const Text(
+                    Text(
                       'NIMO',
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 34,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A1D2E),
+                        color: context.authTitle,
                         letterSpacing: 2.0,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
+                    const SizedBox(height: 6),
+                    Text(
                       'NUH INTELLIGENT MINING OPERATIONS',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF7B8094),
+                        color: context.authMuted,
                         letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 26),
 
-                    const Text(
+                    Text(
                       'İki Adımlı Doğrulama',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: 27,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A1D2E),
+                        color: context.authTitle,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Cep telefonunuza bir sms ile doğrulama kodu gönderildi. Aşağıdaki alana gelen kodu giriniz.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF7B8094),
+                        fontSize: 16,
+                        color: context.authMuted,
                         height: 1.5,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _maskedPhone,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: 19,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1A1D2E),
+                        color: context.authTitle,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 22),
 
                     // OTP Kutucukları
                     Row(
@@ -225,38 +237,38 @@ class _OtpScreenState extends State<OtpScreen> {
                       children: List.generate(6, (index) {
                         bool isFilled = index < _enteredCode.length;
                         String char = isFilled ? _enteredCode[index] : '';
-                        
+
                         return Container(
-                          width: 48,
-                          height: 56,
+                          width: 52,
+                          height: 58,
                           margin: const EdgeInsets.symmetric(horizontal: 4),
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: isFilled ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                              color: isFilled ? context.authGreen : context.authBorder,
                               width: 1.5,
                             ),
-                            borderRadius: BorderRadius.circular(8),
-                            color: const Color(0xFFF8F9FC),
+                            borderRadius: BorderRadius.circular(10),
+                            color: context.authPanel,
                           ),
                           alignment: Alignment.center,
                           child: Text(
                             char,
-                            style: const TextStyle(
-                              fontSize: 24,
+                            style: TextStyle(
+                              fontSize: 26,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1A1D2E),
+                              color: context.authTitle,
                             ),
                           ),
                         );
                       }),
                     ),
-                    const SizedBox(height: 32),
-                    
-                    const Text(
+                    const SizedBox(height: 20),
+
+                    Text(
                       'Tablet için hızlı tuş takımı',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF7B8094),
+                        fontSize: 15,
+                        color: context.authMuted,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -268,21 +280,21 @@ class _OtpScreenState extends State<OtpScreen> {
                       onClear: _onClear,
                     ),
 
-                    const SizedBox(height: 24),
-                    
+                    const SizedBox(height: 18),
+
                     if (_errorMessage != null)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.only(bottom: 14),
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(
-                            color: Color(0xFFD32F2F),
-                            fontSize: 14,
+                          style: TextStyle(
+                            color: context.authError,
+                            fontSize: 17,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      
+
                     // Geri Sayım ve Tekrar Gönder
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -291,9 +303,9 @@ class _OtpScreenState extends State<OtpScreen> {
                           _remainingSeconds > 0
                               ? 'Kod 0:${_remainingSeconds.toString().padLeft(2, '0')} içinde geçerli'
                               : 'Kod süresi doldu',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7B8094),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: context.authMuted,
                           ),
                         ),
                         OutlinedButton(
@@ -329,9 +341,11 @@ class _OtpScreenState extends State<OtpScreen> {
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
                               color: _remainingSeconds == 0
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFDDE1EA),
+                                  ? context.authGreen
+                                  : context.authBorder,
                             ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -340,45 +354,48 @@ class _OtpScreenState extends State<OtpScreen> {
                             'Tekrar gönder${_remainingSeconds > 0 ? " (0:${_remainingSeconds.toString().padLeft(2, '0')})" : ""}',
                             style: TextStyle(
                               color: _remainingSeconds == 0
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFBBC0CC),
+                                  ? context.authGreen
+                                  : context.authHint,
                               fontWeight: FontWeight.w600,
+                              fontSize: 16,
                             ),
                           ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 16),
-                    
+                    const SizedBox(height: 14),
+
                     // Doğrula Butonu
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: _enteredCode.length == 6 ? _verifyCode : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E7D32),
+                          backgroundColor: context.authGreenFill,
                           foregroundColor: Colors.white,
-                          disabledBackgroundColor: const Color(0xFFC8E6C9),
+                          disabledBackgroundColor: context.isDark
+                              ? const Color(0xFF2E4526)
+                              : const Color(0xFFC8E6C9),
                           disabledForegroundColor: Colors.white70,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        icon: const Icon(Icons.check_circle_outline, size: 20),
+                        icon: const Icon(Icons.check_circle_outline, size: 22),
                         label: const Text(
                           'Doğrula',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     // Geri Git Butonu
                     SizedBox(
@@ -397,19 +414,19 @@ class _OtpScreenState extends State<OtpScreen> {
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: context.authGreen, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        icon: const Icon(Icons.arrow_back, color: Color(0xFF2E7D32), size: 20),
-                        label: const Text(
+                        icon: Icon(Icons.arrow_back, color: context.authGreen, size: 22),
+                        label: Text(
                           'Geri Git',
                           style: TextStyle(
-                            color: Color(0xFF2E7D32), 
+                            color: context.authGreen,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 18,
                           ),
                         ),
                       ),
@@ -425,7 +442,7 @@ class _OtpScreenState extends State<OtpScreen> {
           // ── Sağ Panel: İş Makinesi Görseli (Dalgalı Kesim) ──────────────────
           Expanded(
             child: Container(
-              color: const Color(0xFFF8F9FC),
+              color: context.authPanel,
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(40),
@@ -464,9 +481,9 @@ class _NumPad extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FC),
+        color: context.authPanel,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F5)),
+        border: Border.all(color: context.authDivider),
       ),
       padding: const EdgeInsets.all(10),
       child: Column(
@@ -520,24 +537,24 @@ class _NumKey extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.authField,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: () => onKey(label),
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          height: 52,
+          height: 50,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDDE1EA)),
+            border: Border.all(color: context.authBorder),
           ),
           alignment: Alignment.center,
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 20,
+            style: TextStyle(
+              fontSize: 22,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1D2E),
+              color: context.authTitle,
             ),
           ),
         ),
@@ -555,24 +572,25 @@ class _SpecialKey extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFFE8F5E9),
+      color: context.authGreenSoft,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          height: 52,
+          height: 50,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFC8E6C9)),
+            border: Border.all(
+                color: context.authGreen.withValues(alpha: 0.35)),
           ),
           alignment: Alignment.center,
           child: Text(
             label,
-            style: const TextStyle(
-              fontSize: 14,
+            style: TextStyle(
+              fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF2E7D32),
+              color: context.authGreen,
             ),
           ),
         ),

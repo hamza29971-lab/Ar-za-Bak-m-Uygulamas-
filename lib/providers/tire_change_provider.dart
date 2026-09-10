@@ -110,11 +110,47 @@ class TireChangeProvider extends ChangeNotifier {
     return List.generate(count, (i) {
       return TireRecord(
         tireNumber: i + 1,
-        serialNumber: '---',
+        serialNumber: 'SN-904${(i + 1) * 11}',
         lastChangedDate: DateTime.now(),
         actionHistory: [],
       );
     });
+  }
+
+  /// Gönderilmemiş değişikliklerin öncesindeki hâlleri (lastik no -> kayıt).
+  /// Aynı lastik birkaç kez düzenlense de ilk hâli korunur; "İptal Et" bunları
+  /// geri yükler, gönderim tamamlanınca [resetChangedTires] ile düşerler.
+  final Map<int, TireRecord> _undoSnapshots = {};
+
+  /// Değişiklikten önce kaydın kopyası alınır (aynı lastik için yalnızca ilki).
+  void _snapshot(int tireNumber) {
+    if (_undoSnapshots.containsKey(tireNumber)) return;
+    final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
+    if (idx < 0) return;
+    final r = _tireRecords[idx];
+    _undoSnapshots[tireNumber] = TireRecord(
+      tireNumber: r.tireNumber,
+      serialNumber: r.serialNumber,
+      lastChangedDate: r.lastChangedDate,
+      actionHistory: List<TireActionRecord>.from(r.actionHistory),
+      isChanged: r.isChanged,
+    );
+  }
+
+  /// Gönderilmeden iptal edilen işlemler: kayıtlar değişiklik öncesi hâline
+  /// döner. Geri alınan lastik sayısını döndürür.
+  Future<int> discardChanges() async {
+    if (_undoSnapshots.isEmpty) return 0;
+    final int count = _undoSnapshots.length;
+    for (final entry in _undoSnapshots.entries) {
+      final idx = _tireRecords.indexWhere((r) => r.tireNumber == entry.key);
+      if (idx >= 0) _tireRecords[idx] = entry.value;
+    }
+    _undoSnapshots.clear();
+    _editingTireNumber = null;
+    await _saveTireRecords();
+    notifyListeners();
+    return count;
   }
 
   /// Bir lastiği "düzenleme moduna" al
@@ -137,6 +173,7 @@ class TireChangeProvider extends ChangeNotifier {
       return;
     }
 
+    _snapshot(tireNumber);
     final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
     if (idx >= 0) {
       _tireRecords[idx] = _tireRecords[idx].copyWith(
@@ -155,6 +192,7 @@ class TireChangeProvider extends ChangeNotifier {
   /// - Yoksa yeni kayıt olarak ekler
   Future<void> setTireActions(int tireNumber, List<String> actions) async {
     if (actions.isEmpty) return;
+    _snapshot(tireNumber);
     final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
     if (idx >= 0) {
       final now = DateTime.now(); // Aynı anda işaretlenenler aynı zamanı paylaşır
@@ -239,9 +277,10 @@ class TireChangeProvider extends ChangeNotifier {
 
   /// Gönderim sonrasında seri numaralarını '---' haline getir
   Future<void> resetChangedTires() async {
+    // Gönderilen işlemler artık iptal edilemez.
+    _undoSnapshots.clear();
     _tireRecords = _tireRecords.map((r) => r.copyWith(
       isChanged: false,
-      serialNumber: r.isChanged ? '---' : r.serialNumber,
     )).toList();
     await _saveTireRecords();
     notifyListeners();

@@ -30,8 +30,26 @@ class AppConfig {
   /// Nimo Fleet API adresi.
   static const String fleetEventUrl = String.fromEnvironment(
     'NIMO_FLEET_URL',
-    defaultValue: 'https://nimo-fleet-panel.vercel.app/api/event',
+    defaultValue: 'https://mining-be.ndmo.com.tr/vehicle-events/',
   );
+
+  /// Görsellerin yüklendiği uç nokta. Rapor gönderimi iki aşamalıdır:
+  /// önce her görsel buraya multipart olarak yüklenir, dönen URL'ler
+  /// ardından [fleetEventUrl]'e JSON olarak gider.
+  static const String fleetUploadUrl = String.fromEnvironment(
+    'NIMO_FLEET_UPLOAD_URL',
+    defaultValue: 'https://nimo-fleet-panel.vercel.app/api/upload',
+  );
+
+  /// Yüklemede multipart gövdenin alan adı.
+  static const String fleetUploadField = String.fromEnvironment(
+    'NIMO_FLEET_UPLOAD_FIELD',
+    defaultValue: 'file',
+  );
+
+  /// Görsel yüklemesi için ayrı zaman aşımı. Saha bağlantısında bir
+  /// fotoğraf [requestTimeout] içinde bitmeyebilir.
+  static const Duration uploadTimeout = Duration(seconds: 60);
 
   /// Nimo Fleet Health URL.
   static const String fleetHealthUrl = String.fromEnvironment(

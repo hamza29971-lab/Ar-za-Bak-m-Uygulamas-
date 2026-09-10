@@ -8,58 +8,57 @@ import '../models/models.dart';
 import '../services/publish_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import '../utils/formats.dart';
 import '../widgets/common.dart';
 import '../widgets/nimo_page.dart';
+import '../widgets/result_dialog.dart';
 import '../widgets/vehicle_selector.dart';
 
-/// Gönderilebilecek rapor türleri. İkisi de araç kaydı okumaz: raporda
-/// yalnızca görsel ve açıklama gönderilir, araç seçimi isteğe bağlıdır.
+/// Gönderilen raporun türü. Ekran başına sabittir; kullanıcı seçmez.
 enum ReportType {
-  /// Sahada yapılan ve arıza sayılmayan işler için serbest form.
-  serviceForm('Servis Formu', Icons.assignment_outlined),
+  /// "Servis Raporu" ekranının tek türü.
+  general('Servis Raporu', Icons.assignment_outlined),
 
-  /// Arıza bildirimi.
-  fault('Arıza Raporu', Icons.report_gmailerrorred_outlined),
-
-  /// Mekanik Operasyon ekranının tek türü.
+  /// "Mekanik Operasyon" ekranının tek türü.
   mechanical('Mekanik Operasyon', Icons.build_outlined);
 
   const ReportType(this.label, this.icon);
 
   final String label;
   final IconData icon;
-
-  /// "Servis Raporu" sekmesinde seçilebilen türler.
-  static const List<ReportType> serviceTypes = <ReportType>[
-    serviceForm,
-    fault,
-  ];
-
-  /// "Mekanik Operasyon" sekmesinin tek türü.
-  static const List<ReportType> mechanicalTypes = <ReportType>[mechanical];
 }
 
-/// "Servis Raporu" ekranı: rapor türü + araç seçimi + görsel(ler) + açıklama.
+/// "Servis Raporu" ekranı: araç seçimi + görsel(ler) + açıklama.
 ///
-/// Aynı ekran "Mekanik Operasyon" sekmesinde de kullanılır; tek fark rapor
-/// türü listesinin [types] ile daraltılması ve başlıktır.
+/// Aynı ekran "Mekanik Operasyon" sekmesinde de kullanılır; tek fark [type]
+/// ve başlıktır.
 class ServiceReportScreen extends StatefulWidget {
   const ServiceReportScreen({
     super.key,
     this.title = 'Servis Raporu',
-    this.types = ReportType.serviceTypes,
+    this.type = ReportType.general,
     this.accent = AppColors.form,
+    this.allowGallery = true,
+    this.showServiceHours = true,
   });
 
   /// Sayfa başlığı.
   final String title;
 
-  /// "Rapor türü" listesinde gösterilecek türler; ilki varsayılan seçimdir.
-  /// Boş verilmemelidir.
-  final List<ReportType> types;
+  /// Bu ekrandan gönderilen raporun türü.
+  final ReportType type;
 
   /// Ekranın vurgu rengi; sekme rengiyle aynı olmalıdır.
   final Color accent;
+
+  /// Galeriden/dosyadan görsel seçmeye izin verilsin mi. "Servis Raporu" ve
+  /// "Mekanik Operasyon" sekmelerinde kapalıdır: oralarda görsel yalnızca
+  /// kamerayla eklenebilir.
+  final bool allowGallery;
+
+  /// Servisin başlangıç / bitiş saati alanları gösterilsin mi. "Servis
+  /// Raporu" sekmesinde açıktır.
+  final bool showServiceHours;
 
   @override
   State<ServiceReportScreen> createState() => _ServiceReportScreenState();
@@ -69,10 +68,19 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _description = TextEditingController();
   final List<XFile> _images = <XFile>[];
-  late ReportType _type = widget.types.first;
+
+  /// Servisin başlangıç ve bitiş saati; seçilmemişse null.
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
+
   bool _sending = false;
 
   Color get accent => widget.accent;
+
+  /// Kenarlıklar her iki rapor ekranında da aynı mavi tonda. Modül rengi
+  /// (Mekanik Operasyon'da mor) yalnızca simge, başlık ve butonlarda
+  /// kullanılır; kenarlıklar Servis Raporu ile aynı görünür.
+  Color get borderAccent => AppColors.form;
 
   @override
   void dispose() {
@@ -110,13 +118,44 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_desktop
-              ? 'Masaüstünde kamera kullanılamıyor. Fotoğraf çekmek için '
-                  'uygulamayı tablette çalıştırın; buradan "Görsel Ekle" ile '
-                  'dosya seçebilirsiniz.'
+              ? (widget.allowGallery
+                  ? 'Masaüstünde kamera kullanılamıyor. Fotoğraf çekmek için '
+                      'uygulamayı tablette çalıştırın; buradan "Görsel Ekle" '
+                      'ile dosya seçebilirsiniz.'
+                  : 'Masaüstünde kamera kullanılamıyor. Fotoğraf çekmek için '
+                      'uygulamayı tablette çalıştırın.')
               : 'Kamera kullanılamadı: $e'),
         ),
       );
     }
+  }
+
+  // ------------------------------------------------------------------ saatler
+
+  /// Saat her yerde 24 saat biçiminde ("08:30") gösterilir.
+  static String _formatTime(TimeOfDay time) =>
+      '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
+
+  /// Kadranlı `showTimePicker` yerine saat ve dakikanın listeden seçildiği
+  /// pencere açılır; saha ekipleri için okunması ve dokunması daha kolay.
+  Future<void> _pickTime({required bool isStart}) async {
+    final TimeOfDay? picked = await showDialog<TimeOfDay>(
+      context: context,
+      builder: (BuildContext context) => _TimeListPicker(
+        title: isStart ? 'Başlangıç saatini seçin' : 'Bitiş saatini seçin',
+        initial: isStart ? _startTime : _endTime,
+        accent: accent,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _startTime = picked;
+      } else {
+        _endTime = picked;
+      }
+    });
   }
 
   // ------------------------------------------------------------------ gönder
@@ -133,15 +172,30 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     }
 
     final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
+    // Servis saatleri yalnızca alanların gösterildiği ekranda anlamlıdır.
+    // Mekanik Operasyon'da bu alanlar kapalı olduğu için saat bilgisi hiç
+    // gönderilmez; koşul bunu yerleşimden bağımsız olarak garanti eder.
+    final String? startText = widget.showServiceHours && _startTime != null
+        ? _formatTime(_startTime!)
+        : null;
+    final String? endText = widget.showServiceHours && _endTime != null
+        ? _formatTime(_endTime!)
+        : null;
+    final String hours = startText == null && endText == null
+        ? ''
+        : '${startText ?? '-'} - ${endText ?? '-'}';
 
     setState(() => _sending = true);
     final PublishResult result = await PublishService.instance.publishReport(
-      reportType: _type.label,
+      state: state,
+      reportType: widget.type.label,
       description: _description.text.trim(),
       imagePaths: imagePaths,
       items: const <Map<String, Object?>>[],
       vehicleCode: vehicle?.code,
       userRegistryNo: state.user?.registryNo,
+      startTime: startText,
+      endTime: endText,
     );
     if (!mounted) return;
     setState(() => _sending = false);
@@ -152,7 +206,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         id: 'rapor-${sentAt.microsecondsSinceEpoch}',
         vehicleCode: vehicle?.code ?? '',
         date: sentAt,
-        reportType: _type.label,
+        reportType: widget.type.label,
         description: _description.text.trim(),
         imagePaths: imagePaths,
         itemCount: 0,
@@ -161,47 +215,42 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     state.addNotification(
       NotificationItem(
         title: 'Servis raporu gönderildi',
-        message: '${_type.label} • ${imagePaths.length} görsel'
-            '${vehicle != null ? ' • ${vehicle.code}' : ''}',
+        message: '${widget.type.label} • ${imagePaths.length} görsel'
+            '${vehicle != null ? ' • ${vehicle.code}' : ''}'
+            '${hours.isEmpty ? '' : ' • $hours'}',
         date: sentAt,
         kind: NotificationKind.form,
+        vehicleCode: vehicle?.code,
+        details: <String, String>{
+          'Rapor türü': widget.type.label,
+          'Başlangıç saati': ?startText,
+          'Bitiş saati': ?endText,
+          'Gönderilen görsel': '${imagePaths.length}',
+          'Açıklama': _description.text.trim(),
+          'Gönderim tarihi': formatDateTime(sentAt),
+        },
       ),
     );
 
-    await showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
-        title: const Text('Rapor gönderildi'),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              InfoLine(label: 'Rapor türü', value: _type.label, labelWidth: 110),
-              InfoLine(label: 'Araç', value: vehicle?.code ?? '-', labelWidth: 110),
-              InfoLine(
-                label: 'Görsel',
-                value: '${imagePaths.length} adet',
-                labelWidth: 110,
-              ),
-            ],
-          ),
-        ),
-        actions: <Widget>[
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Tamam'),
-          ),
-        ],
-      ),
+    await showResultDialog(
+      context,
+      title: 'Rapor gönderildi',
+      subtitle: formatDateTime(sentAt),
+      details: <String, String>{
+        'Rapor türü': widget.type.label,
+        'Araç': vehicle?.code ?? '-',
+        if (widget.showServiceHours)
+          'Servis saati': hours.isEmpty ? '-' : hours,
+        'Gönderilen görsel': '${imagePaths.length} adet',
+      },
     );
 
     if (!mounted) return;
     setState(() {
       _images.clear();
       _description.clear();
+      _startTime = null;
+      _endTime = null;
     });
   }
 
@@ -221,18 +270,29 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
             children: <Widget>[
               PageHeading(
                 title: widget.title,
-                subtitle:
-                    'Rapor türünü ve aracı seçin, görsel ve açıklama ile gönderin',
+                subtitle: 'Aracı seçin, görsel ve açıklama ile gönderin',
               ),
               const SizedBox(height: 16),
               // Araç listeden seçilir; seçim diğer ekranlarla ortaktır.
-              Align(
-                alignment: Alignment.centerLeft,
-                child: VehicleSelector(
-                  selected: vehicle,
-                  accentColor: accent,
-                  width: 360,
-                  onSelected: state.selectVehicle,
+              // Servis saatleri aynı satırın sağında durur, dar ekranda alta
+              // iner.
+              SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  runSpacing: 12,
+                  children: <Widget>[
+                    VehicleSelector(
+                      selected: vehicle,
+                      accentColor: accent,
+                      borderAccent: borderAccent,
+                      width: 360,
+                      onSelected: state.selectVehicle,
+                    ),
+                    if (widget.showServiceHours) _buildServiceHours(context),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -242,6 +302,83 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
               ),
               const SizedBox(height: 20),
               _buildActions(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Servisin başlangıç ve bitiş saati alanları.
+  Widget _buildServiceHours(BuildContext context) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: <Widget>[
+        _buildTimeField(
+          context,
+          label: 'Başlangıç Saati',
+          value: _startTime,
+          onTap: () => _pickTime(isStart: true),
+        ),
+        _buildTimeField(
+          context,
+          label: 'Bitiş Saati',
+          value: _endTime,
+          onTap: () => _pickTime(isStart: false),
+        ),
+      ],
+    );
+  }
+
+  /// Tıklanınca saat seçiciyi açan, araç seçici ile aynı görünümde alan.
+  Widget _buildTimeField(
+    BuildContext context, {
+    required String label,
+    required TimeOfDay? value,
+    required VoidCallback onTap,
+  }) {
+    final bool isSet = value != null;
+    return SizedBox(
+      width: 200,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            // Metin alanlarıyla aynı dolgu; koyu temada zeminden ayrışır.
+            color: context.isDark ? context.cardColor : context.pageColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isSet ? accent : context.moduleBorderColor(accent), width: 2.5),
+          ),
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.schedule_outlined,
+                  size: 20, color: isSet ? accent : context.mutedColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 11, color: context.isDark ? Colors.white : context.mutedColor)),
+                    const SizedBox(height: 2),
+                    Text(
+                      isSet ? _formatTime(value) : 'Saat seçin',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: context.isDark ? Colors.white : (isSet ? null : context.mutedColor),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_down,
+                  size: 20, color: context.mutedColor),
             ],
           ),
         ),
@@ -265,13 +402,18 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: <Widget>[
-        if (_images.isNotEmpty || _description.text.isNotEmpty)
+        if (_images.isNotEmpty ||
+            _description.text.isNotEmpty ||
+            _startTime != null ||
+            _endTime != null)
           TextButton.icon(
             onPressed: _sending
                 ? null
                 : () => setState(() {
                       _images.clear();
                       _description.clear();
+                      _startTime = null;
+                      _endTime = null;
                     }),
             icon: const Icon(Icons.restart_alt),
             label: const Text('Raporu temizle'),
@@ -305,6 +447,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       title: 'Rapor Görselleri',
       icon: Icons.image_outlined,
       accent: accent,
+      borderAccent: borderAccent,
       expandChild: true,
       trailing: Text('${_images.length} görsel',
           style: TextStyle(fontSize: 13, color: context.mutedColor)),
@@ -313,22 +456,32 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _pickImages,
-                  style: FilledButton.styleFrom(backgroundColor: accent),
-                  icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text('Görsel Ekle'),
+              if (widget.allowGallery) ...<Widget>[
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _pickImages,
+                    style: FilledButton.styleFrom(backgroundColor: accent),
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('Görsel Ekle'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _takePhoto,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Fotoğraf Çek'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _takePhoto,
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Fotoğraf Çek'),
+                  ),
                 ),
-              ),
+              ] else
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _takePhoto,
+                    style: FilledButton.styleFrom(backgroundColor: accent),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Fotoğraf Çek'),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -356,6 +509,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   Widget _buildDropHint(BuildContext context) {
     // Yer varsa ortalanır, dar ekranda (rapor tablosu da açıkken) kayar.
     return DottedBorderBox(
+      accent: borderAccent,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           return SingleChildScrollView(
@@ -370,7 +524,10 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                       style: TextStyle(
                           fontWeight: FontWeight.w600, color: context.mutedColor)),
                   const SizedBox(height: 6),
-                  Text('Birden fazla görsel seçebilirsiniz.',
+                  Text(
+                      widget.allowGallery
+                          ? 'Birden fazla görsel seçebilirsiniz.'
+                          : 'Fotoğraf çekerek görsel ekleyebilirsiniz.',
                       style: TextStyle(fontSize: 13, color: context.mutedColor)),
                 ],
               ),
@@ -439,6 +596,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       title: 'Açıklama',
       icon: Icons.edit_note_outlined,
       accent: accent,
+      borderAccent: borderAccent,
       expandChild: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -467,9 +625,10 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
 /// Kesikli çerçeveli boş alan kutusu.
 class DottedBorderBox extends StatelessWidget {
-  const DottedBorderBox({super.key, required this.child});
+  const DottedBorderBox({super.key, required this.child, required this.accent});
 
   final Widget child;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -478,9 +637,165 @@ class DottedBorderBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(accent), width: 2.5),
       ),
       child: child,
+    );
+  }
+}
+
+
+/// Saat ve dakikanın iki ayrı listeden seçildiği 24 saatlik seçici.
+///
+/// Seçim yapılınca [TimeOfDay] ile, vazgeçilince `null` ile kapanır.
+class _TimeListPicker extends StatefulWidget {
+  const _TimeListPicker({
+    required this.title,
+    required this.initial,
+    required this.accent,
+  });
+
+  final String title;
+
+  /// Alanda hâlihazırda seçili olan saat; yoksa liste seçimsiz açılır.
+  final TimeOfDay? initial;
+
+  final Color accent;
+
+  @override
+  State<_TimeListPicker> createState() => _TimeListPickerState();
+}
+
+class _TimeListPickerState extends State<_TimeListPicker> {
+  static const double _rowHeight = 44;
+  static const double _listHeight = 264; // 6 satır
+
+  late int? _hour = widget.initial?.hour;
+  late int? _minute = widget.initial?.minute;
+
+  late final ScrollController _hourScroll =
+      ScrollController(initialScrollOffset: _offsetFor(_hour, 24));
+  late final ScrollController _minuteScroll =
+      ScrollController(initialScrollOffset: _offsetFor(_minute, 60));
+
+  /// Seçili satır açılışta ortada görünsün; liste sınırlarının dışına taşmaz.
+  static double _offsetFor(int? value, int count) {
+    if (value == null) return 0;
+    final double maxOffset = count * _rowHeight - _listHeight;
+    if (maxOffset <= 0) return 0;
+    final double target = value * _rowHeight - (_listHeight - _rowHeight) / 2;
+    if (target < 0) return 0;
+    return target > maxOffset ? maxOffset : target;
+  }
+
+  @override
+  void dispose() {
+    _hourScroll.dispose();
+    _minuteScroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool complete = _hour != null && _minute != null;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SizedBox(
+        width: 300,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _buildColumn(
+              context,
+              label: 'Saat',
+              count: 24,
+              selected: _hour,
+              controller: _hourScroll,
+              onSelected: (int v) => setState(() => _hour = v),
+            ),
+            const SizedBox(width: 16),
+            _buildColumn(
+              context,
+              label: 'Dakika',
+              count: 60,
+              selected: _minute,
+              controller: _minuteScroll,
+              onSelected: (int v) => setState(() => _minute = v),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        TextButton(
+          // İkisi de seçilmeden saat oluşturulamaz.
+          onPressed: complete
+              ? () => Navigator.of(context)
+                  .pop(TimeOfDay(hour: _hour!, minute: _minute!))
+              : null,
+          child: const Text('Tamam'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColumn(
+    BuildContext context, {
+    required String label,
+    required int count,
+    required int? selected,
+    required ScrollController controller,
+    required ValueChanged<int> onSelected,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(label, style: TextStyle(fontSize: 12, color: context.mutedColor)),
+        const SizedBox(height: 6),
+        Container(
+          width: 120,
+          height: _listHeight,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.moduleBorderColor(widget.accent), width: 2.5),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Scrollbar(
+            controller: controller,
+            thumbVisibility: true,
+            child: ListView.builder(
+              controller: controller,
+              padding: EdgeInsets.zero,
+              itemExtent: _rowHeight,
+              itemCount: count,
+              itemBuilder: (BuildContext context, int i) {
+                final bool isSelected = i == selected;
+                return InkWell(
+                  onTap: () => onSelected(i),
+                  child: Container(
+                    alignment: Alignment.center,
+                    color: isSelected ? widget.accent : null,
+                    child: Text(
+                      i.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? Colors.white : null,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -298,6 +298,78 @@ double vehicleImageXShift(String asset) =>
         ? _leftViewXShift
         : 0;
 
+/// Araca ait tekil fotoğrafın yolu; yoksa `null`.
+///
+/// `Euclid-2`…`Euclid-11`, `Liugong-16`…`Liugong-20` (maden kamyonu) ve
+/// `Liugong-33`…`Liugong-39` (loder) için `assets/images/sol/` altında kendi
+/// fotoğrafı vardır; kalanlar marka görselinde kalır (ör. `Euclid-1`).
+///
+/// [code] araç adıdır: `Euclid-1`, `Liugong-16` … (harf büyüklüğü önemsiz).
+String? vehicleOwnPhoto(String code) {
+  final RegExpMatch? match =
+      RegExp(r'^(euclid|liugong)-(\d+)$').firstMatch(code.toLowerCase());
+  if (match == null) return null;
+
+  final int number = int.parse(match.group(2)!);
+  if (match.group(1) == 'euclid') {
+    return number >= 2 && number <= 11
+        ? 'assets/images/sol/Euclid$number.png'
+        : null;
+  }
+  final bool hasPhoto =
+      (number >= 16 && number <= 20) || (number >= 33 && number <= 39);
+  return hasPhoto ? 'assets/images/sol/Liugong$number.png' : null;
+}
+
+/// Araç fotoğrafının sağ panelde gösterilen hâli: aracın kendi görseli varsa
+/// o, yoksa [fallbackAsset] (marka görseli) çizilir.
+///
+/// Yağ Takviyesi ve Lastik Değişimi ekranları aynı görseli göstersin diye
+/// seçim ve ortalama mantığı burada tek yerde durur.
+class VehicleSidePhoto extends StatelessWidget {
+  const VehicleSidePhoto({
+    super.key,
+    required this.code,
+    required this.fallbackAsset,
+    this.maxHeight = 320,
+  });
+
+  /// Araç adı (`Euclid-1`, `Liugong-16` …).
+  final String code;
+
+  /// Aracın kendi fotoğrafı yoksa kullanılacak marka görseli.
+  final String fallbackAsset;
+
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final String asset = vehicleOwnPhoto(code) ?? fallbackAsset;
+    final Widget image = Image.asset(
+      asset,
+      fit: BoxFit.contain,
+      // Dosya eksikse arayüz bozulmasın; marka görseline düşülür.
+      errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+          Image.asset(fallbackAsset, fit: BoxFit.contain),
+    );
+
+    // Sol görünüm görsellerinin tuvalinde sağda boşluk var; araç ortalanır.
+    final double shift = vehicleImageXShift(asset);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: shift == 0
+          ? image
+          : ClipRect(
+              child: FractionalTranslation(
+                translation: Offset(shift, 0),
+                child: image,
+              ),
+            ),
+    );
+  }
+}
+
 /// "Aracın Fotosu" alanı. Asset bulunamazsa vektörel kaya kamyonu çizimi gösterir,
 /// böylece görsel dosyası eklenmeden de arayüz eksiksiz çalışır.
 class VehiclePhoto extends StatelessWidget {
@@ -371,7 +443,7 @@ class VehiclePhoto extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: context.cardColor,
+        color: context.photoPlate,
         borderRadius: BorderRadius.circular(AppTheme.radius),
         border: Border.all(color: context.borderColor),
       ),

@@ -2,6 +2,8 @@
 
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/numeric_keypad.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../screens/shell_screen.dart';
@@ -108,15 +110,21 @@ class _LoginScreenState extends State<LoginScreen>
         }
         showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Giriş Hatası'),
-              content: Text(errorMsg),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Tamam'),
-                ),
-              ],
+            // Giriş ekranı hep açık temada olduğu için diyalogu da açık
+            // temaya sabitliyoruz; aksi halde uygulama koyu moddayken
+            // pencere koyu gelirdi.
+            builder: (context) => Theme(
+              data: AppTheme.light(),
+              child: AlertDialog(
+                title: const Text('Giriş Hatası'),
+                content: Text(errorMsg),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Tamam'),
+                  ),
+                ],
+              ),
             ),
           );
       }
@@ -210,8 +218,17 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Giriş ekranı, uygulamanın tema tercihi ne olursa olsun her zaman açık
+    // temada gösterilir. Builder, alt ağacın bu yeni temayı görmesini sağlar.
+    return Theme(
+      data: AppTheme.light(),
+      child: Builder(builder: _buildContent),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.authBg,
       body: Row(
         children: [
           // ── Sol Panel: Login Formu ────────────────────────────────
@@ -220,41 +237,44 @@ class _LoginScreenState extends State<LoginScreen>
             child: FadeTransition(
               opacity: _fadeAnim,
               child: SizedBox(
-                width: 460,
+                // Form sütunu ekranın yaklaşık %42'sini kaplar; dar ekranlarda
+                // eski genişliğin altına inmez, çok geniş ekranlarda taşmaz.
+                width: (MediaQuery.sizeOf(context).width * 0.42)
+                    .clamp(460.0, 760.0),
                 child: SingleChildScrollView(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 32),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Robot Karakter
                         Image.asset(
                           'assets/images/robot_yenii.png',
-                          height: 100,
+                          height: 124,
                           fit: BoxFit.contain,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
 
                         // Başlık
-                        const Text(
+                        Text(
                           'Giriş Yap',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 30,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1D2E),
+                            color: context.authTitle,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        const Text(
+                        const SizedBox(height: 8),
+                        Text(
                           'Telefon veya e-posta ile giriş yapın.\nDoğrulama kodu gönderilecektir.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF7B8094),
+                            fontSize: 16,
+                            color: context.authMuted,
                             height: 1.5,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
 
                         // Tab Bar
                         _TabBar(
@@ -280,6 +300,7 @@ class _LoginScreenState extends State<LoginScreen>
                           _PasswordInput(
                             controller: _passwordController,
                             onChanged: (val) => setState(() {}),
+                            onSubmitted: _login,
                           ),
                         ] else ...[
                           _EmailInput(
@@ -290,6 +311,7 @@ class _LoginScreenState extends State<LoginScreen>
                           _PasswordInput(
                             controller: _passwordController,
                             onChanged: (val) => setState(() {}),
+                            onSubmitted: _login,
                           ),
                         ],
 
@@ -309,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen>
           ),
 
           // Dikey ayırıcı
-          Container(width: 1, color: const Color(0xFFEEF0F5)),
+          Container(width: 1, color: context.authDivider),
 
           // ── Sağ Panel: Karşılama + Araç Görseli ──────────────────
           Expanded(
@@ -323,28 +345,28 @@ class _LoginScreenState extends State<LoginScreen>
                     children: [
                       Image.asset(
                         'assets/images/çimnak_logo.png',
-                        height: 60,
+                        height: 110,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 22),
                       // Sadece yeni başlık yazısı
-                      const Text(
+                      Text(
                         'Nuh Intelligent Mining Operations',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 32,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF1A1D2E),
+                          color: context.authTitle,
                           letterSpacing: 0.5,
                         ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
                       // Büyütülmüş Hoşgeldiniz Yazısı
-                      const Text(
-                        'BAKIM SİSTEMİNE HOŞGELDİNİZ',
+                      Text(
+                        'ARIZA VE BAKIM SİSTEMİNE HOŞGELDİNİZ',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 34,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF2E7D32),
+                          color: context.authGreen,
                           letterSpacing: 1.2,
                         ),
                         textAlign: TextAlign.center,
@@ -387,9 +409,9 @@ class _TabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F8),
+        color: context.authSoft,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDDE1EA)),
+        border: Border.all(color: context.authBorder),
       ),
       child: Row(
         children: [
@@ -435,9 +457,9 @@ class _TabItem extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF2E7D32) : Colors.transparent,
+            color: isSelected ? context.authGreenFill : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -445,16 +467,16 @@ class _TabItem extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 16,
-                color: isSelected ? Colors.white : const Color(0xFF7B8094),
+                size: 20,
+                color: isSelected ? Colors.white : context.authMuted,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 17,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : const Color(0xFF7B8094),
+                  color: isSelected ? Colors.white : context.authMuted,
                 ),
               ),
             ],
@@ -468,69 +490,156 @@ class _TabItem extends StatelessWidget {
 // ─────────────────────────────────────────────
 // TELEFON GİRİŞ ALANI
 // ─────────────────────────────────────────────
-class _PhoneInput extends StatelessWidget {
+class _PhoneInput extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
   const _PhoneInput({required this.controller, required this.onChanged});
 
   @override
+  State<_PhoneInput> createState() => _PhoneInputState();
+}
+
+class _PhoneInputState extends State<_PhoneInput> {
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Panel yalnizca alan odaktayken durur; baska bir alana gecilince
+    // kendiliginden kapanir.
+    _focus.addListener(_onFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_onFocusChanged);
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    setState(() {});
+    if (!_focus.hasFocus) return;
+    // Panel alanin altinda aciliyor; form kaydirilabilir oldugu icin
+    // ikisini birden gorunur alana getir.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  /// Alandaki ham rakamlar.
+  String get _digits => widget.controller.text.replaceAll(RegExp(r'\D'), '');
+
+  void _setDigits(String digits) {
+    final String formatted = formatPhoneDigits(digits);
+    // Alan readOnly oldugu icin inputFormatters calismaz; bicimlendirme
+    // burada elle yapilir.
+    widget.controller.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+    widget.onChanged(formatted);
+  }
+
+  void _appendDigit(String digit) {
+    final String digits = _digits;
+    if (digits.length >= kPhoneMaxDigits) return;
+    _setDigits(digits + digit);
+  }
+
+  void _backspace() {
+    final String digits = _digits;
+    if (digits.isEmpty) return;
+    _setDigits(digits.substring(0, digits.length - 1));
+  }
+
+  void _clear() {
+    if (_digits.isEmpty) return;
+    _setDigits('');
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final TextEditingController controller = widget.controller;
     final bool hasValue = controller.text.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Telefon',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF7B8094),
+            color: context.authMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         TextField(
           controller: controller,
-          onChanged: onChanged,
-          keyboardType: TextInputType.number,
-          inputFormatters: [PhoneInputFormatter()],
+          focusNode: _focus,
+          // Tabletin sistem klavyesi ACILMAZ: alan salt okunur, rakamlar
+          // asagidaki uygulama ici panelden girilir. Imlec yine gorunur.
+          readOnly: true,
+          showCursor: true,
+          onTap: () => _focus.requestFocus(),
           decoration: InputDecoration(
             hintText: '(05XX) XXX XX XX',
-            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-            prefixIcon: const Icon(Icons.phone_outlined,
-                color: Color(0xFF7B8094), size: 20),
+            hintStyle: TextStyle(color: context.authHint),
+            prefixIcon: Icon(Icons.phone_outlined,
+                color: context.authMuted, size: 24),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: context.authField,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+              borderSide: BorderSide(color: context.authGreen, width: 2),
             ),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 19),
           ),
-          style: const TextStyle(
-            fontSize: 18,
+          style: TextStyle(
+            fontSize: 21,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1D2E),
+            color: context.authTitle,
             letterSpacing: 1.2,
           ),
         ),
+        // Sayi paneli yalnizca alan odaktayken gorunur.
+        if (_focus.hasFocus) ...<Widget>[
+          const SizedBox(height: 14),
+          NumericKeypad(
+            stretch: true,
+            keyHeight: 54,
+            accent: AppColors.brand,
+            doneLabel: 'Tamam',
+            onDigit: _appendDigit,
+            onBackspace: _backspace,
+            onClear: _clear,
+            onDone: _focus.unfocus,
+          ),
+        ],
       ],
     );
   }
@@ -550,45 +659,47 @@ class _EmailInput extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'E-posta',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF7B8094),
+            color: context.authMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         TextField(
           controller: controller,
           onChanged: onChanged,
           keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const <String>[AutofillHints.email],
           decoration: InputDecoration(
             hintText: 'ornek@email.com',
-            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-            prefixIcon: const Icon(Icons.email_outlined,
-                color: Color(0xFF7B8094), size: 20),
+            hintStyle: TextStyle(color: context.authHint),
+            prefixIcon: Icon(Icons.email_outlined,
+                color: context.authMuted, size: 24),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFDDE1EA), width: 1.5),
+              borderSide: BorderSide(color: context.authBorder, width: 1.5),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFDDE1EA), width: 1.5),
+              borderSide: BorderSide(color: context.authBorder, width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide:
-                  const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                  BorderSide(color: context.authGreen, width: 2),
             ),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 19),
           ),
-          style: const TextStyle(
-            fontSize: 16,
+          style: TextStyle(
+            fontSize: 19,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1D2E),
+            color: context.authTitle,
           ),
         ),
       ],
@@ -619,21 +730,21 @@ class _LoginButton extends StatelessWidget {
         child: ElevatedButton.icon(
           onPressed: canLogin ? onLogin : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2E7D32),
+            backgroundColor: context.authGreenFill,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: const Color(0xFF2E7D32),
+            disabledBackgroundColor: context.authGreenFill,
             disabledForegroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 20),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             elevation: canLogin ? 2 : 0,
           ),
-          icon: const Icon(Icons.login_rounded, size: 20),
+          icon: const Icon(Icons.login_rounded, size: 24),
           label: const Text(
             'Giriş Yap',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 19,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -650,7 +761,14 @@ class _PasswordInput extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
-  const _PasswordInput({required this.controller, required this.onChanged});
+  /// Klavyedeki "bitti" tusuna basildiginda calisir.
+  final VoidCallback? onSubmitted;
+
+  const _PasswordInput({
+    required this.controller,
+    required this.onChanged,
+    this.onSubmitted,
+  });
 
   @override
   State<_PasswordInput> createState() => _PasswordInputState();
@@ -666,29 +784,34 @@ class _PasswordInputState extends State<_PasswordInput> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Şifre',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF7B8094),
+            color: context.authMuted,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         TextField(
           controller: widget.controller,
           onChanged: widget.onChanged,
           obscureText: _obscureText,
+          keyboardType: TextInputType.visiblePassword,
+          textInputAction: TextInputAction.done,
+          autofillHints: const <String>[AutofillHints.password],
+          // Tablette klavyedeki "bitti" tusu dogrudan girisi baslatir.
+          onSubmitted: (_) => widget.onSubmitted?.call(),
           decoration: InputDecoration(
             hintText: '••••••••',
-            hintStyle: const TextStyle(color: Color(0xFFBBC0CC)),
-            prefixIcon: const Icon(Icons.lock_outline,
-                color: Color(0xFF7B8094), size: 20),
+            hintStyle: TextStyle(color: context.authHint),
+            prefixIcon: Icon(Icons.lock_outline,
+                color: context.authMuted, size: 24),
             suffixIcon: IconButton(
               icon: Icon(
                 _obscureText ? Icons.visibility_off : Icons.visibility,
-                color: const Color(0xFF7B8094),
-                size: 20,
+                color: context.authMuted,
+                size: 24,
               ),
               onPressed: () {
                 setState(() {
@@ -697,33 +820,33 @@ class _PasswordInputState extends State<_PasswordInput> {
               },
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: context.authField,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(
-                color: hasValue ? const Color(0xFF2E7D32) : const Color(0xFFDDE1EA),
+                color: hasValue ? context.authGreen : context.authBorder,
                 width: hasValue ? 2 : 1.5,
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+              borderSide: BorderSide(color: context.authGreen, width: 2),
             ),
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 19),
           ),
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 21,
             fontWeight: FontWeight.w600,
-            color: const Color(0xFF1A1D2E),
+            color: context.authTitle,
             letterSpacing: _obscureText ? 2.0 : 1.0,
           ),
         ),
@@ -732,42 +855,24 @@ class _PasswordInputState extends State<_PasswordInput> {
   }
 }
 
-class PhoneInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue,
-    ) {
-      String digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-      
-      // Silme (Backspace) kilitlenmesi cozumu
-      if (oldValue.text.length > newValue.text.length && 
-          oldValue.text.replaceAll(RegExp(r'\D'), '') == digits) {
-        if (digits.isNotEmpty) {
-          digits = digits.substring(0, digits.length - 1);
-        }
-      }
-      
-      if (digits.length > 11) {
-        return oldValue; // 11 haneden fazla girmesin
-      }
-      
-      final String formatted = _formatPhone(digits);
-      return TextEditingValue(
-        text: formatted,
-        selection: TextSelection.collapsed(offset: formatted.length),
-      );
-    }
-
-  String _formatPhone(String digits) {
-    if (digits.isEmpty) return '';
-    if (digits.length <= 4) {
-      return digits.length == 4 ? '($digits) ' : '($digits';
-    }
-    if (digits.length <= 7) return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
-    if (digits.length <= 9) {
-      return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
-    }
-    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7, 9)} ${digits.substring(9)}';
+/// Ham rakamlari "(05XX) XXX XX XX" bicimine cevirir.
+///
+/// Telefon alani salt okunurdur; rakamlar uygulama ici sayi klavyesinden
+/// gelir ve bicimlendirme burada yapilir.
+String formatPhoneDigits(String digits) {
+  if (digits.isEmpty) return '';
+  if (digits.length <= 4) {
+    return digits.length == 4 ? '($digits) ' : '($digits';
   }
+  if (digits.length <= 7) {
+    return '(${digits.substring(0, 4)}) ${digits.substring(4)}';
+  }
+  if (digits.length <= 9) {
+    return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} ${digits.substring(7)}';
+  }
+  return '(${digits.substring(0, 4)}) ${digits.substring(4, 7)} '
+      '${digits.substring(7, 9)} ${digits.substring(9)}';
 }
+
+/// Telefon alanina girilebilecek en fazla hane.
+const int kPhoneMaxDigits = 11;

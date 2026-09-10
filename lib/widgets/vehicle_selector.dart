@@ -14,12 +14,18 @@ class VehicleSelector extends StatefulWidget {
     required this.selected,
     required this.onSelected,
     this.accentColor,
+    this.borderAccent,
     this.width = 420,
   });
 
   final Vehicle? selected;
   final ValueChanged<Vehicle?> onSelected;
   final Color? accentColor;
+
+  /// Kenarlık rengi. Verilmezse [accentColor] kullanılır; modül renginden
+  /// farklı bir kenarlık isteniyorsa (ör. Mekanik Operasyon'da mavi
+  /// kenarlık) buradan verilir.
+  final Color? borderAccent;
   final double width;
 
   @override
@@ -105,6 +111,9 @@ class _VehicleSelectorState extends State<VehicleSelector> {
     _entry?.markNeedsBuild();
   }
 
+  /// Kenarlıklarda kullanılan renk; verilmemişse vurgu rengine düşer.
+  Color? get _edge => widget.borderAccent ?? widget.accentColor;
+
   Widget _buildOverlay(BuildContext overlayContext) {
     final AppState state = AppScope.read(context);
     final List<Vehicle> items = state.filterVehicles(
@@ -136,11 +145,17 @@ class _VehicleSelectorState extends State<VehicleSelector> {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  constraints: const BoxConstraints(maxHeight: 300),
+                  constraints: const BoxConstraints(maxHeight: 420),
                   decoration: BoxDecoration(
-                    color: context.pageColor,
+                    color:
+                        context.isDark ? context.elevatedColor : context.pageColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.borderColor),
+                    border: Border.all(
+                      color: _edge != null
+                          ? context.moduleBorderColor(_edge!)
+                          : context.borderColor,
+                      width: 2.5,
+                    ),
                     boxShadow: <BoxShadow>[
                       BoxShadow(
                         color: Colors.black.withValues(
@@ -175,7 +190,10 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                           itemCount: items.length,
                           separatorBuilder: (_, _) => Divider(
                             height: 1,
-                            color: context.borderColor.withValues(alpha: 0.6),
+                            color: (_edge != null
+                                    ? context.moduleBorderColor(_edge!)
+                                    : context.borderColor)
+                                .withValues(alpha: 0.6),
                           ),
                           itemBuilder: (BuildContext context, int i) {
                             final Vehicle v = items[i];
@@ -187,19 +205,19 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                     ? accent.withValues(alpha: 0.08)
                                     : Colors.transparent,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
+                                  horizontal: 16,
+                                  vertical: 16,
                                 ),
                                 child: Row(
                                   children: <Widget>[
                                     Icon(
                                       Icons.local_shipping_outlined,
-                                      size: 20,
+                                      size: 24,
                                       color: isSelected
                                           ? accent
                                           : context.mutedColor,
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -208,15 +226,16 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                           Text(
                                             v.code,
                                             style: TextStyle(
+                                              fontSize: 16,
                                               fontWeight: FontWeight.w600,
                                               color: isSelected ? accent : null,
                                             ),
                                           ),
-                                          const SizedBox(height: 2),
+                                          const SizedBox(height: 3),
                                           Text(
                                             '${v.typeLabel} • ${v.tireCount} lastik',
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 13,
                                               color: context.mutedColor,
                                             ),
                                           ),
@@ -226,7 +245,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                     if (isSelected)
                                       Icon(
                                         Icons.check_circle,
-                                        size: 18,
+                                        size: 20,
                                         color: accent,
                                       ),
                                   ],
@@ -260,9 +279,10 @@ class _VehicleSelectorState extends State<VehicleSelector> {
           },
           onTap: _showOverlay,
           textInputAction: TextInputAction.search,
+          style: const TextStyle(fontSize: 18),
           decoration: InputDecoration(
             hintText: 'Araç Seç',
-            prefixIcon: const Icon(Icons.local_shipping_outlined, size: 20),
+            prefixIcon: const Icon(Icons.local_shipping_outlined, size: 24),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
@@ -277,8 +297,26 @@ class _VehicleSelectorState extends State<VehicleSelector> {
               ],
             ),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
+              horizontal: 16,
+              vertical: 20,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: _edge != null
+                    ? context.moduleBorderColor(_edge!)
+                    : context.borderColor,
+                width: 2.5,
+              ),
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: _edge != null
+                    ? context.moduleBorderColor(_edge!)
+                    : context.borderColor,
+                width: 2.5,
+              ),
             ),
           ),
         ),

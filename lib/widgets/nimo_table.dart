@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
@@ -46,13 +46,14 @@ class NimoTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = accent ?? Theme.of(context).colorScheme.primary;
+    final Color color =
+        context.accent(accent ?? Theme.of(context).colorScheme.primary);
 
     return Container(
       decoration: BoxDecoration(
-        color: context.pageColor,
+        color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: context.moduleBorderColor(color), width: 2.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -60,7 +61,7 @@ class NimoTable extends StatelessWidget {
         children: <Widget>[
           // Başlık satırı
           Container(
-            color: context.cardColor,
+            color: context.isDark ? context.elevatedColor : context.cardColor,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: <Widget>[
@@ -177,9 +178,10 @@ class RowActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color tone = filled ? context.accentFill(color) : context.accent(color);
     final ButtonStyle style = filled
         ? FilledButton.styleFrom(
-            backgroundColor: color,
+            backgroundColor: tone,
             foregroundColor: Colors.white,
             minimumSize: const Size(0, 42),
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -187,10 +189,10 @@ class RowActionButton extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           )
         : OutlinedButton.styleFrom(
-            foregroundColor: color,
+            foregroundColor: tone,
             minimumSize: const Size(0, 42),
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            side: BorderSide(color: color.withValues(alpha: 0.5)),
+            side: BorderSide(color: tone.withValues(alpha: 0.5)),
             textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           );

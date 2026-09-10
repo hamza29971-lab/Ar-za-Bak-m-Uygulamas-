@@ -14,10 +14,11 @@ import '../config/app_config.dart';
 class FleetEvent {
   const FleetEvent({
     required this.title,
+    this.subtitle = '',
     this.type = 'genel',
     this.note = '',
     this.deviceId,
-    this.vehicleLabel,
+    this.vehicleUUID,
     this.operatorLabel,
     this.occurredAt,
     this.fields = const <String, Object?>{},
@@ -26,6 +27,10 @@ class FleetEvent {
   /// Zorunlu. Sunucu 2–200 karakter bekler.
   final String title;
 
+  /// Başlığın hemen altındaki ikincil satır, ör. "Manuel Yağlamalar".
+  /// Boşsa hiç gönderilmez.
+  final String subtitle;
+
   /// `bakim`, `lastik`, `yakit`, `ariza`, `genel`.
   final String type;
 
@@ -33,7 +38,7 @@ class FleetEvent {
   final String note;
 
   final String? deviceId;
-  final String? vehicleLabel;
+  final String? vehicleUUID;
   final String? operatorLabel;
   final DateTime? occurredAt;
 
@@ -49,11 +54,13 @@ class FleetEvent {
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'title': _clamp(title, maxTitle),
+      if (subtitle.trim().isNotEmpty)
+        'subtitle': _clamp(subtitle.trim(), maxTitle),
       'type': type,
       if (note.trim().isNotEmpty) 'note': _clamp(note.trim(), maxNote),
       if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
-      if (vehicleLabel != null && vehicleLabel!.isNotEmpty)
-        'vehicleLabel': vehicleLabel,
+      if (vehicleUUID != null && vehicleUUID!.isNotEmpty)
+        'vehicleUUID': vehicleUUID,
       if (operatorLabel != null && operatorLabel!.isNotEmpty)
         'operatorLabel': operatorLabel,
       // Yerel saatin ISO çıktısında dilim eki olmadığı için UTC gönderilir.
@@ -79,8 +86,13 @@ class FleetEvent {
       if (v is num || v is bool) {
         out[e.key] = v;
       } else if (v is Iterable<Object?>) {
-        final String joined = v.map((Object? x) => '$x').join(', ');
-        if (joined.isNotEmpty) out[e.key] = _clamp(joined, maxNote);
+        if (e.key == 'gorseller') {
+          // Base64 görselleri kırpmadan listeye çevirip ekle
+          out[e.key] = v.toList();
+        } else {
+          final String joined = v.map((Object? x) => '$x').join(', ');
+          if (joined.isNotEmpty) out[e.key] = _clamp(joined, maxNote);
+        }
       } else {
         final String text = '$v'.trim();
         if (text.isNotEmpty) out[e.key] = _clamp(text, maxNote);
@@ -113,7 +125,7 @@ class FleetResult {
 /// Fleet Panel istemcisi. Ekranlar yalnızca bu arayüzü tanır; testlerde
 /// [MockFleetEventClient] yerleştirilir.
 abstract interface class FleetEventClient {
-  Future<FleetResult> send(FleetEvent event);
+  Future<FleetResult> send(FleetEvent event, {String? accessToken});
 
   /// Bağlantı sınaması; anahtar gerektirmez.
   Future<bool> health();
@@ -126,25 +138,37 @@ class HttpFleetEventClient implements FleetEventClient {
   final http.Client _client;
 
   @override
-  Future<FleetResult> send(FleetEvent event) async {
+  Future<FleetResult> send(FleetEvent event, {String? accessToken}) async {
+    final String payload = jsonEncode(event.toJson());
+    debugPrint('[Fleet] gönderim: $payload');
     try {
       final http.Response response = await _client
           .post(
             Uri.parse(AppConfig.fleetEventUrl),
             headers: <String, String>{
               'Content-Type': 'application/json',
-              'X-Fleet-Key': AppConfig.fleetApiKey,
+              if (accessToken != null && accessToken.isNotEmpty)
+                'Authorization': 'Bearer $accessToken',
             },
-            body: jsonEncode(event.toJson()),
+            body: payload,
           )
           .timeout(AppConfig.requestTimeout);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final Object? body = jsonDecode(utf8.decode(response.bodyBytes));
-        final String? id =
-            body is Map<String, Object?> ? body['id'] as String? : null;
+        // Yeni API: data.uuid; eski Fleet API: id
+        String? id;
+        if (body is Map<String, Object?>) {
+          final Object? data = body['data'];
+          if (data is Map<String, Object?>) {
+            id = data['uuid'] as String?;
+          }
+          id ??= body['id'] as String?;
+        }
+        debugPrint('[Fleet] gönderim başarılı, kayıt id: $id');
         return FleetResult.success(id);
       }
+      debugPrint('[Fleet] gönderim reddedildi: HTTP ${response.statusCode} ${response.body}');
       return FleetResult.failure(_messageFor(response.statusCode));
     } on Object catch (e) {
       debugPrint('[Fleet] gönderim hatası: $e');
@@ -190,7 +214,7 @@ class MockFleetEventClient implements FleetEventClient {
   int _counter = 0;
 
   @override
-  Future<FleetResult> send(FleetEvent event) async {
+  Future<FleetResult> send(FleetEvent event, {String? accessToken}) async {
     sent.add(event);
     if (failWith != null) return FleetResult.failure(failWith);
     debugPrint('[Fleet] ${jsonEncode(event.toJson())}');
