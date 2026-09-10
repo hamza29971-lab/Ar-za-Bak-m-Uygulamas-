@@ -78,9 +78,9 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   Color get accent => widget.accent;
 
   /// Kenarlıklar her iki rapor ekranında da aynı mavi tonda. Modül rengi
-  /// (Mekanik Operasyon'da mor) yalnızca simge, başlık ve butonlarda
-  /// kullanılır; kenarlıklar Servis Raporu ile aynı görünür.
-  Color get borderAccent => AppColors.form;
+  /// Kullanıldığı sekmenin (Servis Raporu veya Mekanik Operasyon) ana rengini
+  /// kenarlıklarda da kullanır. Böylece Mekanik Operasyon tamamen sarı olur.
+  Color get borderAccent => accent;
 
   @override
   void dispose() {
