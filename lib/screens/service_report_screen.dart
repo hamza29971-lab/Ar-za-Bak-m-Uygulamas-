@@ -92,13 +92,21 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   Future<void> _pickImages() async {
     try {
+      final int remaining = 5 - _images.length;
+      if (remaining <= 0) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('En fazla 5 fotoğraf eklenebilir.')),
+        );
+        return;
+      }
       final List<XFile> picked = await _picker.pickMultiImage(
         imageQuality: 50,
         maxWidth: 1200,
         maxHeight: 1200,
       );
       if (picked.isEmpty) return;
-      setState(() => _images.addAll(picked));
+      setState(() => _images.addAll(picked.take(remaining)));
     } on Object catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,6 +122,13 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   Future<void> _takePhoto() async {
     try {
+      if (_images.length >= 5) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('En fazla 5 fotoğraf eklenebilir.')),
+        );
+        return;
+      }
       final XFile? shot = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 50,
@@ -201,16 +216,16 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                 const SizedBox(height: 16),
                 const Text(
                   'İşlemi tamamlayıp raporu gönderebilmemiz için aşağıdaki bilgileri de seçmeniz/yazmanız gerekiyor:',
-                  style: TextStyle(fontSize: 15),
+                  style: const TextStyle(fontSize: 16),
                 ),
                 const SizedBox(height: 20),
                 ...errors.map((String e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                          Expanded(child: Text(e, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+                          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                          Expanded(child: Text(e, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
                         ],
                       ),
                     )),
@@ -715,6 +730,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
               maxLines: null,
               expands: true,
               textAlignVertical: TextAlignVertical.top,
+              textInputAction: TextInputAction.done,
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 hintText: 'Rapor ile ilgili açıklamayı buraya yazın...',
