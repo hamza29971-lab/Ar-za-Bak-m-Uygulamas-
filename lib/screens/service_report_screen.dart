@@ -92,7 +92,11 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   Future<void> _pickImages() async {
     try {
-      final List<XFile> picked = await _picker.pickMultiImage();
+      final List<XFile> picked = await _picker.pickMultiImage(
+        imageQuality: 50,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
       if (picked.isEmpty) return;
       setState(() => _images.addAll(picked));
     } on Object catch (e) {
@@ -110,7 +114,12 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   Future<void> _takePhoto() async {
     try {
-      final XFile? shot = await _picker.pickImage(source: ImageSource.camera);
+      final XFile? shot = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 50,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
       if (shot == null) return;
       setState(() => _images.add(shot));
     } on Object catch (e) {
