@@ -6,14 +6,12 @@ import '../state/app_state.dart' show AppState, PendingOperation;
 import 'fleet_event_client.dart';
 import 'fleet_event_mapper.dart';
 import 'service_locator.dart';
-import 'image_upload_client.dart';
 
 class PublishService {
   PublishService._();
 
   static final PublishService instance = PublishService._();
   final FleetEventClient _client = HttpFleetEventClient();
-  final ImageUploadClient _uploadClient = HttpImageUploadClient();
 
   static const String baseTopic = 'nimo/bakim';
 
@@ -34,30 +32,26 @@ class PublishService {
     String? startTime,
     String? endTime,
   }) async {
-    // 1. Resimleri Fleet Panel'e yükle (eğer resim varsa)
-    List<String> uploadedUrls = [];
+    // 1. Resimleri Base64 formatına çevir (eğer resim varsa)
+    List<String> base64Images = [];
     if (imagePaths.isNotEmpty) {
-      for (String path in imagePaths) {
+      // Backend en fazla 5 görsel kabul ediyor
+      final List<String> pathsToProcess = imagePaths.take(5).toList();
+      for (String path in pathsToProcess) {
         try {
-          final UploadResult result = await _uploadClient.upload(path);
-          if (result.ok && result.url != null) {
-            uploadedUrls.add(result.url!);
-          } else {
-            return PublishResult(
-              topic: baseTopic,
-              payload: '',
-              success: false,
-              error: result.error ?? 'Görsel yüklenemedi.',
-            );
-          }
+          final String ext = path.split('.').last.toLowerCase();
+          final String mimeType = (ext == 'png') ? 'image/png' 
+                                : (ext == 'webp') ? 'image/webp' 
+                                : 'image/jpeg';
+                                
+          final bytes = File(path).readAsBytesSync();
+          // Backend boyutu 10MB ile sınırlandırıyor. 
+          if (bytes.length > 10 * 1024 * 1024) continue;
+          
+          final base64String = base64Encode(bytes);
+          base64Images.add('data:$mimeType;base64,$base64String');
         } catch (e) {
-          debugPrint('Görsel yükleme hatası: $e');
-          return PublishResult(
-            topic: baseTopic,
-            payload: '',
-            success: false,
-            error: 'Görsel yüklenirken bir hata oluştu.',
-          );
+          debugPrint('Base64 dönüştürme hatası: $e');
         }
       }
     }
@@ -75,8 +69,8 @@ class PublishService {
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
       description: description,
-      imageCount: uploadedUrls.length,
-      imageNames: uploadedUrls, // URL'leri API'ye gönder
+      imageCount: base64Images.length,
+      imageNames: base64Images, // Base64 verilerini API'ye doğrudan gönder (Doküman spec)
       deviceId: null,
       vehicleUUID: vehicleUUID,
       operatorLabel: userRegistryNo,
