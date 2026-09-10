@@ -169,14 +169,84 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   // ------------------------------------------------------------------ gönder
 
+  void _showValidationPopup(List<String> errors) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: <Widget>[
+              Icon(Icons.warning_amber_rounded, color: AppColors.fault, size: 28),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Eksik veya Hatalı Alanlar', style: TextStyle(fontSize: 18))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const Text('Lütfen formu göndermeden önce aşağıdaki hataları düzeltin:', style: TextStyle(fontSize: 14)),
+              const SizedBox(height: 16),
+              ...errors.map((String e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Expanded(child: Text(e, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+                      ],
+                    ),
+                  )),
+            ],
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Tamam, Düzelteceğim'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _send() async {
     final AppState state = AppScope.read(context);
     final Vehicle? vehicle = state.selectedVehicle;
 
-    if (_images.isEmpty && _description.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('En az bir görsel ekleyin veya açıklama yazın.')),
-      );
+    final List<String> errors = [];
+
+    if (vehicle == null) {
+      errors.add('Araç seçimi yapmadınız.');
+    }
+
+    if (widget.showServiceHours) {
+      if (_startTime == null) {
+        errors.add('Başlangıç saatini girmediniz.');
+      }
+      if (_endTime == null) {
+        errors.add('Bitiş saatini girmediniz.');
+      }
+      
+      if (_startTime != null && _endTime != null) {
+        final int startMin = _startTime!.hour * 60 + _startTime!.minute;
+        final int endMin = _endTime!.hour * 60 + _endTime!.minute;
+        if (startMin >= endMin) {
+          errors.add('Başlangıç saati, bitiş saatinden önce olmalıdır.');
+        }
+      }
+    }
+
+    if (_images.isEmpty) {
+      errors.add('Hiç fotoğraf eklemediniz (En az 1 fotoğraf zorunludur).');
+    }
+
+    if (_description.text.trim().isEmpty) {
+      errors.add('Açıklama alanını boş bıraktınız.');
+    }
+
+    if (errors.isNotEmpty) {
+      _showValidationPopup(errors);
       return;
     }
 
