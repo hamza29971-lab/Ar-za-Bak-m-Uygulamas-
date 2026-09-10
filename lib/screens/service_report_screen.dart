@@ -172,6 +172,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         title: isStart ? 'Başlangıç saatini seçin' : 'Bitiş saatini seçin',
         initial: isStart ? _startTime : _endTime,
         accent: accent,
+        minTime: isStart ? null : _startTime,
       ),
     );
     if (picked == null) return;
@@ -180,6 +181,14 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     setState(() {
       if (isStart) {
         _startTime = picked;
+        // Eğer başlangıç saati değiştiyse ve mevcut bitiş saati başlangıçtan önce kaldıysa sıfırla
+        if (_endTime != null) {
+          final int startMins = _startTime!.hour * 60 + _startTime!.minute;
+          final int endMins = _endTime!.hour * 60 + _endTime!.minute;
+          if (startMins >= endMins) {
+            _endTime = null;
+          }
+        }
       } else {
         _endTime = picked;
       }
@@ -434,6 +443,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   /// Servisin başlangıç ve bitiş saati alanları.
   Widget _buildServiceHours(BuildContext context) {
+    final bool canPickEnd = _startTime != null;
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -448,7 +458,17 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           context,
           label: 'Bitiş Saati',
           value: _endTime,
-          onTap: () => _pickTime(isStart: false),
+          isDisabled: !canPickEnd,
+          onTap: canPickEnd
+              ? () => _pickTime(isStart: false)
+              : () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Lütfen önce başlangıç saatini seçin.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
         ),
       ],
     );
@@ -460,49 +480,65 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     required String label,
     required TimeOfDay? value,
     required VoidCallback onTap,
+    bool isDisabled = false,
   }) {
     final bool isSet = value != null;
     return SizedBox(
       width: 200,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            // Metin alanlarıyla aynı dolgu; koyu temada zeminden ayrışır.
-            color: context.isDark ? context.cardColor : context.pageColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isSet ? accent : context.moduleBorderColor(accent), width: 2.5),
-          ),
-          child: Row(
-            children: <Widget>[
-              Icon(Icons.schedule_outlined,
-                  size: 20, color: isSet ? accent : context.mutedColor),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(label,
+      child: Opacity(
+        opacity: isDisabled ? 0.45 : 1.0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: isDisabled ? null : onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              // Metin alanlarıyla aynı dolgu; koyu temada zeminden ayrışır.
+              color: context.isDark ? context.cardColor : context.pageColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: isSet ? accent : context.moduleBorderColor(accent),
+                  width: 2.5),
+            ),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.schedule_outlined,
+                    size: 20, color: isSet ? accent : context.mutedColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(label,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: context.isDark
+                                  ? Colors.white
+                                  : context.mutedColor)),
+                      const SizedBox(height: 2),
+                      Text(
+                        isSet
+                            ? _formatTime(value)
+                            : (isDisabled ? 'Önce başl. seçin' : 'Saat seçin'),
                         style: TextStyle(
-                            fontSize: 11, color: context.isDark ? Colors.white : context.mutedColor)),
-                    const SizedBox(height: 2),
-                    Text(
-                      isSet ? _formatTime(value) : 'Saat seçin',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: context.isDark ? Colors.white : (isSet ? null : context.mutedColor),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: context.isDark
+                              ? Colors.white
+                              : (isSet ? null : context.mutedColor),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.keyboard_arrow_down,
-                  size: 20, color: context.mutedColor),
-            ],
+                Icon(
+                  isDisabled ? Icons.lock_outline : Icons.keyboard_arrow_down,
+                  size: 20,
+                  color: context.mutedColor,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -661,6 +697,48 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     );
   }
 
+  void _showFullScreenImage(BuildContext context, XFile file) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (BuildContext ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(),
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: kIsWeb
+                        ? Image.network(file.path, fit: BoxFit.contain)
+                        : Image.file(File(file.path), fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: CircleAvatar(
+                  backgroundColor: Colors.black.withValues(alpha: 0.65),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 22),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildThumb(BuildContext context, int index) {
     final XFile file = _images[index];
     return ClipRRect(
@@ -668,17 +746,19 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          if (kIsWeb)
-            Image.network(file.path, fit: BoxFit.cover)
-          else
-            Image.file(File(file.path), fit: BoxFit.cover,
-                errorBuilder: (BuildContext c, Object e, StackTrace? s) {
-              return Container(
-                color: context.cardColor,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image_outlined),
-              );
-            }),
+          GestureDetector(
+            onTap: () => _showFullScreenImage(context, file),
+            child: kIsWeb
+                ? Image.network(file.path, fit: BoxFit.cover)
+                : Image.file(File(file.path), fit: BoxFit.cover,
+                    errorBuilder: (BuildContext c, Object e, StackTrace? s) {
+                    return Container(
+                      color: context.cardColor,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
+                    );
+                  }),
+          ),
           Positioned(
             right: 6,
             top: 6,
@@ -698,14 +778,16 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.45),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Text(
-                file.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 11),
+            child: IgnorePointer(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.45),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text(
+                  file.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                ),
               ),
             ),
           ),
@@ -777,6 +859,7 @@ class _TimeListPicker extends StatefulWidget {
     required this.title,
     required this.initial,
     required this.accent,
+    this.minTime,
   });
 
   final String title;
@@ -785,6 +868,9 @@ class _TimeListPicker extends StatefulWidget {
   final TimeOfDay? initial;
 
   final Color accent;
+
+  /// Eğer verilirse, bu saat/dakikadan önceki değerler buğulu/devre dışı bırakılır.
+  final TimeOfDay? minTime;
 
   @override
   State<_TimeListPicker> createState() => _TimeListPickerState();
@@ -836,7 +922,22 @@ class _TimeListPickerState extends State<_TimeListPicker> {
               count: 24,
               selected: _hour,
               controller: _hourScroll,
-              onSelected: (int v) => setState(() => _hour = v),
+              isItemDisabled: (int h) {
+                if (widget.minTime == null) return false;
+                return h < widget.minTime!.hour;
+              },
+              onSelected: (int v) {
+                setState(() {
+                  _hour = v;
+                  // Eğer seçilen saat minTime saatiyse ve mevcut dakika minTime dakikasından küçük/eşitse dakikayı sıfırla
+                  if (widget.minTime != null &&
+                      _hour == widget.minTime!.hour &&
+                      _minute != null &&
+                      _minute! <= widget.minTime!.minute) {
+                    _minute = null;
+                  }
+                });
+              },
             ),
             const SizedBox(width: 16),
             _buildColumn(
@@ -845,6 +946,15 @@ class _TimeListPickerState extends State<_TimeListPicker> {
               count: 60,
               selected: _minute,
               controller: _minuteScroll,
+              isItemDisabled: (int m) {
+                if (widget.minTime == null) return false;
+                if (_hour == null) return true;
+                if (_hour! < widget.minTime!.hour) return true;
+                if (_hour! == widget.minTime!.hour) {
+                  return m <= widget.minTime!.minute;
+                }
+                return false;
+              },
               onSelected: (int v) => setState(() => _minute = v),
             ),
           ],
@@ -856,7 +966,7 @@ class _TimeListPickerState extends State<_TimeListPicker> {
           child: const Text('Vazgeç'),
         ),
         TextButton(
-          // İkisi de seçilmeden saat oluşturulamaz.
+          // İkisi de seçilmeden ve geçerli olmadan saat oluşturulamaz.
           onPressed: complete
               ? () => Navigator.of(context)
                   .pop(TimeOfDay(hour: _hour!, minute: _minute!))
@@ -874,6 +984,7 @@ class _TimeListPickerState extends State<_TimeListPicker> {
     required int? selected,
     required ScrollController controller,
     required ValueChanged<int> onSelected,
+    bool Function(int item)? isItemDisabled,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -886,7 +997,8 @@ class _TimeListPickerState extends State<_TimeListPicker> {
           height: _listHeight,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: context.moduleBorderColor(widget.accent), width: 2.5),
+            border: Border.all(
+                color: context.moduleBorderColor(widget.accent), width: 2.5),
           ),
           clipBehavior: Clip.antiAlias,
           child: Scrollbar(
@@ -899,6 +1011,25 @@ class _TimeListPickerState extends State<_TimeListPicker> {
               itemCount: count,
               itemBuilder: (BuildContext context, int i) {
                 final bool isSelected = i == selected;
+                final bool isDisabled = isItemDisabled?.call(i) ?? false;
+
+                if (isDisabled) {
+                  return Container(
+                    alignment: Alignment.center,
+                    color: context.isDark
+                        ? Colors.black.withValues(alpha: 0.3)
+                        : Colors.grey.shade100,
+                    child: Text(
+                      i.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                        color: context.mutedColor.withValues(alpha: 0.3),
+                      ),
+                    ),
+                  );
+                }
+
                 return InkWell(
                   onTap: () => onSelected(i),
                   child: Container(
