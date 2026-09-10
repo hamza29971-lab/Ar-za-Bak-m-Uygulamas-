@@ -15,6 +15,12 @@ class PublishService {
 
   static const String baseTopic = 'nimo/bakim';
 
+  /// Araç sunucudaki listeyle eşleşmediğinde kayıt hiç gönderilmez; aksi
+  /// halde panelde hangi araca ait olduğu belli olmayan bir satır oluşurdu.
+  static String _missingUuidError(String? vehicleCode) =>
+      '${vehicleCode ?? 'Araç'} sunucudaki araç listesinde bulunamadı. '
+      'Kayıt gönderilmedi; yöneticinize bildirin.';
+
   Future<PublishResult> publishReport({
     required AppState state,
     required String reportType,
@@ -40,13 +46,23 @@ class PublishService {
       }
     }
 
+    final String? vehicleUUID = state.vehicleUuidFor(vehicleCode);
+    if (vehicleUUID == null) {
+      return PublishResult(
+        topic: baseTopic,
+        payload: '',
+        success: false,
+        error: _missingUuidError(vehicleCode),
+      );
+    }
+
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
       description: description,
       imageCount: base64Images.length,
       imageNames: base64Images, // Base64 verilerini API'ye gönder
       deviceId: null,
-      vehicleUUID: state.vehicleUuidFor(vehicleCode),
+      vehicleUUID: vehicleUUID,
       operatorLabel: userRegistryNo,
       occurredAt: DateTime.now(),
       startTime: startTime,
@@ -78,6 +94,19 @@ class PublishService {
     required List<PendingOperation> pending,
     UserProfile? user,
   }) async {
+    // Kuyrukta UUID'si çözülemeyen bir araç varsa hiçbir şey gönderilmez:
+    // yarısı gitmiş bir kuyruğu kullanıcının elle ayıklaması gerekirdi.
+    for (final PendingOperation operation in pending) {
+      if (state.vehicleUuidFor(operation.vehicleCode) == null) {
+        return PublishResult(
+          topic: topic,
+          payload: '',
+          success: false,
+          error: _missingUuidError(operation.vehicleCode),
+        );
+      }
+    }
+
     int sent = 0;
     for (final PendingOperation operation in pending) {
       final FleetEvent event = FleetEventMapper.fromPending(

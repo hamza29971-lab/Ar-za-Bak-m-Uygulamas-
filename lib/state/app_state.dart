@@ -162,18 +162,52 @@ class AppState extends ChangeNotifier {
   /// yüklenmemişse ya da eşleşme bulunamazsa `null` döner.
   String? vehicleUuidFor(String? vehicleCode) {
     if (vehicleCode == null || vehicleCode.trim().isEmpty) return null;
-    return _vehicleUuidByCode[_normalizeVehicleKey(vehicleCode)];
+    final String? key = _canonicalKey(vehicleCode);
+    return key == null ? null : _vehicleUuidByCode[key];
   }
 
-  static String _normalizeVehicleKey(String value) =>
-      value.trim().toUpperCase().replaceAll(RegExp(r'[\s\-_]+'), '');
+  /// Sunucudaki isimlendirme yerel kodlardan tamamen farklı:
+  /// `05-01-IM-KK-EUCLID.02` ↔ `Euclid-2`, `05-01-IM-KK-HTC.EUC.09` ↔
+  /// `Euclid-9`, `05-01-IM-KK-XCMG.E.13E` ↔ `XCMG-13`. Ortak nokta marka ve
+  /// sıra numarası olduğu için iki taraf da `MARKA#NUMARA` biçimine indirgenip
+  /// öyle eşleştirilir. Marka bilinmiyorsa (KOMT, SY, HITC, ARK ...) eşleşme
+  /// denenmez; yalnızca numarası tutan yabancı bir araca bağlanmak,
+  /// eşleşmemekten daha kötüdür.
+  static const Map<String, String> _brandAliases = <String, String>{
+    'EUCLID': 'EUCLID',
+    'EUC': 'EUCLID',
+    'XCMG': 'XCMG',
+    'LIUGONG': 'LIUGONG',
+    'LIUG': 'LIUGONG',
+  };
+
+  static String? _canonicalKey(String label) {
+    final List<String> tokens = label
+        .toUpperCase()
+        .split(RegExp(r'[^A-Z0-9]+'))
+        .where((String t) => t.isNotEmpty)
+        .toList();
+    if (tokens.isEmpty) return null;
+
+    String? brand;
+    for (final String token in tokens) {
+      final String? mapped = _brandAliases[token];
+      if (mapped != null) brand = mapped;
+    }
+    if (brand == null) return null;
+
+    // Sondaki numara: `02` → 2, `13E` → 13.
+    final String digits = tokens.last.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+    return '$brand#${int.parse(digits)}';
+  }
 
   /// Testler için: dizini ağdan çekmeden UUID önbelleğini doldurur.
   @visibleForTesting
-  void seedVehicleDirectory(Map<String, String> uuidByCode) {
+  void seedVehicleDirectory(Map<String, String> uuidByLabel) {
     _vehicleUuidByCode = <String, String>{
-      for (final MapEntry<String, String> e in uuidByCode.entries)
-        _normalizeVehicleKey(e.key): e.value,
+      for (final MapEntry<String, String> e in uuidByLabel.entries)
+        if (_canonicalKey(e.key) case final String key) key: e.value,
     };
   }
 
@@ -185,17 +219,20 @@ class AppState extends ChangeNotifier {
         await _vehicleDirectoryService.fetchAll(accessToken: accessToken);
     if (entries.isEmpty) return;
 
-    final Map<String, String> byCode = <String, String>{};
+    final Map<String, String> byKey = <String, String>{};
     for (final VehicleDirectoryEntry entry in entries) {
-      byCode[_normalizeVehicleKey(entry.label)] = entry.id;
+      final String? key = _canonicalKey(entry.label);
+      if (key != null) byKey[key] = entry.id;
     }
-    _vehicleUuidByCode = byCode;
+    _vehicleUuidByCode = byKey;
 
     for (final Vehicle vehicle in _vehicles) {
-      if (!byCode.containsKey(_normalizeVehicleKey(vehicle.code))) {
+      final String? key = _canonicalKey(vehicle.code);
+      if (key == null || !byKey.containsKey(key)) {
         debugPrint('[FleetUUID] eşleşmedi: ${vehicle.code}');
       }
     }
+    debugPrint('[FleetUUID] ${byKey.length} araç eşleştirildi');
   }
 
   // -------------------------------------------------------------- işlemler

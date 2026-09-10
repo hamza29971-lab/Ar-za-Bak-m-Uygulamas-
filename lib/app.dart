@@ -66,8 +66,11 @@ class _NimoAppState extends State<NimoApp> {
     }
   }
 
+<<<<<<< Updated upstream
   // Tek navigatorKey: OTA güncelleme diyaloğu ve Kiosk kapısı için ortaklaşa kullanılır.
 
+=======
+>>>>>>> Stashed changes
   @override
   void dispose() {
     _updateTimer?.cancel();

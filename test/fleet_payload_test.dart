@@ -29,6 +29,28 @@ void main() {
   Map<String, Object?> fieldsOf(Map<String, Object?> json) =>
       json['fields']! as Map<String, Object?>;
 
+  test('sunucudaki isimlendirme yerel arac koduyla eslesir', () {
+    final AppState state = AppState();
+    // mining-be'nin search-auto-complete cevabindan birebir alinmis adlar.
+    state.seedVehicleDirectory(<String, String>{
+      '05-01-IM-KK-EUCLID.02': 'uuid-euclid-2',
+      '05-01-IM-KK-HTC.EUC.09': 'uuid-euclid-9',
+      '05-01-IM-KK-XCMG.E.13E': 'uuid-xcmg-13',
+      '05-03-IM-LM-LIUG.EL.33': 'uuid-liugong-33',
+      '05-05-IM-PM-KOMT.550.9': 'uuid-komatsu-9',
+    });
+
+    expect(state.vehicleUuidFor('Euclid-2'), 'uuid-euclid-2');
+    expect(state.vehicleUuidFor('Euclid-9'), 'uuid-euclid-9');
+    expect(state.vehicleUuidFor('XCMG-13'), 'uuid-xcmg-13');
+    expect(state.vehicleUuidFor('Liugong-33'), 'uuid-liugong-33');
+
+    // Sunucuda karsiligi olmayan araclar eslesmez.
+    expect(state.vehicleUuidFor('Euclid-12'), isNull);
+    // Yalnizca numarasi tutan yabanci bir marka (KOMT.550.9) baglanmaz.
+    expect(state.vehicleUuidFor('Euclid-9') == 'uuid-komatsu-9', isFalse);
+  });
+
   test('her yag olayi secili aracin UUIDsini tasir', () {
     final AppState state = AppState();
     final Vehicle vehicle = state.vehicles.first;

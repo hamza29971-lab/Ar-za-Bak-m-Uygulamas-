@@ -590,6 +590,11 @@ class _PhoneInputState extends State<_PhoneInput> {
           readOnly: true,
           showCursor: true,
           onTap: () => _focus.requestFocus(),
+          // Masaustu platformlarda TextField varsayilan olarak alanin
+          // DISINA her tiklamada odagi birakir. Sayi paneli alanin
+          // disinda ayri bir widget oldugu icin bu varsayilan, panele
+          // her dokunuldugunda odagi (ve paneli) aninda kapatiyordu.
+          onTapOutside: (PointerDownEvent event) {},
           decoration: InputDecoration(
             hintText: '(05XX) XXX XX XX',
             hintStyle: TextStyle(color: context.authHint),
