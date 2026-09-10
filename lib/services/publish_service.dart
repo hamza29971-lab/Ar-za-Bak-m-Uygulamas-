@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../state/app_state.dart' show AppState, PendingOperation;
 import 'fleet_event_client.dart';
 import 'fleet_event_mapper.dart';
+import 'service_locator.dart';
 
 class PublishService {
   PublishService._();
@@ -52,7 +53,10 @@ class PublishService {
       endTime: endTime,
     );
 
-    final FleetResult result = await _client.send(event);
+    // 2. Access token'ı güvenli deposundan oku
+    final String? accessToken = await ServiceLocator.tokens.readAccessToken();
+
+    final FleetResult result = await _client.send(event, accessToken: accessToken);
     return PublishResult(
       topic: baseTopic,
       payload: event.toJson().toString(),
@@ -82,7 +86,8 @@ class PublishService {
         user: user,
         vehicleUUID: state.vehicleUuidFor(operation.vehicleCode),
       );
-      final FleetResult result = await _client.send(event);
+      final String? accessToken = await ServiceLocator.tokens.readAccessToken();
+      final FleetResult result = await _client.send(event, accessToken: accessToken);
       if (!result.ok) {
         return PublishResult(
           topic: topic,

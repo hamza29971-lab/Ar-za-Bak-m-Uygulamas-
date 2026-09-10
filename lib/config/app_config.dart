@@ -30,7 +30,7 @@ class AppConfig {
   /// Nimo Fleet API adresi.
   static const String fleetEventUrl = String.fromEnvironment(
     'NIMO_FLEET_URL',
-    defaultValue: 'https://nimo-fleet-panel.vercel.app/api/event',
+    defaultValue: 'https://mining-be.ndmo.com.tr/vehicle-events/',
   );
 
   /// Görsellerin yüklendiği uç nokta. Rapor gönderimi iki aşamalıdır:

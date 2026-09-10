@@ -66,9 +66,7 @@ class _NimoAppState extends State<NimoApp> {
     }
   }
 
-  /// Kiosk parola penceresi bu anahtar uzerinden acilir; [MaterialApp.builder]
-  /// icindeki context Navigator'un ustunde kalir.
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  // Tek navigatorKey: OTA güncelleme diyaloğu ve Kiosk kapısı için ortaklaşa kullanılır.
 
   @override
   void dispose() {
@@ -92,11 +90,10 @@ class _NimoAppState extends State<NimoApp> {
               navigatorKey: NimoApp.navigatorKey,
               title: 'NIMO Bakım',
               debugShowCheckedModeBanner: false,
-              navigatorKey: _navigatorKey,
               // Kiosk modunda uygulamadan yalnizca parola ile cikilabilir.
               // Kapi tum sayfalarin uzerinde durur.
               builder: (BuildContext context, Widget? child) => KioskExitGate(
-                navigatorKey: _navigatorKey,
+                navigatorKey: NimoApp.navigatorKey,
                 child: child ?? const SizedBox.shrink(),
               ),
               theme: AppTheme.light(),

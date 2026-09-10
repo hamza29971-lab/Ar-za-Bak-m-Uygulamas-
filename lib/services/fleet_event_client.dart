@@ -125,7 +125,7 @@ class FleetResult {
 /// Fleet Panel istemcisi. Ekranlar yalnızca bu arayüzü tanır; testlerde
 /// [MockFleetEventClient] yerleştirilir.
 abstract interface class FleetEventClient {
-  Future<FleetResult> send(FleetEvent event);
+  Future<FleetResult> send(FleetEvent event, {String? accessToken});
 
   /// Bağlantı sınaması; anahtar gerektirmez.
   Future<bool> health();
@@ -138,7 +138,7 @@ class HttpFleetEventClient implements FleetEventClient {
   final http.Client _client;
 
   @override
-  Future<FleetResult> send(FleetEvent event) async {
+  Future<FleetResult> send(FleetEvent event, {String? accessToken}) async {
     final String payload = jsonEncode(event.toJson());
     debugPrint('[Fleet] gönderim: $payload');
     try {
@@ -147,16 +147,24 @@ class HttpFleetEventClient implements FleetEventClient {
             Uri.parse(AppConfig.fleetEventUrl),
             headers: <String, String>{
               'Content-Type': 'application/json',
-              'X-Fleet-Key': AppConfig.fleetApiKey,
+              if (accessToken != null && accessToken.isNotEmpty)
+                'Authorization': 'Bearer $accessToken',
             },
             body: payload,
           )
           .timeout(AppConfig.requestTimeout);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final Object? body = jsonDecode(utf8.decode(response.bodyBytes));
-        final String? id =
-            body is Map<String, Object?> ? body['id'] as String? : null;
+        // Yeni API: data.uuid; eski Fleet API: id
+        String? id;
+        if (body is Map<String, Object?>) {
+          final Object? data = body['data'];
+          if (data is Map<String, Object?>) {
+            id = data['uuid'] as String?;
+          }
+          id ??= body['id'] as String?;
+        }
         debugPrint('[Fleet] gönderim başarılı, kayıt id: $id');
         return FleetResult.success(id);
       }
@@ -206,7 +214,7 @@ class MockFleetEventClient implements FleetEventClient {
   int _counter = 0;
 
   @override
-  Future<FleetResult> send(FleetEvent event) async {
+  Future<FleetResult> send(FleetEvent event, {String? accessToken}) async {
     sent.add(event);
     if (failWith != null) return FleetResult.failure(failWith);
     debugPrint('[Fleet] ${jsonEncode(event.toJson())}');
