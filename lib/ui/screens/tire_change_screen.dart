@@ -1140,6 +1140,7 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
             'op': 'kontrol',
             'tireId': 'Lastik #${widget.record.tireNumber}',
             'position': _getTireName(vehicle.id, widget.record.tireNumber),
+            'serialNo': widget.record.serialNumber,
             // İki kontrol türü ayrı ayrı gönderilir; işaretlenmeyen de
             // `false` olarak gider ki panelde ikisinin durumu da görünsün.
             'airCompleted': _airChecked,
