@@ -312,9 +312,8 @@ String? vehicleOwnPhoto(String code) {
 
   final int number = int.parse(match.group(2)!);
   if (match.group(1) == 'euclid') {
-    return number >= 2 && number <= 11
-        ? 'assets/images/sol/Euclid$number.png'
-        : null;
+    // Tüm Euclid araçları Euclid-1'deki temiz görseli kullansın
+    return null;
   }
   final bool hasPhoto =
       (number >= 16 && number <= 20) || (number >= 33 && number <= 39);
