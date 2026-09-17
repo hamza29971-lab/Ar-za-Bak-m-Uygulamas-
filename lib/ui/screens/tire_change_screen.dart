@@ -534,7 +534,7 @@ class _TableHeader extends StatelessWidget {
           ),
           SizedBox(width: 8),
           SizedBox(
-            width: 160,
+            width: 260,
             child: Text(
               '',
               textAlign: TextAlign.center,
@@ -727,51 +727,49 @@ class _TireRowState extends State<_TireRow>
 
           const SizedBox(width: 8),
 
-          // Değiştir / Tamam / Kontrol butonu
+          // İlk lastik kaydı / Değiştir / Tamam / Kontrol butonu
           SizedBox(
-            width: 160,
+            width: widget.record.hasInitialRecord ? 160 : 250,
             child: widget.isEditing
                 ? ElevatedButton(
                     onPressed: () {
                       FocusManager.instance.primaryFocus?.unfocus();
                       final String newSerial = _controller.text.trim();
-                      // Geçmiş kaydında "önceki seri no" gösterilebilsin diye
-                      // değişiklik uygulanmadan önce okunur.
                       final String oldSerial = widget.record.serialNumber;
+                      final bool isInitial = !widget.record.hasInitialRecord;
 
-                      // Gerçek bir değişiklik olmadan Tamam basıldıysa
-                      // (boş veya aynı seri no) sadece düzenleme modundan çık;
-                      // gereksiz yere pending kuyruğuna ekleme yapma.
-                      if (newSerial.isEmpty || newSerial == oldSerial) {
+                      if (newSerial.isEmpty || (newSerial == oldSerial && !isInitial)) {
                         provider.cancelEditing();
                         _controller.clear();
                         return;
                       }
 
-                      provider.confirmChange(widget.record.tireNumber, newSerial);
+                      provider.confirmChange(widget.record.tireNumber, newSerial, isInitial: isInitial);
                       final state = AppScope.read(context);
                       final vehicle = provider.selectedVehicle;
                       if (vehicle != null) {
                         final DateTime now = DateTime.now();
-                        // İşlem iptal edilirse geçmiş satırı da silinsin diye
-                        // kuyruk kaydı ile aynı kimlik kullanılır.
+                        final String opCode = isInitial ? 'ilk_kayit' : 'degisim';
+                        final String opTitle = isInitial ? 'İlk Lastik Kaydı' : 'Lastik Değişimi';
+                        final String opLabel = isInitial
+                            ? 'Lastik #${widget.record.tireNumber} ilk kaydı yapıldı ($newSerial)'
+                            : 'Lastik #${widget.record.tireNumber} değiştirildi ($newSerial)';
+
                         final String activityId =
                             'tire-change-${now.microsecondsSinceEpoch}';
                         state.addPending(PendingOperation(
                           kind: PendingKind.tire,
                           vehicleCode: vehicle.name,
-                          label: 'Lastik #${widget.record.tireNumber} değiştirildi ($newSerial)',
+                          label: opLabel,
                           date: now,
                           activityId: activityId,
                           payload: <String, Object?>{
-                            'op': 'degisim',
+                            'op': opCode,
                             'tireId': 'Lastik #${widget.record.tireNumber}',
-                            // Tabloda gösterilen konum adının aynısı
-                            // ("Ön sağ", "Arka sol dış" ...).
                             'position': _getTireName(
                                 vehicle.id, widget.record.tireNumber),
                             'serialNo': newSerial,
-                            'previousSerialNo': oldSerial,
+                            if (!isInitial) 'previousSerialNo': oldSerial,
                           },
                         ));
                         state.addActivity(
@@ -779,24 +777,23 @@ class _TireRowState extends State<_TireRow>
                             id: activityId,
                             vehicleCode: vehicle.name,
                             date: now,
-                            reportType: 'Lastik Değişimi',
-                            description: 'Lastik #${widget.record.tireNumber} değiştirildi ($newSerial)',
+                            reportType: opTitle,
+                            description: opLabel,
                             imagePaths: [],
                           ),
                         );
                         state.addNotification(
                           global_models.NotificationItem(
-                            title: 'Lastik değişimi kaydedildi',
-                            message: '${vehicle.name} aracı Lastik #${widget.record.tireNumber} yeni seri numarası ile değiştirildi.',
+                            title: '$opTitle kaydedildi',
+                            message: '${vehicle.name} aracı Lastik #${widget.record.tireNumber} seri numarası $newSerial olarak kaydedildi.',
                             date: DateTime.now(),
                             kind: global_models.NotificationKind.tire,
                             vehicleCode: vehicle.name,
                             details: <String, String>{
-                              'İşlem': 'Lastik değişimi',
+                              'İşlem': opTitle,
                               'Lastik': 'Lastik #${widget.record.tireNumber}',
-                              'Önceki seri numarası': oldSerial,
-                              'Yeni seri numarası': newSerial,
-                              'Değişim tarihi': formatDateTime(DateTime.now()),
+                              'Seri numarası': newSerial,
+                              'Tarih': formatDateTime(DateTime.now()),
                             },
                           ),
                         );
@@ -824,6 +821,31 @@ class _TireRowState extends State<_TireRow>
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      if (!widget.record.hasInitialRecord) ...[
+                        OutlinedButton(
+                          onPressed: () {
+                            provider.startEditing(widget.record.tireNumber);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFD97706),
+                            side: const BorderSide(
+                                color: Color(0xFFD97706), width: 1.5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'İlk lastik kaydı',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       OutlinedButton(
                         onPressed: () {
                           provider.startEditing(widget.record.tireNumber);
