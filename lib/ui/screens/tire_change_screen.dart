@@ -869,31 +869,29 @@ class _TireRowState extends State<_TireRow>
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Expanded( // Kontrol butonuna kalan boşluğu doldurt ki taşma olmasın
-                        child: ElevatedButton(
-                          onPressed: () {
-                            FocusManager.instance.primaryFocus?.unfocus();
-                            showTireActionSheet(context, provider, widget.record, 'Lastik #${widget.record.tireNumber}');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: context.accentFill(const Color(0xFF198754)),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
+                      ElevatedButton(
+                        onPressed: () {
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          showTireActionSheet(context, provider, widget.record, 'Lastik #${widget.record.tireNumber}');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: context.accentFill(const Color(0xFF198754)),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
-                            'Kontrol',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Kontrol',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
