@@ -729,7 +729,7 @@ class _TireRowState extends State<_TireRow>
 
           // İlk lastik kaydı / Değiştir / Tamam / Kontrol butonu
           SizedBox(
-            width: widget.record.hasInitialRecord ? 160 : 250,
+            width: 260,
             child: widget.isEditing
                 ? ElevatedButton(
                     onPressed: () {
