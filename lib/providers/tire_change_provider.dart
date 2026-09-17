@@ -88,12 +88,18 @@ class TireChangeProvider extends ChangeNotifier {
               history.add(TireActionRecord.fromJson(Map<String, dynamic>.from(a)));
             }
           }
+          final String serial = item['serialNumber'] ?? '---';
+          final bool hasInitial = item['hasInitialRecord'] ?? false;
+          // Eski demo SN-904... verilerini temizle ve '---' olarak ayarla
+          final bool isOldMock = serial.startsWith('SN-904');
+          final String finalSerial = (isOldMock && !hasInitial) ? '---' : serial;
+
           return TireRecord(
             tireNumber: item['tireNumber'],
-            serialNumber: item['serialNumber'],
+            serialNumber: finalSerial,
             lastChangedDate: DateTime.parse(item['lastChangedDate']),
             actionHistory: history,
-            hasInitialRecord: item['hasInitialRecord'] ?? false,
+            hasInitialRecord: (isOldMock && !hasInitial) ? false : hasInitial,
           );
         }).toList();
       } catch (_) {
@@ -111,7 +117,7 @@ class TireChangeProvider extends ChangeNotifier {
     return List.generate(count, (i) {
       return TireRecord(
         tireNumber: i + 1,
-        serialNumber: 'SN-904${(i + 1) * 11}',
+        serialNumber: '---',
         lastChangedDate: DateTime.now(),
         actionHistory: [],
         hasInitialRecord: false,

@@ -821,7 +821,7 @@ class _TireRowState extends State<_TireRow>
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      if (!widget.record.hasInitialRecord) ...[
+                      if (!widget.record.hasInitialRecord || widget.record.serialNumber == '---') ...[
                         OutlinedButton(
                           onPressed: () {
                             provider.startEditing(widget.record.tireNumber);
