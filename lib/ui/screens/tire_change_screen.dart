@@ -822,19 +822,19 @@ class _TireRowState extends State<_TireRow>
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       if (!widget.record.hasInitialRecord || widget.record.serialNumber == '---') ...[
-                        ElevatedButton(
+                        OutlinedButton(
                           onPressed: () {
                             provider.startEditing(widget.record.tireNumber);
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFB000),
-                            foregroundColor: Colors.black87,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFD97706),
+                            side: const BorderSide(
+                                color: Color(0xFFD97706), width: 1.5),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 8),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            elevation: 0,
                           ),
                           child: const Text(
                             'İlk lastik kaydı',
