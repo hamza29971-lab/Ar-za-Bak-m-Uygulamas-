@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import 'vehicle_type_filter.dart';
 
 /// "Araç Seç" alanı.
 /// - Tıklandığında tüm araçlar aşağı doğru listelenir.
@@ -41,6 +42,9 @@ class _VehicleSelectorState extends State<VehicleSelector> {
   /// Kullanıcı arama yazmaya başladı mı? Başlamadıysa (ör. alana yeni tıklandı)
   /// seçili aracın kodu filtre olarak kullanılmaz, tüm liste gösterilir.
   bool _typing = false;
+
+  /// Seçili araç kategorisi (`Kamyon`/`Ekskavatör`/`Loder`); `null` ise tümü.
+  String? _typeFilter;
 
   @override
   void initState() {
@@ -116,9 +120,16 @@ class _VehicleSelectorState extends State<VehicleSelector> {
 
   Widget _buildOverlay(BuildContext overlayContext) {
     final AppState state = AppScope.read(context);
-    final List<Vehicle> items = state.filterVehicles(
-      _typing ? _controller.text : '',
-    );
+    // Metin araması ile kategori filtresi birlikte uygulanır.
+    final List<Vehicle> items = state
+        .filterVehicles(_typing ? _controller.text : '')
+        .where((Vehicle v) => _typeFilter == null || v.category == _typeFilter)
+        .toList();
+    // Kategori listesi filodan türetilir, sabit sırayla.
+    final List<String> categories = <String>[
+      for (final String c in vehicleCategoryOrder)
+        if (state.vehicles.any((Vehicle v) => v.category == c)) c,
+    ];
     final Color accent =
         widget.accentColor ?? Theme.of(context).colorScheme.primary;
 
@@ -166,7 +177,27 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                       ),
                     ],
                   ),
-                  child: items.isEmpty
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      VehicleTypeFilter(
+                        categories: categories,
+                        selected: _typeFilter,
+                        accent: _edge ?? accent,
+                        onChanged: (String? type) {
+                          setState(() => _typeFilter = type);
+                          _entry?.markNeedsBuild();
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        color: (_edge != null
+                                ? context.moduleBorderColor(_edge!)
+                                : context.borderColor)
+                            .withValues(alpha: 0.6),
+                      ),
+                      Flexible(
+                        child: items.isEmpty
                       ? Padding(
                           padding: const EdgeInsets.all(20),
                           child: Row(
@@ -233,7 +264,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                           ),
                                           const SizedBox(height: 3),
                                           Text(
-                                            '${v.typeLabel} • ${v.tireCount} lastik',
+                                            v.typeLabel,
                                             style: TextStyle(
                                               fontSize: 13,
                                               color: context.mutedColor,
@@ -254,6 +285,9 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                             );
                           },
                         ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

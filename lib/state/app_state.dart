@@ -170,15 +170,18 @@ class AppState extends ChangeNotifier {
   /// `05-01-IM-KK-EUCLID.02` ↔ `Euclid-2`, `05-01-IM-KK-HTC.EUC.09` ↔
   /// `Euclid-9`, `05-01-IM-KK-XCMG.E.13E` ↔ `XCMG-13`. Ortak nokta marka ve
   /// sıra numarası olduğu için iki taraf da `MARKA#NUMARA` biçimine indirgenip
-  /// öyle eşleştirilir. Marka bilinmiyorsa (KOMT, SY, HITC, ARK ...) eşleşme
-  /// denenmez; yalnızca numarası tutan yabancı bir araca bağlanmak,
-  /// eşleşmemekten daha kötüdür.
+  /// öyle eşleştirilir. Marka bilinmiyorsa eşleşme denenmez; yalnızca
+  /// numarası tutan yabancı bir araca bağlanmak, eşleşmemekten daha kötüdür.
   static const Map<String, String> _brandAliases = <String, String>{
     'EUCLID': 'EUCLID',
     'EUC': 'EUCLID',
+    // Sunucuda Euclid-11/12'nin karşılığı "ARK 11"/"ARK 12" olarak kayıtlı.
+    'ARK': 'EUCLID',
     'XCMG': 'XCMG',
     'LIUGONG': 'LIUGONG',
     'LIUG': 'LIUGONG',
+    // Sunucudaki bazı kayıtlarda harfler yer değiştirmiş yazılmış.
+    'LUIGONG': 'LIUGONG',
     'HITACHI': 'HITACHI',
     'HITC': 'HITACHI',
     'HITCEX': 'HITACHI',

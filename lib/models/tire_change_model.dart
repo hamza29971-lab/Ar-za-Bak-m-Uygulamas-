@@ -1,5 +1,8 @@
 // lib/models/tire_change_model.dart
 
+import '../data/fleet.dart';
+import 'models.dart' as fleet_models;
+
 /// Her bir kontrol aksiyonunu kendi tarihi ile birlikte tutar
 class TireActionRecord {
   final String action; // Örn: "Lastiklerin havası tamamlandı"
@@ -34,7 +37,25 @@ class VehicleModel {
     required this.topDownImagePath,
   });
 
+  /// Tip bilgisi tek kaynaktan gelsin diye global filo kataloğundan
+  /// (`lib/data/fleet.dart`) araç adıyla okunur; bu ekranın kendi listesi
+  /// ayrı olduğu için aksi halde etiketler iki ekranda farklı olurdu.
+  static final Map<String, fleet_models.Vehicle> _fleetByCode =
+      <String, fleet_models.Vehicle>{
+    for (final fleet_models.Vehicle v in Fleet.vehicles()) v.code: v,
+  };
+
+  /// Filo kataloğundaki tip kodu (`TRUCK_ELECTRIC`, `ROCK_TRUCK` ...).
+  /// Katalogda bulunamazsa boş döner.
+  String get type => _fleetByCode[name]?.type ?? '';
+
+  /// Filtre çiplerindeki geniş grup (`Kamyon`/`Ekskavatör`/`Loder`).
+  String? get category => _fleetByCode[name]?.category;
+
   String get typeLabel {
+    final String? label = _fleetByCode[name]?.typeLabel;
+    if (label != null) return label;
+    // Katalogda olmayan bir araç için eski davranış: lastik sayısından tahmin.
     if (tireCount <= 4) return 'Yükleyici';
     if (tireCount <= 6) return 'Kaya Kamyonu';
     return 'Maden Kamyonu';
@@ -75,41 +96,10 @@ class VehicleModel {
         imagePath: 'assets/images/loader.png',
         topDownImagePath: 'assets/images/loader_top_down.jpg',
       )),
-      // Paletli araçlar — lastiği yok (tireCount: 0). lib/data/fleet.dart'taki
-      // eşlenik kayıtlarla ayni isimleri tasimalilar (UUID eslestirmesi ve
-      // kuyruk kayitlari isim uzerinden gider).
-      for (final String n in ['1200', '1800', '1900', '490-1', '490-2'])
-        VehicleModel(
-          id: 'hitachi_${n.replaceAll('-', '_')}',
-          name: 'Hitachi-$n',
-          tireCount: 0,
-          imagePath: 'assets/images/yesil_excavator.png',
-          topDownImagePath: 'assets/images/yesil_excavator.png',
-        ),
-      for (int i = 68; i <= 70; i++)
-        VehicleModel(
-          id: 'sany_$i',
-          name: 'Sany-$i',
-          tireCount: 0,
-          imagePath: 'assets/images/yesil_excavator.png',
-          topDownImagePath: 'assets/images/yesil_excavator.png',
-        ),
-      for (final String n in ['6', '7', '40', '41'])
-        VehicleModel(
-          id: 'liugong_ex_$n',
-          name: 'Liugong-$n',
-          tireCount: 0,
-          imagePath: 'assets/images/yesil_excavator.png',
-          topDownImagePath: 'assets/images/yesil_excavator.png',
-        ),
-      for (final String n in ['4', '5', 'K6', 'K7', 'K8', 'K9'])
-        VehicleModel(
-          id: 'komatsu_${n.toLowerCase()}',
-          name: 'Komatsu-$n',
-          tireCount: 0,
-          imagePath: 'assets/images/yesil_excavator.png',
-          topDownImagePath: 'assets/images/yesil_excavator.png',
-        ),
+      // Paletli araçlar (Hitachi/Sany/Liugong-ekskavatör/Komatsu) burada
+      // kasıtlı olarak YOK — hiçbirinin lastiği olmadığı için Lastik
+      // Değişimi ekranının araç listesinde görünmezler. lib/data/fleet.dart'taki
+      // global filoda (Yağ Takviyesi vb. diğer ekranlar) yer alırlar.
     ];
   }
 }
