@@ -47,8 +47,49 @@ void main() {
 
     // Sunucuda karsiligi olmayan araclar eslesmez.
     expect(state.vehicleUuidFor('Euclid-12'), isNull);
-    // Yalnizca numarasi tutan yabanci bir marka (KOMT.550.9) baglanmaz.
+    // Farkli markadaki bir kayit (KOMT.550.9), numarasi ayni diye baska bir
+    // araca (Euclid-9) baglanmaz.
     expect(state.vehicleUuidFor('Euclid-9') == 'uuid-komatsu-9', isFalse);
+  });
+
+  test('paletli araclarin markalari da sunucu isimlendirmesiyle eslesir', () {
+    final AppState state = AppState();
+    state.seedVehicleDirectory(<String, String>{
+      // HITCEX1200 gibi marka+numara bitisik tokenlar.
+      '05-05-IM-PM-HITCEX1200': 'uuid-hitachi-1200',
+      '05-05-IM-PM-HITCEX1800': 'uuid-hitachi-1800',
+      // HITC.490.1 / .2: marka ayri token, son basamak tek rakam.
+      '05-05-IM-PM-HITC.490.1': 'uuid-hitachi-490-1',
+      '05-05-IM-PM-HITC.490.2': 'uuid-hitachi-490-2',
+      '05-05-IM-PM-SY.385H.68': 'uuid-sany-68',
+      '05-05-IM-PM-KOMT.550.9': 'uuid-komatsu-9',
+    });
+
+    expect(state.vehicleUuidFor('Hitachi-1200'), 'uuid-hitachi-1200');
+    expect(state.vehicleUuidFor('Hitachi-1800'), 'uuid-hitachi-1800');
+    expect(state.vehicleUuidFor('Hitachi-490-1'), 'uuid-hitachi-490-1');
+    expect(state.vehicleUuidFor('Hitachi-490-2'), 'uuid-hitachi-490-2');
+    expect(state.vehicleUuidFor('Sany-68'), 'uuid-sany-68');
+    // Yerel filoda "Komatsu-9" yok (yalnizca 4/5/K6-K9 eklendi); yine de
+    // eslestirme mekanizmasinin kendisi dogru calisiyor mu diye ayri kontrol.
+    expect(state.vehicleUuidFor('Komatsu-9'), 'uuid-komatsu-9');
+  });
+
+  test('paletli araclar lastiksiz olarak filoya eklenmis', () {
+    final AppState state = AppState();
+    const List<String> codes = <String>[
+      'Hitachi-1200', 'Hitachi-1800', 'Hitachi-1900',
+      'Hitachi-490-1', 'Hitachi-490-2',
+      'Sany-68', 'Sany-69', 'Sany-70',
+      'Liugong-6', 'Liugong-7', 'Liugong-40', 'Liugong-41',
+      'Komatsu-4', 'Komatsu-5', 'Komatsu-K6', 'Komatsu-K7', 'Komatsu-K8', 'Komatsu-K9',
+    ];
+    for (final String code in codes) {
+      final Vehicle vehicle =
+          state.vehicles.firstWhere((Vehicle v) => v.code == code);
+      expect(vehicle.tirePositions, isEmpty, reason: code);
+      expect(vehicle.tireCount, 0, reason: code);
+    }
   });
 
   test('her yag olayi secili aracin UUIDsini tasir', () {

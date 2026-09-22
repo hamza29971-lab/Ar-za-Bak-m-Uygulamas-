@@ -179,6 +179,13 @@ class AppState extends ChangeNotifier {
     'XCMG': 'XCMG',
     'LIUGONG': 'LIUGONG',
     'LIUG': 'LIUGONG',
+    'HITACHI': 'HITACHI',
+    'HITC': 'HITACHI',
+    'HITCEX': 'HITACHI',
+    'SANY': 'SANY',
+    'SY': 'SANY',
+    'KOMATSU': 'KOMATSU',
+    'KOMT': 'KOMATSU',
   };
 
   static String? _canonicalKey(String label) {
@@ -192,7 +199,20 @@ class AppState extends ChangeNotifier {
     String? brand;
     for (final String token in tokens) {
       final String? mapped = _brandAliases[token];
-      if (mapped != null) brand = mapped;
+      if (mapped != null) {
+        brand = mapped;
+        continue;
+      }
+      // Bitişik marka+numara token'ları ("HITCEX1200"): bilinen bir marka
+      // önekiyle başlayıp devamı tamamen rakamsa, yine marka sayılır.
+      for (final MapEntry<String, String> alias in _brandAliases.entries) {
+        if (token.length > alias.key.length &&
+            token.startsWith(alias.key) &&
+            RegExp(r'^[0-9]+$').hasMatch(token.substring(alias.key.length))) {
+          brand = alias.value;
+          break;
+        }
+      }
     }
     if (brand == null) return null;
 

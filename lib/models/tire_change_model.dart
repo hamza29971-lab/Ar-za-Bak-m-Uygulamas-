@@ -75,6 +75,41 @@ class VehicleModel {
         imagePath: 'assets/images/loader.png',
         topDownImagePath: 'assets/images/loader_top_down.jpg',
       )),
+      // Paletli araçlar — lastiği yok (tireCount: 0). lib/data/fleet.dart'taki
+      // eşlenik kayıtlarla ayni isimleri tasimalilar (UUID eslestirmesi ve
+      // kuyruk kayitlari isim uzerinden gider).
+      for (final String n in ['1200', '1800', '1900', '490-1', '490-2'])
+        VehicleModel(
+          id: 'hitachi_${n.replaceAll('-', '_')}',
+          name: 'Hitachi-$n',
+          tireCount: 0,
+          imagePath: 'assets/images/yesil_excavator.png',
+          topDownImagePath: 'assets/images/yesil_excavator.png',
+        ),
+      for (int i = 68; i <= 70; i++)
+        VehicleModel(
+          id: 'sany_$i',
+          name: 'Sany-$i',
+          tireCount: 0,
+          imagePath: 'assets/images/yesil_excavator.png',
+          topDownImagePath: 'assets/images/yesil_excavator.png',
+        ),
+      for (final String n in ['6', '7', '40', '41'])
+        VehicleModel(
+          id: 'liugong_ex_$n',
+          name: 'Liugong-$n',
+          tireCount: 0,
+          imagePath: 'assets/images/yesil_excavator.png',
+          topDownImagePath: 'assets/images/yesil_excavator.png',
+        ),
+      for (final String n in ['4', '5', 'K6', 'K7', 'K8', 'K9'])
+        VehicleModel(
+          id: 'komatsu_${n.toLowerCase()}',
+          name: 'Komatsu-$n',
+          tireCount: 0,
+          imagePath: 'assets/images/yesil_excavator.png',
+          topDownImagePath: 'assets/images/yesil_excavator.png',
+        ),
     ];
   }
 }

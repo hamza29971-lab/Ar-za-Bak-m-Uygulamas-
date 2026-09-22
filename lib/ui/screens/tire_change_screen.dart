@@ -115,13 +115,19 @@ class _LeftPanel extends StatelessWidget {
                   Divider(height: 1, thickness: 1, color: context.borderColor),
                   // Tablo satırları
                   Expanded(
-                    child: provider.selectedVehicle == null || provider.tireRecords.isEmpty
+                    child: provider.selectedVehicle == null
                         ? const EmptyState(
                             icon: Icons.tire_repair_outlined,
                             title: 'Araç seçilmedi',
                             message: 'Lastik kayıtlarını görmek için yukarıdaki "Araç Seç" alanından bir araç seçin.',
                           )
-                        : ListView.separated(
+                        : provider.tireRecords.isEmpty
+                            ? EmptyState(
+                                icon: Icons.tire_repair_outlined,
+                                title: 'Bu araçta lastik kaydı yok',
+                                message: '${provider.selectedVehicle!.name} paletli bir araç; lastik değişimi/kontrolü bu ekranda yapılmaz.',
+                              )
+                            : ListView.separated(
                             padding: EdgeInsets.zero,
                             itemCount: provider.tireRecords.length,
                             separatorBuilder: (context, index) => Divider(

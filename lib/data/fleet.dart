@@ -146,6 +146,18 @@ class Fleet {
             type: 'LOADER',
             positions: tires4,
           ),
+
+        // Paletli araçlar (ekskavatör vb.) — lastiği yok. Lastik Değişimi
+        // ekranında seçilebilirler ama lastik listesi hiç çıkmaz (bkz.
+        // lib/models/tire_change_model.dart'taki eşlenik kayıtlar).
+        for (final String n in <String>['1200', '1800', '1900', '490-1', '490-2'])
+          _vehicle(code: 'Hitachi-$n', type: 'EXCAVATOR', positions: <String>[]),
+        for (int i = 68; i <= 70; i++)
+          _vehicle(code: 'Sany-$i', type: 'EXCAVATOR', positions: <String>[]),
+        for (final String n in <String>['6', '7', '40', '41'])
+          _vehicle(code: 'Liugong-$n', type: 'EXCAVATOR', positions: <String>[]),
+        for (final String n in <String>['4', '5', 'K6', 'K7', 'K8', 'K9'])
+          _vehicle(code: 'Komatsu-$n', type: 'EXCAVATOR', positions: <String>[]),
       ];
 
   static Vehicle _vehicle({

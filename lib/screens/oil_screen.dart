@@ -697,7 +697,11 @@ class _VehicleDisplay extends StatelessWidget {
     String fallbackPath = 'assets/images/vehicle_default.png';
     final lower = vehicle.code.toLowerCase();
 
-    if (lower.startsWith('euclid')) {
+    if (vehicle.tirePositions.isEmpty) {
+      // Paletli araçlar (Hitachi/Sany/Komatsu/yeni Liugong ekskavatörleri):
+      // marka ne olursa olsun aynı jenerik görsel kullanılır.
+      fallbackPath = 'assets/images/yesil_excavator.png';
+    } else if (lower.startsWith('euclid')) {
       fallbackPath = 'assets/images/yesil_arac.png';
     } else if (lower.startsWith('xcmg')) {
       fallbackPath = 'assets/images/yesil_excavator.png';
