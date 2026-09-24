@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/models.dart' show vehicleCategoryOrder;
 import '../models/tire_change_model.dart';
 import '../state/app_state.dart';
 
@@ -40,11 +41,33 @@ class TireChangeProvider extends ChangeNotifier {
   String _searchQuery = '';
   String get searchQuery => _searchQuery;
 
-  // Filtrelenmiş araç listesi
+  // Seçili araç kategorisi (Kamyon/Ekskavatör/Loder); null ise tümü.
+  String? _typeFilter;
+  String? get typeFilter => _typeFilter;
+
+  void setTypeFilter(String? category) {
+    if (_typeFilter == category) return;
+    _typeFilter = category;
+    notifyListeners();
+  }
+
+  /// Listedeki araç kategorileri, sabit sırayla.
+  List<String> get vehicleCategories => <String>[
+        for (final String c in vehicleCategoryOrder)
+          if (vehicles.any((VehicleModel v) => v.category == c)) c,
+      ];
+
+  // Filtrelenmiş araç listesi: kategori filtresi ve arama birlikte uygulanır.
   List<VehicleModel> get filteredVehicles {
-    if (_searchQuery.isEmpty) return vehicles;
-    final q = _searchQuery.toLowerCase();
-    return vehicles.where((v) => v.name.toLowerCase().contains(q)).toList();
+    Iterable<VehicleModel> list = vehicles;
+    if (_typeFilter != null) {
+      list = list.where((VehicleModel v) => v.category == _typeFilter);
+    }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((v) => v.name.toLowerCase().contains(q));
+    }
+    return list.toList();
   }
 
   TireChangeProvider() {

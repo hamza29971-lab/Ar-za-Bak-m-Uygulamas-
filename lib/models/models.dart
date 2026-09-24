@@ -80,15 +80,41 @@ class Vehicle {
   int get tireCount => tirePositions.length;
 
   String get typeLabel => switch (type) {
-        'ROCK_TRUCK' => 'Kaya Kamyonu',
+        'ROCK_TRUCK' => 'K. Kamyon',
         'MINING_TRUCK' => 'Maden Kamyonu',
         'EXCAVATOR' => 'Ekskavatör',
         'LOADER' => 'Yükleyici',
         'MIXER' => 'Mikser',
         'DOZER' => 'Dozer',
+        'TRUCK_ELECTRIC' => 'E.Kamyon',
+        'LOADER_ELECTRIC' => 'Loder Elektrikli',
+        'SHOVEL' => 'Shovel',
+        'EXCAVATOR_DIESEL' => 'Ekskavatör Dizel',
+        'EXCAVATOR_ELECTRIC' => 'Ekskavatör Elektrikli',
         _ => type,
       };
+
+  /// Araç seçim listelerindeki filtre çiplerinde kullanılan geniş grup.
+  /// `type` ayrıntılı kalır (etiket ve mining-be eşleştirmesi için); bu
+  /// yalnızca filtre görünümü içindir. `Shovel` de Ekskavatör'e girer.
+  String? get category => vehicleCategoryOf(type);
 }
+
+/// [Vehicle.category] ve `VehicleModel.category` (Lastik Değişimi kataloğu)
+/// aynı gruplamayı kullansın diye ortak fonksiyon.
+String? vehicleCategoryOf(String type) => switch (type) {
+      'TRUCK_ELECTRIC' || 'ROCK_TRUCK' || 'MINING_TRUCK' => 'Kamyon',
+      'SHOVEL' ||
+      'EXCAVATOR_DIESEL' ||
+      'EXCAVATOR_ELECTRIC' ||
+      'EXCAVATOR' =>
+        'Ekskavatör',
+      'LOADER_ELECTRIC' || 'LOADER' => 'Loder',
+      _ => null,
+    };
+
+/// Filtre çiplerinin gösterileceği sabit sıra.
+const List<String> vehicleCategoryOrder = <String>['Kamyon', 'Ekskavatör', 'Loder'];
 
 /// Lastik Değişimi ekranındaki bir satır.
 class TireRecord {

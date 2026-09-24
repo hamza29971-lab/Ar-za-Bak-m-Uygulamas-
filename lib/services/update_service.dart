@@ -89,7 +89,7 @@ class UpdateService {
       int newBuildNumber, void Function(double progress) onProgress) async {
     final ts = DateTime.now().millisecondsSinceEpoch;
     final url = Uri.parse(
-        'https://raw.githubusercontent.com/$_owner/$_repo/main/nimobakim.apk?t=$ts');
+        'https://raw.githubusercontent.com/$_owner/$_repo/main/latest.apk?t=$ts');
 
     final request = http.Request('GET', url);
     request.headers.addAll({

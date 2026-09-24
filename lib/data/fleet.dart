@@ -115,37 +115,64 @@ class Fleet {
 
   /// Sahadaki tüm araçlar.
   static List<Vehicle> vehicles() => <Vehicle>[
-        // Euclid kaya kamyonları — 6 lastik
+        // Euclid — 6 lastik. 1/2 ve 9-12 "Elektrikli Kamyon", 3-8 "Kaya Kamyonu".
         for (int i = 1; i <= 12; i++)
           _vehicle(
             code: 'Euclid-$i',
-            type: 'ROCK_TRUCK',
+            type: (i >= 3 && i <= 8) ? 'ROCK_TRUCK' : 'TRUCK_ELECTRIC',
             positions: tires6,
           ),
 
-        // XCMG maden kamyonları — 10 lastik
+        // XCMG — 10 lastik, Elektrikli Kamyon.
         for (int i = 13; i <= 15; i++)
           _vehicle(
             code: 'XCMG-$i',
-            type: 'MINING_TRUCK',
+            type: 'TRUCK_ELECTRIC',
             positions: tires10,
           ),
 
-        // Liugong maden kamyonları — 10 lastik
+        // Liugong — 10 lastik, Elektrikli Kamyon.
         for (int i = 16; i <= 20; i++)
           _vehicle(
             code: 'Liugong-$i',
-            type: 'MINING_TRUCK',
+            type: 'TRUCK_ELECTRIC',
             positions: tires10,
           ),
 
-        // Liugong loderler — 4 lastik
+        // Liugong loderler — 4 lastik, Loder Elektrikli.
         for (int i = 33; i <= 39; i++)
           _vehicle(
             code: 'Liugong-$i',
-            type: 'LOADER',
+            type: 'LOADER_ELECTRIC',
             positions: tires4,
           ),
+
+        // Paletli araçlar — lastiği yok. Lastik Değişimi ekranında hiç
+        // listelenmezler (bkz. lib/models/tire_change_model.dart — bu
+        // araçlar o kataloğa eklenmez); diğer ekranlarda normal araç gibi
+        // görünürler.
+        //
+        // Hitachi: 1200/1800/1900 "Shovel", 490 serisi "Ekskavatör Dizel".
+        for (final String n in <String>['1200', '1800', '1900'])
+          _vehicle(code: 'Hitachi-$n', type: 'SHOVEL', positions: <String>[]),
+        for (final String n in <String>['490-1', '490-2'])
+          _vehicle(code: 'Hitachi-$n', type: 'EXCAVATOR_DIESEL', positions: <String>[]),
+
+        // Sany — hepsi Ekskavatör Dizel.
+        for (int i = 68; i <= 70; i++)
+          _vehicle(code: 'Sany-$i', type: 'EXCAVATOR_DIESEL', positions: <String>[]),
+
+        // Liugong paletli: 6/7 Ekskavatör Dizel, 40/41 Loder Elektrikli.
+        for (final String n in <String>['6', '7'])
+          _vehicle(code: 'Liugong-$n', type: 'EXCAVATOR_DIESEL', positions: <String>[]),
+        for (final String n in <String>['40', '41'])
+          _vehicle(code: 'Liugong-$n', type: 'LOADER_ELECTRIC', positions: <String>[]),
+
+        // Komatsu: 4/5/K6/K7 Ekskavatör Dizel, K8 Ekskavatör Elektrikli.
+        // K9 sunucuda hiç yok; filodan çıkarıldı.
+        for (final String n in <String>['4', '5', 'K6', 'K7'])
+          _vehicle(code: 'Komatsu-$n', type: 'EXCAVATOR_DIESEL', positions: <String>[]),
+        _vehicle(code: 'Komatsu-K8', type: 'EXCAVATOR_ELECTRIC', positions: <String>[]),
       ];
 
   static Vehicle _vehicle({

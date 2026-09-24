@@ -1,5 +1,8 @@
 // lib/models/tire_change_model.dart
 
+import '../data/fleet.dart';
+import 'models.dart' as fleet_models;
+
 /// Her bir kontrol aksiyonunu kendi tarihi ile birlikte tutar
 class TireActionRecord {
   final String action; // Örn: "Lastiklerin havası tamamlandı"
@@ -34,7 +37,24 @@ class VehicleModel {
     required this.topDownImagePath,
   });
 
+  /// Tip bilgisi tek kaynaktan gelsin diye global filo kataloğundan
+  /// (`lib/data/fleet.dart`) araç adıyla okunur; bu ekranın kendi listesi
+  /// ayrı olduğu için aksi halde etiketler iki ekranda farklı olurdu.
+  static final Map<String, fleet_models.Vehicle> _fleetByCode =
+      <String, fleet_models.Vehicle>{
+    for (final fleet_models.Vehicle v in Fleet.vehicles()) v.code: v,
+  };
+
+  /// Filo kataloğundaki tip kodu (`TRUCK_ELECTRIC`, `ROCK_TRUCK` ...).
+  /// Katalogda bulunamazsa boş döner.
+  String get type => _fleetByCode[name]?.type ?? '';
+
+  /// Filtre çiplerindeki geniş grup (`Kamyon`/`Ekskavatör`/`Loder`).
+  String? get category => _fleetByCode[name]?.category;
+
   String get typeLabel {
+    final String? label = _fleetByCode[name]?.typeLabel;
+    if (label != null) return label;
     if (tireCount <= 4) return 'Yükleyici';
     if (tireCount <= 6) return 'Kaya Kamyonu';
     return 'Maden Kamyonu';

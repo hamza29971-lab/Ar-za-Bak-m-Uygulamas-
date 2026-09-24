@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
+import 'vehicle_type_filter.dart';
 
 /// "Araç Seç" alanı.
 /// - Tıklandığında tüm araçlar aşağı doğru listelenir.
@@ -41,6 +42,9 @@ class _VehicleSelectorState extends State<VehicleSelector> {
   /// Kullanıcı arama yazmaya başladı mı? Başlamadıysa (ör. alana yeni tıklandı)
   /// seçili aracın kodu filtre olarak kullanılmaz, tüm liste gösterilir.
   bool _typing = false;
+
+  /// Seçili araç kategorisi (`Kamyon`/`Ekskavatör`/`Loder`); `null` ise tümü.
+  String? _typeFilter;
 
   @override
   void initState() {
@@ -116,9 +120,14 @@ class _VehicleSelectorState extends State<VehicleSelector> {
 
   Widget _buildOverlay(BuildContext overlayContext) {
     final AppState state = AppScope.read(context);
-    final List<Vehicle> items = state.filterVehicles(
-      _typing ? _controller.text : '',
-    );
+    final List<Vehicle> items = state
+        .filterVehicles(_typing ? _controller.text : '')
+        .where((Vehicle v) => _typeFilter == null || v.category == _typeFilter)
+        .toList();
+    final List<String> categories = <String>[
+      for (final String c in vehicleCategoryOrder)
+        if (state.vehicles.any((Vehicle v) => v.category == c)) c,
+    ];
     final Color accent =
         widget.accentColor ?? Theme.of(context).colorScheme.primary;
 
@@ -166,94 +175,117 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                       ),
                     ],
                   ),
-                  child: items.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Row(
-                            children: <Widget>[
-                              Icon(
-                                Icons.search_off,
-                                size: 18,
-                                color: context.mutedColor,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Eşleşen araç bulunamadı',
-                                style: TextStyle(color: context.mutedColor),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          shrinkWrap: true,
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            color: (_edge != null
-                                    ? context.moduleBorderColor(_edge!)
-                                    : context.borderColor)
-                                .withValues(alpha: 0.6),
-                          ),
-                          itemBuilder: (BuildContext context, int i) {
-                            final Vehicle v = items[i];
-                            final bool isSelected = v.id == widget.selected?.id;
-                            return InkWell(
-                              onTap: () => _select(v),
-                              child: Container(
-                                color: isSelected
-                                    ? accent.withValues(alpha: 0.08)
-                                    : Colors.transparent,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      VehicleTypeFilter(
+                        categories: categories,
+                        selected: _typeFilter,
+                        accent: _edge ?? accent,
+                        onChanged: (String? type) {
+                          setState(() => _typeFilter = type);
+                          _entry?.markNeedsBuild();
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        color: (_edge != null
+                                ? context.moduleBorderColor(_edge!)
+                                : context.borderColor)
+                            .withValues(alpha: 0.6),
+                      ),
+                      Flexible(
+                        child: items.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.all(20),
                                 child: Row(
                                   children: <Widget>[
                                     Icon(
-                                      Icons.local_shipping_outlined,
-                                      size: 24,
-                                      color: isSelected
-                                          ? accent
-                                          : context.mutedColor,
+                                      Icons.search_off,
+                                      size: 18,
+                                      color: context.mutedColor,
                                     ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Eşleşen araç bulunamadı',
+                                      style: TextStyle(color: context.mutedColor),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                shrinkWrap: true,
+                                itemCount: items.length,
+                                separatorBuilder: (_, _) => Divider(
+                                  height: 1,
+                                  color: (_edge != null
+                                          ? context.moduleBorderColor(_edge!)
+                                          : context.borderColor)
+                                      .withValues(alpha: 0.6),
+                                ),
+                                itemBuilder: (BuildContext context, int i) {
+                                  final Vehicle v = items[i];
+                                  final bool isSelected = v.id == widget.selected?.id;
+                                  return InkWell(
+                                    onTap: () => _select(v),
+                                    child: Container(
+                                      color: isSelected
+                                          ? accent.withValues(alpha: 0.08)
+                                          : Colors.transparent,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 16,
+                                      ),
+                                      child: Row(
                                         children: <Widget>[
-                                          Text(
-                                            v.code,
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: isSelected ? accent : null,
+                                          Icon(
+                                            Icons.local_shipping_outlined,
+                                            size: 24,
+                                            color: isSelected
+                                                ? accent
+                                                : context.mutedColor,
+                                          ),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: <Widget>[
+                                                Text(
+                                                  v.code,
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: isSelected ? accent : null,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  v.typeLabel,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: context.mutedColor,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            '${v.typeLabel} • ${v.tireCount} lastik',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: context.mutedColor,
+                                          if (isSelected)
+                                            Icon(
+                                              Icons.check_circle,
+                                              size: 20,
+                                              color: accent,
                                             ),
-                                          ),
                                         ],
                                       ),
                                     ),
-                                    if (isSelected)
-                                      Icon(
-                                        Icons.check_circle,
-                                        size: 20,
-                                        color: accent,
-                                      ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

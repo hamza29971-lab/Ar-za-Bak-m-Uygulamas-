@@ -14,6 +14,7 @@ import '../../models/models.dart' as global_models;
 import '../../utils/formats.dart';
 import '../../widgets/pending_send_dialog.dart';
 import '../../widgets/vehicle_photo.dart';
+import '../../widgets/vehicle_type_filter.dart';
 
 class TireChangeScreen extends StatelessWidget {
   const TireChangeScreen({super.key});
@@ -267,9 +268,7 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
                   builder: (BuildContext context, Widget? _) {
                     final List<VehicleModel> filtered =
                         widget.provider.filteredVehicles;
-                    return filtered.isEmpty
-                        ? _buildEmptyResult(context)
-                        : _buildResultsList(context, filtered);
+                    return _buildResultsPanel(context, filtered);
                   },
                 ),
               ),
@@ -280,10 +279,12 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
     );
   }
 
-  Widget _buildResultsList(BuildContext context, List<VehicleModel> filtered) {
+  /// Tip filtresi + sonuç listesi (ya da "sonuç yok" satırı). Filtre satırı
+  /// liste boşken de görünür kalır ki kullanıcı seçimi geri alabilsin.
+  Widget _buildResultsPanel(BuildContext context, List<VehicleModel> filtered) {
     return Container(
       margin: const EdgeInsets.only(top: 4),
-      constraints: const BoxConstraints(maxHeight: 320),
+      constraints: const BoxConstraints(maxHeight: 360),
       decoration: BoxDecoration(
         color: context.isDark ? context.cardColor : context.pageColor,
         borderRadius: BorderRadius.circular(10),
@@ -296,7 +297,28 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
           ),
         ],
       ),
-      child: ListView.builder(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          VehicleTypeFilter(
+            categories: widget.provider.vehicleCategories,
+            selected: widget.provider.typeFilter,
+            accent: AppColors.tire,
+            onChanged: widget.provider.setTypeFilter,
+          ),
+          Divider(height: 1, color: context.borderColor),
+          Flexible(
+            child: filtered.isEmpty
+                ? _buildEmptyResult(context)
+                : _buildResultsList(context, filtered),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultsList(BuildContext context, List<VehicleModel> filtered) {
+    return ListView.builder(
         shrinkWrap: true,
         padding: const EdgeInsets.symmetric(vertical: 4),
         itemCount: filtered.length,
@@ -358,19 +380,12 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
             ),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildEmptyResult(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: context.isDark ? context.cardColor : context.pageColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.moduleBorderColor(AppColors.tire), width: 2.5),
-      ),
       child: Row(
         children: [
           Icon(Icons.search_off_rounded,
