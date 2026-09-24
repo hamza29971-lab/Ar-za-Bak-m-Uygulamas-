@@ -697,8 +697,12 @@ class _VehicleDisplay extends StatelessWidget {
     String fallbackPath = 'assets/images/vehicle_default.png';
     final lower = vehicle.code.toLowerCase();
 
-    if (vehicle.tirePositions.isEmpty) {
-      // Paletli araçlar (Hitachi/Sany/Komatsu/yeni Liugong ekskavatörleri):
+    if (vehicle.type == 'LOADER_ELECTRIC') {
+      // Tüm loderler (tekerlekli Liugong-33..39 ve paletli Liugong-40/41)
+      // aynı görseli kullanır.
+      fallbackPath = 'assets/images/loader.png';
+    } else if (vehicle.tirePositions.isEmpty) {
+      // Diğer paletli araçlar (Hitachi/Sany/Komatsu/Liugong ekskavatörleri):
       // marka ne olursa olsun aynı jenerik görsel kullanılır.
       fallbackPath = 'assets/images/yesil_excavator.png';
     } else if (lower.startsWith('euclid')) {
@@ -706,11 +710,7 @@ class _VehicleDisplay extends StatelessWidget {
     } else if (lower.startsWith('xcmg')) {
       fallbackPath = 'assets/images/yesil_excavator.png';
     } else if (lower.startsWith('liugong')) {
-      if (vehicle.tireCount <= 4) {
-        fallbackPath = 'assets/images/loader.png';
-      } else {
-        fallbackPath = 'assets/images/green_truck.png';
-      }
+      fallbackPath = 'assets/images/green_truck.png';
     }
 
     // Görsel, kendi tablasında durur; böylece koyu temada sayfa zemininden
