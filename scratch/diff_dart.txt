@@ -1,0 +1,489 @@
+﻿diff --git a/lib/models/tire_change_model.dart b/lib/models/tire_change_model.dart
+index 91b5e66..679afeb 100644
+--- a/lib/models/tire_change_model.dart
++++ b/lib/models/tire_change_model.dart
+@@ -48,7 +48,7 @@ class VehicleModel {
+         id: 'euclid_${i + 1}',
+         name: 'Euclid-${i + 1}',
+         tireCount: 6,
+-        imagePath: 'assets/images/euclid_truck.png',
++        imagePath: 'assets/images/yesil_arac.png',
+         topDownImagePath: 'assets/images/truck_6_top_down.jpg',
+       )),
+       // Liugong 16-20 (10 Lastik)
+@@ -64,7 +64,7 @@ class VehicleModel {
+         id: 'xcmg_${i + 13}',
+         name: 'XCMG-${i + 13}',
+         tireCount: 10,
+-        imagePath: 'assets/images/xcmg_truck.png',
++        imagePath: 'assets/images/yesil_excavator.png',
+         topDownImagePath: 'assets/images/truck_10_top_down.jpg',
+       )),
+       // Liugong 33-39 ÔÇö Loder tipi (4 Lastik)
+diff --git a/lib/providers/tire_change_provider.dart b/lib/providers/tire_change_provider.dart
+index 40c7c7b..5a3984b 100644
+--- a/lib/providers/tire_change_provider.dart
++++ b/lib/providers/tire_change_provider.dart
+@@ -236,4 +236,14 @@ class TireChangeProvider extends ChangeNotifier {
+     _sendSuccess = false;
+     notifyListeners();
+   }
++
++  /// G├Ânderim sonras─▒nda seri numaralar─▒n─▒ '---' haline getir
++  Future<void> resetChangedTires() async {
++    _tireRecords = _tireRecords.map((r) => r.copyWith(
++      isChanged: false,
++      serialNumber: r.isChanged ? '---' : r.serialNumber,
++    )).toList();
++    await _saveTireRecords();
++    notifyListeners();
++  }
+ }
+diff --git a/lib/screens/oil_screen.dart b/lib/screens/oil_screen.dart
+index 07550fd..9c5c3e8 100644
+--- a/lib/screens/oil_screen.dart
++++ b/lib/screens/oil_screen.dart
+@@ -205,13 +205,23 @@ class _OilScreenState extends State<OilScreen> {
+             icon: Icons.fact_check_outlined,
+             color: AppColors.form,
+             filled: false,
+-            onPressed: () {
++            onPressed: () async {
+               state.checkOil(vehicle!, r);
+-              ScaffoldMessenger.of(context)
+-                ..hideCurrentSnackBar()
+-                ..showSnackBar(
+-                  const SnackBar(content: Text('Kontroller Tamamland─▒')),
+-                );
++              if (!context.mounted) return;
++              await showDialog<void>(
++                context: context,
++                builder: (BuildContext context) => AlertDialog(
++                  icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
++                  title: const Text('Kontrol Tamamland─▒'),
++                  content: Text('${r.oilType} alan─▒ kontrol edilmi┼ş olarak i┼şaretlendi.'),
++                  actions: <Widget>[
++                    FilledButton(
++                      onPressed: () => Navigator.of(context).pop(),
++                      child: const Text('Tamam'),
++                    ),
++                  ],
++                ),
++              );
+             },
+           ),
+         ];
+@@ -237,7 +247,7 @@ class _OilScreenState extends State<OilScreen> {
+     );
+ 
+     if (request == null || !context.mounted) return;
+-    _commitRefill(context, state, vehicle, request.record, request.amount,
++    await _commitRefill(context, state, vehicle, request.record, request.amount,
+         request.product);
+   }
+ 
+@@ -282,11 +292,21 @@ class _OilScreenState extends State<OilScreen> {
+     for (final OilRecord r in records) {
+       state.checkOil(vehicle, r);
+     }
+-    ScaffoldMessenger.of(context)
+-      ..hideCurrentSnackBar()
+-      ..showSnackBar(
+-        SnackBar(content: Text('${records.length} alan kontrol edildi.')),
+-      );
++    if (!context.mounted) return;
++    await showDialog<void>(
++      context: context,
++      builder: (BuildContext context) => AlertDialog(
++        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
++        title: const Text('Kontrol Tamamland─▒'),
++        content: Text('${records.length} alan kontrol edildi.'),
++        actions: <Widget>[
++          FilledButton(
++            onPressed: () => Navigator.of(context).pop(),
++            child: const Text('Tamam'),
++          ),
++        ],
++      ),
++    );
+   }
+ 
+   /// "G├Ânder": bu ekranda yap─▒l─▒p bekleyen i┼şlemleri tek mesajda yollar.
+@@ -348,6 +368,7 @@ class _OilScreenState extends State<OilScreen> {
+ 
+     final int count = pending.length;
+     state.clearPending(PendingKind.oil);
++    state.selectVehicle(null);
+     state.addNotification(
+       NotificationItem(
+         title: 'Ya─ş i┼şlemleri g├Ânderildi',
+@@ -397,21 +418,30 @@ class _OilScreenState extends State<OilScreen> {
+   }
+ 
+   /// Takviyeyi kaydeder ve kullan─▒c─▒ya bilgi verir.
+-  void _commitRefill(
++  Future<void> _commitRefill(
+     BuildContext context,
+     AppState state,
+     Vehicle vehicle,
+     OilRecord record,
+     double amount,
+     String product,
+-  ) {
++  ) async {
+     state.refillOil(vehicle, record, amount, product: product);
+-    ScaffoldMessenger.of(context)
+-      ..hideCurrentSnackBar()
+-      ..showSnackBar(SnackBar(
+-        content: Text('${record.oilType} i├ğin ${amount.toStringAsFixed(1)} L'
+-            ' kaydedildi ($product).'),
+-      ));
++    if (!context.mounted) return;
++    await showDialog<void>(
++      context: context,
++      builder: (BuildContext context) => AlertDialog(
++        icon: const Icon(Icons.check_circle, color: AppColors.brand, size: 42),
++        title: const Text('Takviye Kaydedildi'),
++        content: SizedBox(width: 460, child: Text('${record.oilType} i├ğin ${amount.toStringAsFixed(1)} L kaydedildi.\n\nKullan─▒lan ├£r├╝n:\n$product', style: const TextStyle(fontSize: 16))),
++        actions: <Widget>[
++          FilledButton(
++            onPressed: () => Navigator.of(context).pop(),
++            child: const Text('Tamam'),
++          ),
++        ],
++      ),
++    );
+   }
+ }
+ 
+@@ -621,9 +651,9 @@ class _VehicleDisplay extends StatelessWidget {
+     final lower = vehicle.code.toLowerCase();
+     
+     if (lower.startsWith('euclid')) {
+-      imagePath = 'assets/images/euclid_truck.png';
++      imagePath = 'assets/images/yesil_arac.png';
+     } else if (lower.startsWith('xcmg')) {
+-      imagePath = 'assets/images/xcmg_truck.png';
++      imagePath = 'assets/images/yesil_excavator.png';
+     } else if (lower.startsWith('liugong')) {
+       if (vehicle.tireCount <= 4) {
+         imagePath = 'assets/images/loader.png';
+diff --git a/lib/screens/profile_settings_screen.dart b/lib/screens/profile_settings_screen.dart
+index 4fc6504..4e3812e 100644
+--- a/lib/screens/profile_settings_screen.dart
++++ b/lib/screens/profile_settings_screen.dart
+@@ -219,55 +219,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
+             ],
+           ),
+           const SizedBox(height: 22),
+-          Container(
+-            padding: const EdgeInsets.all(20),
+-            decoration: BoxDecoration(
+-              color: context.cardColor,
+-              borderRadius: BorderRadius.circular(AppTheme.radius),
+-              border: Border.all(color: context.borderColor),
+-            ),
+-            child: Row(
+-              children: <Widget>[
+-                CircleAvatar(
+-                  radius: 34,
+-                  backgroundColor: AppColors.brandSoft,
+-                  child: Text(
+-                    user?.initials ?? '?',
+-                    style: const TextStyle(
+-                        color: AppColors.brand,
+-                        fontSize: 22,
+-                        fontWeight: FontWeight.w700),
+-                  ),
+-                ),
+-                const SizedBox(width: 20),
+-                Expanded(
+-                  child: Column(
+-                    crossAxisAlignment: CrossAxisAlignment.start,
+-                    children: <Widget>[
+-                      Text(user?.fullName ?? '-',
+-                          maxLines: 1,
+-                          overflow: TextOverflow.ellipsis,
+-                          style: const TextStyle(
+-                              fontSize: 22, fontWeight: FontWeight.w700)),
+-                      const SizedBox(height: 4),
+-                      Text(user?.email ?? '-',
+-                          maxLines: 1,
+-                          overflow: TextOverflow.ellipsis,
+-                          style: TextStyle(color: context.mutedColor, fontSize: 14)),
+-                    ],
+-                  ),
+-                ),
+-              ],
+-            ),
+-          ),
+-          const SizedBox(height: 24),
+-          Text('DETAYLAR',
+-              style: TextStyle(
+-                  fontSize: 12,
+-                  letterSpacing: 1,
+-                  fontWeight: FontWeight.w700,
+-                  color: context.mutedColor)),
+-          const SizedBox(height: 12),
+           _DetailRow(
+               icon: Icons.person_outline, label: 'AD SOYAD', value: user?.fullName ?? '-'),
+           _DetailRow(
+diff --git a/lib/ui/screens/login_screen.dart b/lib/ui/screens/login_screen.dart
+index fe1d589..ef0200f 100644
+--- a/lib/ui/screens/login_screen.dart
++++ b/lib/ui/screens/login_screen.dart
+@@ -321,28 +321,35 @@ class _LoginScreenState extends State<LoginScreen>
+                   padding: const EdgeInsets.symmetric(vertical: 40),
+                   child: Column(
+                     children: [
+-                      // Ho┼şgeldiniz Metni
++                      Image.asset(
++                        'assets/images/├ğimnak_logo.png',
++                        height: 60,
++                      ),
++                      const SizedBox(height: 16),
++                      // Sadece yeni ba┼şl─▒k yaz─▒s─▒
+                       const Text(
+-                        'NUH ├ç─░MENTO',
++                        'Nuh Intelligent Mining Operations',
+                         style: TextStyle(
+                           fontSize: 22,
+                           fontWeight: FontWeight.w800,
+                           color: Color(0xFF1A1D2E),
+-                          letterSpacing: 1.5,
++                          letterSpacing: 0.5,
+                         ),
++                        textAlign: TextAlign.center,
+                       ),
+-                      const SizedBox(height: 6),
++                      const SizedBox(height: 12),
++                      // B├╝y├╝t├╝lm├╝┼ş Ho┼şgeldiniz Yaz─▒s─▒
+                       const Text(
+                         'BAKIM S─░STEM─░NE HO┼ŞGELD─░N─░Z',
+                         style: TextStyle(
+-                          fontSize: 16,
+-                          fontWeight: FontWeight.w600,
++                          fontSize: 24,
++                          fontWeight: FontWeight.w800,
+                           color: Color(0xFF2E7D32),
+                           letterSpacing: 1.2,
+                         ),
++                        textAlign: TextAlign.center,
+                       ),
+                       const SizedBox(height: 30),
+-
+                       Expanded(
+                         child: Padding(
+                           padding: const EdgeInsets.symmetric(horizontal: 80),
+diff --git a/lib/ui/screens/tire_change_screen.dart b/lib/ui/screens/tire_change_screen.dart
+index fa7f30d..173e920 100644
+--- a/lib/ui/screens/tire_change_screen.dart
++++ b/lib/ui/screens/tire_change_screen.dart
+@@ -166,6 +166,18 @@ class _VehicleSearchFieldState extends State<_VehicleSearchField> {
+     _controller.text = widget.provider.selectedVehicle?.name ?? '';
+   }
+ 
++  @override
++  void didUpdateWidget(covariant _VehicleSearchField oldWidget) {
++    super.didUpdateWidget(oldWidget);
++    if (widget.provider.selectedVehicle?.name != _controller.text) {
++      if (widget.provider.selectedVehicle == null) {
++        _controller.clear();
++      } else if (!_isOpen) {
++        _controller.text = widget.provider.selectedVehicle!.name;
++      }
++    }
++  }
++
+   @override
+   void dispose() {
+     _controller.dispose();
+@@ -844,6 +856,8 @@ class _PendingSubmitButtonState extends State<_PendingSubmitButton> {
+ 
+     final int count = pending.length;
+     state.clearPending(PendingKind.tire);
++    await widget.provider.resetChangedTires();
++    widget.provider.clearSelectedVehicle();
+     
+     await showDialog<void>(
+       context: context,
+@@ -935,19 +949,22 @@ class _VehicleDisplay extends StatelessWidget {
+ }
+ 
+ // ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-// BOTTOM SHEET (KONTROL MEN├£S├£)
++// POPUP (KONTROL MEN├£S├£)
+ // ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+ void showTireActionSheet(BuildContext context, TireChangeProvider provider, TireRecord record, String label) {
+-  showModalBottomSheet(
++  showDialog(
+     context: context,
+-    isScrollControlled: true,
+-    backgroundColor: Colors.transparent,
+-    constraints: const BoxConstraints(maxWidth: 800),
+     builder: (BuildContext sheetContext) {
+-      return _TireActionSheetContent(
+-        provider: provider,
+-        record: record,
+-        label: label,
++      return Dialog(
++        backgroundColor: Colors.transparent,
++        child: Container(
++          width: 700,
++          child: _TireActionSheetContent(
++            provider: provider,
++            record: record,
++            label: label,
++          ),
++        ),
+       );
+     },
+   ).then((_) {
+@@ -1026,11 +1043,11 @@ class _TireActionSheetContentState extends State<_TireActionSheetContent> {
+ 
+ 
+     return Container(
+-      decoration: const BoxDecoration(
++      decoration: BoxDecoration(
+         color: Colors.white,
+-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
++        borderRadius: BorderRadius.circular(24),
+       ),
+-      padding: const EdgeInsets.all(32),
++      padding: const EdgeInsets.all(40),
+       child: Column(
+         mainAxisSize: MainAxisSize.min,
+         crossAxisAlignment: CrossAxisAlignment.stretch,
+diff --git a/lib/widgets/nimo_page.dart b/lib/widgets/nimo_page.dart
+index a245e11..a37080a 100644
+--- a/lib/widgets/nimo_page.dart
++++ b/lib/widgets/nimo_page.dart
+@@ -88,8 +88,8 @@ class NimoTopBar extends StatelessWidget {
+           ),
+           const SizedBox(width: 10),
+           _CircleAction(
+-            icon: Icons.notifications_none,
+-            tooltip: 'Bildirimler',
++            icon: Icons.history,
++            tooltip: 'Ge├ğmi┼ş',
+             badge: state.unreadCount,
+             onTap: () => showNotificationsDialog(context),
+           ),
+@@ -233,54 +233,25 @@ class _ProfileButton extends StatelessWidget {
+           ),
+         ),
+         child: Container(
++          width: 46,
+           height: 46,
+-          padding: const EdgeInsets.symmetric(horizontal: 8),
+           decoration: BoxDecoration(
+             borderRadius: BorderRadius.circular(14),
+             border: Border.all(color: context.borderColor),
+           ),
+-          child: Row(
+-            mainAxisSize: MainAxisSize.min,
+-            children: <Widget>[
+-              CircleAvatar(
+-                radius: 15,
+-                backgroundColor: AppColors.brandSoft,
+-                child: Text(
+-                  user?.initials ?? '?',
+-                  style: const TextStyle(
+-                    color: AppColors.brand,
+-                    fontWeight: FontWeight.w700,
+-                    fontSize: 12,
+-                  ),
++          child: Center(
++            child: CircleAvatar(
++              radius: 15,
++              backgroundColor: AppColors.brandSoft,
++              child: Text(
++                user?.initials ?? '?',
++                style: const TextStyle(
++                  color: AppColors.brand,
++                  fontWeight: FontWeight.w700,
++                  fontSize: 12,
+                 ),
+               ),
+-              if (!compact) ...<Widget>[
+-                const SizedBox(width: 10),
+-                ConstrainedBox(
+-                  constraints: const BoxConstraints(maxWidth: 150),
+-                  child: Column(
+-                    mainAxisAlignment: MainAxisAlignment.center,
+-                    crossAxisAlignment: CrossAxisAlignment.start,
+-                    children: <Widget>[
+-                      Text(
+-                        user?.fullName ?? 'Profil',
+-                        maxLines: 1,
+-                        overflow: TextOverflow.ellipsis,
+-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+-                      ),
+-                      Text(
+-                        user?.role ?? '',
+-                        maxLines: 1,
+-                        overflow: TextOverflow.ellipsis,
+-                        style: TextStyle(fontSize: 11, color: context.mutedColor),
+-                      ),
+-                    ],
+-                  ),
+-                ),
+-                const SizedBox(width: 6),
+-                Icon(Icons.chevron_right, size: 18, color: context.mutedColor),
+-              ],
+-            ],
++            ),
+           ),
+         ),
+       ),
+diff --git a/lib/widgets/notifications_dialog.dart b/lib/widgets/notifications_dialog.dart
+index c8467df..9919891 100644
+--- a/lib/widgets/notifications_dialog.dart
++++ b/lib/widgets/notifications_dialog.dart
+@@ -1,4 +1,4 @@
+-´╗┐import 'package:flutter/material.dart';
++import 'package:flutter/material.dart';
+ 
+ import '../models/models.dart';
+ import '../state/app_state.dart';
+@@ -42,7 +42,7 @@ class _NotificationsDialog extends StatelessWidget {
+                       color: AppColors.brandSoft,
+                       borderRadius: BorderRadius.circular(12),
+                     ),
+-                    child: const Icon(Icons.notifications_none,
++                    child: const Icon(Icons.history,
+                         color: AppColors.brand, size: 24),
+                   ),
+                   const SizedBox(width: 14),
+@@ -50,11 +50,11 @@ class _NotificationsDialog extends StatelessWidget {
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: <Widget>[
+-                        const Text('Bildirimler',
++                        const Text('Ge├ğmi┼ş',
+                             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                         const SizedBox(height: 2),
+                         Text(
+-                          unread == 0 ? 'Hepsi g├╝ncel' : '$unread okunmam─▒┼ş bildirim',
++                          unread == 0 ? 'Hepsi g├╝ncel' : '$unread yeni i┼şlem',
+                           style: TextStyle(fontSize: 13, color: context.mutedColor),
+                         ),
+                       ],
+@@ -74,7 +74,7 @@ class _NotificationsDialog extends StatelessWidget {
+               child: Row(
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                 children: <Widget>[
+-                  const Text('T├╝m bildirimler',
++                  const Text('T├╝m ge├ğmi┼ş',
+                       style: TextStyle(fontWeight: FontWeight.w600)),
+                   Text('${items.length} kay─▒t',
+                       style: TextStyle(fontSize: 13, color: context.mutedColor)),
+@@ -91,7 +91,7 @@ class _NotificationsDialog extends StatelessWidget {
+                         children: <Widget>[
+                           Icon(Icons.inbox_outlined, size: 42, color: context.mutedColor),
+                           const SizedBox(height: 14),
+-                          Text('Hen├╝z bildirim yok.',
++                          Text('Hen├╝z ge├ğmi┼ş kayd─▒ yok.',
+                               style: TextStyle(color: context.mutedColor, fontSize: 15)),
+                         ],
+                       ),

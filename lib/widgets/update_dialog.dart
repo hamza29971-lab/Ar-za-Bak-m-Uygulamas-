@@ -46,7 +46,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
         
         if (mounted) {
           if (result.type == ResultType.done) {
-            Navigator.of(context).pop();
+            setState(() {
+              _isDownloading = false;
+              _statusText = 'Kurulum ekranı açıldı. Lütfen yüklemeyi onaylayın.';
+            });
+            // Dialog'u hemen kapatmıyoruz; kurulum başarılı olursa uygulama zaten kapanıp açılacak.
+            // İptal edilirse, kullanıcı kapat butonuna basabilir.
           } else {
             setState(() {
               _isDownloading = false;

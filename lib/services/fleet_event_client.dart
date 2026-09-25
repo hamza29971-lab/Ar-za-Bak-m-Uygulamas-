@@ -146,6 +146,7 @@ class HttpFleetEventClient implements FleetEventClient {
             Uri.parse(AppConfig.fleetEventUrl),
             headers: <String, String>{
               'Content-Type': 'application/json',
+              'X-Fleet-Key': AppConfig.fleetApiKey,
               if (accessToken != null && accessToken.isNotEmpty)
                 'Authorization': 'Bearer $accessToken',
             },

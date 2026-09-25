@@ -1,11 +1,11 @@
-import 'dart:io';
-import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../state/app_state.dart' show AppState, PendingOperation;
 import 'fleet_event_client.dart';
 import 'fleet_event_mapper.dart';
 import 'service_locator.dart';
+import 'image_upload_client.dart';
 
 class PublishService {
   PublishService._();
@@ -32,26 +32,21 @@ class PublishService {
     String? startTime,
     String? endTime,
   }) async {
-    // 1. Resimleri Base64 formatına çevir (eğer resim varsa)
-    List<String> base64Images = [];
+    // 1. Resimleri yükle
+    List<String> uploadedImageUrls = [];
     if (imagePaths.isNotEmpty) {
-      // Backend en fazla 5 görsel kabul ediyor
+      final ImageUploadClient uploadClient = HttpImageUploadClient();
       final List<String> pathsToProcess = imagePaths.take(5).toList();
       for (String path in pathsToProcess) {
         try {
-          final String ext = path.split('.').last.toLowerCase();
-          final String mimeType = (ext == 'png') ? 'image/png' 
-                                : (ext == 'webp') ? 'image/webp' 
-                                : 'image/jpeg';
-                                
-          final bytes = File(path).readAsBytesSync();
-          // Backend boyutu 10MB ile sınırlandırıyor. 
-          if (bytes.length > 10 * 1024 * 1024) continue;
-          
-          final base64String = base64Encode(bytes);
-          base64Images.add('data:$mimeType;base64,$base64String');
+          final UploadResult uploadResult = await uploadClient.upload(path);
+          if (uploadResult.ok && uploadResult.url != null) {
+            uploadedImageUrls.add(uploadResult.url!);
+          } else {
+            debugPrint('Resim yüklenemedi: ${uploadResult.error}');
+          }
         } catch (e) {
-          debugPrint('Base64 dönüştürme hatası: $e');
+          debugPrint('Resim yükleme hatası: $e');
         }
       }
     }
@@ -69,8 +64,8 @@ class PublishService {
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
       description: description,
-      imageCount: base64Images.length,
-      imageNames: base64Images, // Base64 verilerini API'ye doğrudan gönder (Doküman spec)
+      imageCount: uploadedImageUrls.length,
+      imageNames: uploadedImageUrls, // Yüklenen resimlerin URL'lerini API'ye gönder
       deviceId: null,
       vehicleUUID: vehicleUUID,
       operatorLabel: userRegistryNo,

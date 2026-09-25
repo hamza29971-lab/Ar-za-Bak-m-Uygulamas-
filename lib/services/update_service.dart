@@ -36,15 +36,11 @@ class UpdateService {
   }
 
   /// Tabletteki yerel build_number'i okur.
-  /// SharedPreferences ve assets/version.txt içindeki en büyük sayıyı döndürür.
+  /// assets/version.txt içindeki sayıyı döndürür.
   static Future<int> getLocalBuildNumber() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getInt(_prefKey) ?? 1;
       final content = await rootBundle.loadString('assets/version.txt');
-      final assetVersion = int.tryParse(content.trim()) ?? 1;
-      
-      return saved > assetVersion ? saved : assetVersion;
+      return int.tryParse(content.trim()) ?? 1;
     } catch (_) {
       return 1;
     }
@@ -54,12 +50,6 @@ class UpdateService {
   static Future<void> ignoreBuild(int buildNumber) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_ignoredKey, buildNumber);
-  }
-
-  /// Basarili indirme sonrasi build_number'i kaydeder.
-  static Future<void> saveLocalBuildNumber(int buildNumber) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefKey, buildNumber);
   }
 
   /// Guncelleme gerekip gerekmedigini kontrol eder.
@@ -130,8 +120,6 @@ class UpdateService {
     final file = File(savePath);
     
     await file.writeAsBytes(bytes, flush: true);
-    // Indirilen build numarasini kaydet (bir sonraki kontrolde kullanilir)
-    await saveLocalBuildNumber(newBuildNumber);
     return file;
   }
 }
