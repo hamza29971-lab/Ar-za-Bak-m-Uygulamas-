@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../screens/shell_screen.dart';
@@ -100,6 +101,15 @@ class _OtpScreenState extends State<OtpScreen> {
             refreshToken: (payload['refreshToken'] ?? '').toString(),
             user: UserProfile.fromJson(safeUser),
           );
+          if (kDebugMode) {
+            // Yetki teşhisi: yalnızca anahtar adları ve claim özeti; ham token
+            // asla yazılmaz.
+            debugPrint('[Auth] giriş cevabı anahtarları: '
+                '${payload is Map ? payload.keys.toList() : payload.runtimeType}');
+            debugPrint('[Auth] token '
+                '${session.accessToken.isEmpty ? 'BOŞ' : 'var (${session.accessToken.length} karakter)'}'
+                '; claim özeti: ${jwtAuthSummary(session.accessToken)}');
+          }
           AppScope.read(context).applySession(session);
         } catch (e) {
           debugPrint('AuthSession Parse Hatası: $e');

@@ -1,6 +1,38 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
+
+/// Yetki teşhisi için JWT gövdesindeki yetkiyle ilgili claim'ler ve tüm claim
+/// adları. Ham token ya da imza asla döndürülmez; yalnızca debug logu içindir.
+Map<String, Object?> jwtAuthSummary(String token) {
+  final List<String> parts = token.split('.');
+  if (parts.length != 3) return <String, Object?>{'jwt': false};
+  try {
+    final Object? claims = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    );
+    if (claims is! Map<String, Object?>) return <String, Object?>{'jwt': false};
+
+    const List<String> relevant = <String>[
+      'roles', 'role', 'authorities', 'permissions', 'scope', 'scopes',
+      'groups', 'exp', 'iat',
+    ];
+    final Object? exp = claims['exp'];
+    return <String, Object?>{
+      'jwt': true,
+      'claimAdlari': claims.keys.toList(),
+      for (final String k in relevant)
+        if (claims.containsKey(k)) k: claims[k],
+      if (exp is int)
+        'expUtc': DateTime.fromMillisecondsSinceEpoch(exp * 1000, isUtc: true)
+            .toIso8601String(),
+    };
+  } on FormatException {
+    return <String, Object?>{'jwt': false};
+  }
+}
 
 /// Doğrulama kodunun gönderileceği kanal.
 enum OtpChannel { sms, email }

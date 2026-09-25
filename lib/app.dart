@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -30,6 +31,9 @@ class _NimoAppState extends State<NimoApp> {
   @override
   void initState() {
     super.initState();
+    // OTA yalnızca Android tablette anlamlı (APK kurar). Windows'ta
+    // geliştirme sırasında kontrol hiç çalıştırılmaz.
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     _updateTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _checkForUpdate();
     });

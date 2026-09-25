@@ -1,6 +1,6 @@
 // lib/widgets/update_dialog.dart
 import 'package:flutter/material.dart';
-import 'package:open_file/open_file.dart';
+import '../services/kiosk_service.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 
@@ -13,9 +13,21 @@ class UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
+  /// Kurulum sonucunun bekleneceği en uzun süre.
+  static const int _installWaitSeconds = 120;
+
   bool _isDownloading = false;
   double _progress = 0.0;
   String _statusText = '';
+
+  /// Hata gösterilir ve düğmeler geri gelir; güncelleme "kuruldu" sayılmadığı
+  /// için bir sonraki kontrolde yeniden önerilir.
+  void _fail(String message) {
+    setState(() {
+      _isDownloading = false;
+      _statusText = 'Hata: $message';
+    });
+  }
 
   Future<void> _startDownload() async {
     setState(() {
@@ -37,36 +49,38 @@ class _UpdateDialogState extends State<UpdateDialog> {
         },
       );
 
-      if (mounted) {
-        setState(() => _statusText = 'Kurulum başlatılıyor...');
-        final result = await OpenFile.open(
-          file.path,
-          type: 'application/vnd.android.package-archive',
-        );
-        
-        if (mounted) {
-          if (result.type == ResultType.done) {
-            setState(() {
-              _isDownloading = false;
-              _statusText = 'Kurulum ekranı açıldı. Lütfen yüklemeyi onaylayın.';
-            });
-            // Dialog'u hemen kapatmıyoruz; kurulum başarılı olursa uygulama zaten kapanıp açılacak.
-            // İptal edilirse, kullanıcı kapat butonuna basabilir.
-          } else {
-            setState(() {
-              _isDownloading = false;
-              _statusText = 'Kurulum hatası: ${result.message}';
-            });
-          }
+      if (!mounted) return;
+      setState(() => _statusText = 'Kurulum başlatılıyor...');
+
+      // Sistem yükleyici ekranı kiosk kilidinde açılamadığı için kurulum
+      // Android tarafında sessizce yapılır (device owner).
+      final String? startError =
+          await KioskService.instance.installUpdate(file.path);
+      if (!mounted) return;
+      if (startError != null) {
+        _fail(startError);
+        return;
+      }
+
+      setState(() => _statusText =
+          'Güncelleme kuruluyor. Uygulama birazdan kendiliğinden yeniden açılacak.');
+
+      // Başarılı kurulumda uygulama süreci sonlandırılıp yeniden açılır ve bu
+      // döngü hiç bitmez. Bitiyorsa kurulum başarısız olmuştur.
+      for (int i = 0; i < _installWaitSeconds; i++) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        final String? error = await KioskService.instance.consumeInstallError();
+        if (error != null) {
+          _fail(error);
+          return;
         }
       }
-    } catch (e) {
       if (mounted) {
-        setState(() {
-          _isDownloading = false;
-          _statusText = 'Hata: $e';
-        });
+        _fail('Kurulum tamamlanamadı. Lütfen daha sonra tekrar deneyin.');
       }
+    } catch (e) {
+      if (mounted) _fail('$e');
     }
   }
 

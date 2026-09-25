@@ -55,6 +55,7 @@ class VehicleModel {
   String get typeLabel {
     final String? label = _fleetByCode[name]?.typeLabel;
     if (label != null) return label;
+    // Katalogda olmayan bir araç için eski davranış: lastik sayısından tahmin.
     if (tireCount <= 4) return 'Yükleyici';
     if (tireCount <= 6) return 'Kaya Kamyonu';
     return 'Maden Kamyonu';
@@ -95,6 +96,10 @@ class VehicleModel {
         imagePath: 'assets/images/loader.png',
         topDownImagePath: 'assets/images/loader_top_down.jpg',
       )),
+      // Paletli araçlar (Hitachi/Sany/Liugong-ekskavatör/Komatsu) burada
+      // kasıtlı olarak YOK — hiçbirinin lastiği olmadığı için Lastik
+      // Değişimi ekranının araç listesinde görünmezler. lib/data/fleet.dart'taki
+      // global filoda (Yağ Takviyesi vb. diğer ekranlar) yer alırlar.
     ];
   }
 }
