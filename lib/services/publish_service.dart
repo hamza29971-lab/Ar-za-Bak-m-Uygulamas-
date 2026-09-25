@@ -35,11 +35,21 @@ class PublishService {
     // 1. Resimleri Base64 formatına çevir (eğer resim varsa)
     List<String> base64Images = [];
     if (imagePaths.isNotEmpty) {
-      for (String path in imagePaths) {
+      // Backend en fazla 5 görsel kabul ediyor
+      final List<String> pathsToProcess = imagePaths.take(5).toList();
+      for (String path in pathsToProcess) {
         try {
+          final String ext = path.split('.').last.toLowerCase();
+          final String mimeType = (ext == 'png') ? 'image/png' 
+                                : (ext == 'webp') ? 'image/webp' 
+                                : 'image/jpeg';
+                                
           final bytes = File(path).readAsBytesSync();
+          // Backend boyutu 10MB ile sınırlandırıyor. 
+          if (bytes.length > 10 * 1024 * 1024) continue;
+          
           final base64String = base64Encode(bytes);
-          base64Images.add('data:image/jpeg;base64,$base64String');
+          base64Images.add('data:$mimeType;base64,$base64String');
         } catch (e) {
           debugPrint('Base64 dönüştürme hatası: $e');
         }
@@ -60,7 +70,7 @@ class PublishService {
       reportType: reportType,
       description: description,
       imageCount: base64Images.length,
-      imageNames: base64Images, // Base64 verilerini API'ye gönder
+      imageNames: base64Images, // Base64 verilerini API'ye doğrudan gönder (Doküman spec)
       deviceId: null,
       vehicleUUID: vehicleUUID,
       operatorLabel: userRegistryNo,

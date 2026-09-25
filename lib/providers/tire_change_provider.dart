@@ -111,11 +111,18 @@ class TireChangeProvider extends ChangeNotifier {
               history.add(TireActionRecord.fromJson(Map<String, dynamic>.from(a)));
             }
           }
+          final String serial = item['serialNumber'] ?? '---';
+          final bool hasInitial = item['hasInitialRecord'] ?? false;
+          // Eski demo SN-904... verilerini temizle ve '---' olarak ayarla
+          final bool isOldMock = serial.startsWith('SN-904');
+          final String finalSerial = (isOldMock && !hasInitial) ? '---' : serial;
+
           return TireRecord(
             tireNumber: item['tireNumber'],
-            serialNumber: item['serialNumber'],
+            serialNumber: finalSerial,
             lastChangedDate: DateTime.parse(item['lastChangedDate']),
             actionHistory: history,
+            hasInitialRecord: (isOldMock && !hasInitial) ? false : hasInitial,
           );
         }).toList();
       } catch (_) {
@@ -133,9 +140,10 @@ class TireChangeProvider extends ChangeNotifier {
     return List.generate(count, (i) {
       return TireRecord(
         tireNumber: i + 1,
-        serialNumber: 'SN-904${(i + 1) * 11}',
+        serialNumber: '---',
         lastChangedDate: DateTime.now(),
         actionHistory: [],
+        hasInitialRecord: false,
       );
     });
   }
@@ -157,6 +165,7 @@ class TireChangeProvider extends ChangeNotifier {
       lastChangedDate: r.lastChangedDate,
       actionHistory: List<TireActionRecord>.from(r.actionHistory),
       isChanged: r.isChanged,
+      hasInitialRecord: r.hasInitialRecord,
     );
   }
 
@@ -176,6 +185,20 @@ class TireChangeProvider extends ChangeNotifier {
     return count;
   }
 
+  /// Gönderilmeden iptal edilen işlemler: kayıtlar değişiklik öncesi hâline
+  /// geri döndürülür.
+  void undoTire(int tireNumber) {
+    final snapshot = _undoSnapshots.remove(tireNumber);
+    if (snapshot != null) {
+      final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
+      if (idx >= 0) {
+        _tireRecords[idx] = snapshot;
+        _saveTireRecords();
+        notifyListeners();
+      }
+    }
+  }
+
   /// Bir lastiği "düzenleme moduna" al
   void startEditing(int tireNumber) {
     _editingTireNumber = tireNumber;
@@ -188,8 +211,8 @@ class TireChangeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Yeni seri numarası ile lastiği güncelle
-  Future<void> confirmChange(int tireNumber, String newSerial) async {
+  /// Seri numarasını değiştir / kaydet
+  Future<void> confirmChange(int tireNumber, String newSerial, {bool isInitial = false}) async {
     if (newSerial.trim().isEmpty) {
       _editingTireNumber = null;
       notifyListeners();
@@ -203,6 +226,7 @@ class TireChangeProvider extends ChangeNotifier {
         serialNumber: newSerial.trim(),
         lastChangedDate: DateTime.now(),
         isChanged: true,
+        hasInitialRecord: true,
       );
     }
     _editingTireNumber = null;
@@ -250,6 +274,7 @@ class TireChangeProvider extends ChangeNotifier {
               'serialNumber': r.serialNumber,
               'lastChangedDate': r.lastChangedDate.toIso8601String(),
               'actionHistory': r.actionHistory.map((a) => a.toJson()).toList(),
+              'hasInitialRecord': r.hasInitialRecord,
             })
         .toList();
     await prefs.setString(key, jsonEncode(jsonList));

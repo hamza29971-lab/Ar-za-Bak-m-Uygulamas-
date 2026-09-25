@@ -110,6 +110,7 @@ class TireRecord {
   DateTime lastChangedDate; // Seri No'nun son değiştirilme tarihi
   List<TireActionRecord> actionHistory; // Tüm kontrol aksiyonları (her biri kendi tarihiyle)
   bool isChanged; // Bu oturumda değiştirildi mi?
+  bool hasInitialRecord; // İlk lastik kaydı yapıldı mı?
 
   TireRecord({
     required this.tireNumber,
@@ -117,6 +118,7 @@ class TireRecord {
     required this.lastChangedDate,
     List<TireActionRecord>? actionHistory,
     this.isChanged = false,
+    this.hasInitialRecord = false,
   }) : actionHistory = actionHistory ?? [];
 
   /// Son kontrol aksiyonu (varsa)
@@ -128,6 +130,7 @@ class TireRecord {
     DateTime? lastChangedDate,
     List<TireActionRecord>? actionHistory,
     bool? isChanged,
+    bool? hasInitialRecord,
   }) {
     return TireRecord(
       tireNumber: tireNumber,
@@ -135,6 +138,7 @@ class TireRecord {
       lastChangedDate: lastChangedDate ?? this.lastChangedDate,
       actionHistory: actionHistory ?? List.from(this.actionHistory),
       isChanged: isChanged ?? this.isChanged,
+      hasInitialRecord: hasInitialRecord ?? this.hasInitialRecord,
     );
   }
 }
