@@ -1,7 +1,7 @@
 name: nimo_arizabakim
 description: "NIMO Arıza Bakım Tablet Uygulaması"
 publish_to: 'none'
-version: 1.0.0+72
+version: 1.0.0+73
 
 environment:
   sdk: ^3.11.5
@@ -16,7 +16,7 @@ dependencies:
   shared_preferences: ^2.3.2
   # flutter_localizations (SDK) intl ^0.20.3 istiyor; tam surume sabitlemek
   # bagimlilik cozumunu kilitliyordu.
-  intl: ^0.20.3
+  intl: ^0.20.2
   permission_handler: ^11.3.1
   image_picker: ^1.2.3
   http: ^1.6.0
