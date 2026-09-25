@@ -64,6 +64,24 @@ class ServiceReportScreen extends StatefulWidget {
   State<ServiceReportScreen> createState() => _ServiceReportScreenState();
 }
 
+class _ServiceCartItem {
+  final Vehicle vehicle;
+  final List<XFile> images;
+  final String description;
+  final String? serviceType;
+  final TimeOfDay? startTime;
+  final TimeOfDay? endTime;
+
+  _ServiceCartItem({
+    required this.vehicle,
+    required this.images,
+    required this.description,
+    this.serviceType,
+    this.startTime,
+    this.endTime,
+  });
+}
+
 class _ServiceReportScreenState extends State<ServiceReportScreen> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _description = TextEditingController();
@@ -72,6 +90,18 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   /// Servisin başlangıç ve bitiş saati; seçilmemişse null.
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
+
+  String? _selectedService;
+  static const List<String> _defaultServices = [
+    'Yağ Bakımı',
+    'Fren Bakımı',
+    'Lastik Değişimi',
+    'Genel Arıza',
+    'Periyodik Bakım',
+    'Akü Değişimi',
+  ];
+
+  final List<_ServiceCartItem> _cart = [];
 
   bool _sending = false;
 
@@ -195,6 +225,177 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     });
   }
 
+  // ------------------------------------------------------------------ sepet fonksiyonları
+  Future<void> _pickService() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final String? picked = await showDialog<String>(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('Servis seçin'),
+          content: SizedBox(
+            width: 300,
+            height: 264, // Saat seçici ile aynı yükseklik
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                    color: context.moduleBorderColor(accent), width: 2.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ListView.builder(
+                itemExtent: 44, // Saat seçici ile aynı satır yüksekliği
+                itemCount: _defaultServices.length,
+                itemBuilder: (context, index) {
+                  final String service = _defaultServices[index];
+                  final bool isSelected = _selectedService == service;
+                  return InkWell(
+                    onTap: () => Navigator.pop(ctx, service),
+                    child: Container(
+                      alignment: Alignment.center,
+                      color: isSelected ? accent : null,
+                      child: Text(
+                        service,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? Colors.white : null,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(
+                  foregroundColor: context.isDark ? Colors.white : Colors.green),
+              child: const Text('Vazgeç'),
+            ),
+          ],
+        );
+      }
+    );
+    if (picked != null) {
+      setState(() => _selectedService = picked);
+    }
+  }
+
+
+  void _approveAndPickEndTime() {
+    if (_cart.isEmpty) {
+      _showValidationPopup(['Lütfen önce işlem yapılacak araçları (İşlemi Kaydet ile) sepete ekleyin.']);
+      return;
+    }
+    _pickTime(isStart: false);
+  }
+
+  void _saveToCart() {
+    final AppState state = AppScope.of(context);
+    final Vehicle? vehicle = state.selectedVehicle;
+    
+    final List<String> errors = <String>[];
+    if (vehicle == null) errors.add('Lütfen işlem yapılacak aracı seçin.');
+    if (_selectedService == null) errors.add('Lütfen yapılan servisi seçin.');
+    if (widget.showServiceHours && _startTime == null) {
+      errors.add('Başlangıç saatini seçmediniz.');
+    }
+
+    if (errors.isNotEmpty) {
+      _showValidationPopup(errors);
+      return;
+    }
+
+    setState(() {
+      _cart.add(_ServiceCartItem(
+        vehicle: vehicle!,
+        images: List.from(_images),
+        description: _description.text.trim(),
+        serviceType: _selectedService,
+        startTime: _startTime,
+        endTime: _endTime,
+      ));
+      
+      // Formu sıfırla
+      state.selectVehicle(null);
+      _images.clear();
+      _description.clear();
+      _selectedService = null;
+      _startTime = null;
+      _endTime = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('İşlem başarıyla kaydedildi! Yeni bir araç girebilirsiniz.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _showCart() async {
+    if (_cart.isEmpty) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Bekleyen Raporlar',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _cart.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final item = _cart[index];
+                    final timeStr = (item.startTime != null && item.endTime != null)
+                        ? '(${_formatTime(item.startTime!)} - ${_formatTime(item.endTime!)})'
+                        : '';
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: accent,
+                        child: Text('${index + 1}', style: const TextStyle(color: Colors.white)),
+                      ),
+                      title: Text('${item.vehicle.code} - ${item.serviceType ?? ""}'),
+                      subtitle: Text(timeStr),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          setState(() => _cart.removeAt(index));
+                          Navigator.pop(ctx);
+                          if (_cart.isNotEmpty) _showCart();
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Kapat'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ------------------------------------------------------------------ gönder
 
   void _showValidationPopup(List<String> errors) {
@@ -259,131 +460,113 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   }
 
   Future<void> _send() async {
-    final AppState state = AppScope.read(context);
-    final Vehicle? vehicle = state.selectedVehicle;
-
-    final List<String> errors = [];
-
-    if (vehicle == null) {
-      errors.add('Araç seçimi yapmadınız.');
-    }
-
-    if (widget.showServiceHours) {
-      if (_startTime == null) {
-        errors.add('Başlangıç saatini seçmediniz.');
-      }
-      if (_endTime == null) {
-        errors.add('Bitiş saatini seçmediniz.');
-      }
-      // Saat mantık kontrolü seçim anında yapılıyor, burada tekrar kontrol gerekmez
-    }
-
-    if (_images.isEmpty) {
-      errors.add('Hiç fotoğraf eklemediniz (En az 1 fotoğraf zorunludur).');
-    }
-
-    if (_description.text.trim().isEmpty) {
-      errors.add('Açıklama alanını boş bıraktınız.');
-    }
-
-    if (errors.isNotEmpty) {
-      _showValidationPopup(errors);
+    if (_cart.isEmpty) {
+      _showValidationPopup(['Bekleyen Raporlar listenizde gönderilecek hiçbir işlem yok. Lütfen önce bir araca işlem yapıp "Kaydet"e basın.']);
       return;
     }
-
-    final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
-    // Servis saatleri yalnızca alanların gösterildiği ekranda anlamlıdır.
-    // Mekanik Operasyon'da bu alanlar kapalı olduğu için saat bilgisi hiç
-    // gönderilmez; koşul bunu yerleşimden bağımsız olarak garanti eder.
-    final String? startText = widget.showServiceHours && _startTime != null
-        ? _formatTime(_startTime!)
-        : null;
-    final String? endText = widget.showServiceHours && _endTime != null
-        ? _formatTime(_endTime!)
-        : null;
-    final String hours = startText == null && endText == null
-        ? ''
-        : '${startText ?? '-'} - ${endText ?? '-'}';
 
     setState(() => _sending = true);
-    final PublishResult result = await PublishService.instance.publishReport(
-      state: state,
-      reportType: widget.type.label,
-      description: _description.text.trim(),
-      imagePaths: imagePaths,
-      items: const <Map<String, Object?>>[],
-      vehicleCode: vehicle?.code,
-      userRegistryNo: state.user?.registryNo,
-      startTime: startText,
-      endTime: endText,
-    );
-    if (!mounted) return;
-    setState(() => _sending = false);
+    final AppState state = AppScope.read(context);
 
-    // Gönderim başarısızsa form korunur: kullanıcı düzeltip tekrar dener.
-    if (!result.success) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(
-            'Gönderilemedi: ${result.error ?? 'bilinmeyen hata'}',
-          ),
-        ));
-      return;
-    }
+    int successCount = 0;
+    
+    for (int i = 0; i < _cart.length; i++) {
+      final item = _cart[i];
+      final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
+      
+      final String? startText = widget.showServiceHours && item.startTime != null
+          ? _formatTime(item.startTime!)
+          : null;
+      final String? endText = widget.showServiceHours && _endTime != null
+          ? _formatTime(_endTime!)
+          : null;
+      final String hours = startText == null && endText == null
+          ? ''
+          : '${startText ?? '-'} - ${endText ?? '-'}';
 
-    final DateTime sentAt = DateTime.now();
-    state.addActivity(
-      ServiceReportActivity(
-        id: 'rapor-${sentAt.microsecondsSinceEpoch}',
-        vehicleCode: vehicle?.code ?? '',
-        date: sentAt,
+      final String fullDescription = item.serviceType != null && item.serviceType!.isNotEmpty
+          ? '[${item.serviceType}] - ${_description.text}'
+          : _description.text;
+
+      final PublishResult result = await PublishService.instance.publishReport(
+        state: state,
         reportType: widget.type.label,
-        description: _description.text.trim(),
+        description: fullDescription,
         imagePaths: imagePaths,
-        itemCount: 0,
-      ),
-    );
-    state.addNotification(
-      NotificationItem(
-        title: 'Servis raporu gönderildi',
-        message: '${widget.type.label} • ${imagePaths.length} görsel'
-            '${vehicle != null ? ' • ${vehicle.code}' : ''}'
-            '${hours.isEmpty ? '' : ' • $hours'}',
-        date: sentAt,
-        kind: NotificationKind.form,
-        vehicleCode: vehicle?.code,
-        details: <String, String>{
-          'Rapor türü': widget.type.label,
-          'Başlangıç saati': ?startText,
-          'Bitiş saati': ?endText,
-          'Gönderilen görsel': '${imagePaths.length}',
-          'Açıklama': _description.text.trim(),
-          'Gönderim tarihi': formatDateTime(sentAt),
-        },
-      ),
-    );
+        items: const <Map<String, Object?>>[],
+        vehicleCode: item.vehicle.code,
+        userRegistryNo: state.user?.registryNo,
+        startTime: startText,
+        endTime: endText,
+      );
 
-    await showResultDialog(
-      context,
-      title: 'Rapor gönderildi',
-      subtitle: formatDateTime(sentAt),
-      details: <String, String>{
-        'Rapor türü': widget.type.label,
-        'Araç': vehicle?.code ?? '-',
-        if (widget.showServiceHours)
-          'Servis saati': hours.isEmpty ? '-' : hours,
-        'Gönderilen görsel': '${imagePaths.length} adet',
-      },
-    );
+      if (!result.success) {
+        if (!mounted) return;
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(
+              '${item.vehicle.code} gönderilirken hata oluştu: ${result.error ?? "bilinmeyen hata"}. Sepettekiler duruyor, tekrar deneyebilirsiniz.',
+            ),
+          ));
+        return; // Hata durumunda döngüyü durdur
+      }
+
+      successCount++;
+      
+      final DateTime sentAt = DateTime.now();
+      state.addActivity(
+        ServiceReportActivity(
+          id: 'rapor-${sentAt.microsecondsSinceEpoch}',
+          vehicleCode: item.vehicle.code,
+          date: sentAt,
+          reportType: widget.type.label,
+          description: fullDescription,
+          imagePaths: imagePaths,
+          itemCount: 0,
+        ),
+      );
+      state.addNotification(
+        NotificationItem(
+          title: 'Servis raporu gönderildi',
+          message: '${widget.type.label} • ${imagePaths.length} görsel'
+              ' • ${item.vehicle.code}'
+              '${hours.isEmpty ? '' : ' • $hours'}',
+          date: sentAt,
+          kind: NotificationKind.form,
+          vehicleCode: item.vehicle.code,
+          details: <String, String>{
+            'Rapor türü': widget.type.label,
+            'Araç': item.vehicle.code,
+            'Başlangıç saati': startText ?? '-',
+            'Bitiş saati': endText ?? '-',
+            'Gönderilen görsel': '${imagePaths.length}',
+            'Açıklama': fullDescription,
+            'Gönderim tarihi': formatDateTime(sentAt),
+          },
+        ),
+      );
+    }
 
     if (!mounted) return;
     setState(() {
+      _sending = false;
+      _cart.clear(); // Hepsini başarıyla gönderince sepeti sıfırla
       _images.clear();
       _description.clear();
-      _startTime = null;
       _endTime = null;
     });
+
+    final DateTime now = DateTime.now();
+    await showResultDialog(
+      context,
+      title: 'Toplu Gönderim Başarılı',
+      subtitle: formatDateTime(now),
+      details: <String, String>{
+        'Gönderilen Toplam Rapor': '$successCount adet',
+      },
+    );
   }
 
   // ------------------------------------------------------------------ arayüz
@@ -443,99 +626,140 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   /// Servisin başlangıç ve bitiş saati alanları.
   Widget _buildServiceHours(BuildContext context) {
-    final bool canPickEnd = _startTime != null;
     return Wrap(
       spacing: 12,
       runSpacing: 12,
       children: <Widget>[
-        _buildTimeField(
+        // 1. Kayıt Göstergesi (Eski Sepet)
+        _buildActionBox(
+          context,
+          label: null,
+          value: _cart.isEmpty ? 'Kayıt Yok' : 'Kayıt (${_cart.length})',
+          icon: Icons.assignment_outlined,
+          isSet: _cart.isNotEmpty,
+          onTap: _showCart,
+        ),
+        // 2. Servis Seç
+        _buildActionBox(
+          context,
+          label: 'Servis Seç',
+          value: _selectedService ?? 'Servis seçin',
+          icon: Icons.build_circle_outlined,
+          isSet: _selectedService != null,
+          onTap: _pickService,
+        ),
+        // 3. Başlangıç Saati
+        _buildActionBox(
           context,
           label: 'Başlangıç Saati',
-          value: _startTime,
+          value: _startTime != null ? _formatTime(_startTime!) : 'Saat seçin',
+          icon: Icons.schedule_outlined,
+          isSet: _startTime != null,
           onTap: () => _pickTime(isStart: true),
         ),
-        _buildTimeField(
+        // 4. İşlemi Kaydet (Toplu işlem için sepete atar)
+        _buildActionBox(
           context,
-          label: 'Bitiş Saati',
-          value: _endTime,
-          isDisabled: !canPickEnd,
-          onTap: canPickEnd
-              ? () => _pickTime(isStart: false)
-              : () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Lütfen önce başlangıç saatini seçin.'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+          label: null,
+          value: 'İşlemi Kaydet',
+          icon: Icons.save_outlined,
+          isSet: true,
+          color: Colors.blue,
+          onTap: _saveToCart,
         ),
+        // 5. Onayla VEYA Bitiş Saati
+        if (_endTime == null)
+          _buildActionBox(
+            context,
+            label: null,
+            value: 'Onayla',
+            icon: Icons.check_circle_outline,
+            isSet: true,
+            color: Colors.green,
+            onTap: _approveAndPickEndTime,
+          )
+        else
+          _buildActionBox(
+            context,
+            label: 'Bitiş Saati',
+            value: _formatTime(_endTime!),
+            icon: Icons.schedule_outlined,
+            isSet: true,
+            color: Colors.green,
+            onTap: () => _pickTime(isStart: false),
+          ),
       ],
     );
   }
 
-  /// Tıklanınca saat seçiciyi açan, araç seçici ile aynı görünümde alan.
-  Widget _buildTimeField(
+  /// Genel buton/seçici kutu yapısı
+  Widget _buildActionBox(
     BuildContext context, {
-    required String label,
-    required TimeOfDay? value,
+    String? label,
+    required String value,
+    IconData? icon,
     required VoidCallback onTap,
+    bool isSet = false,
     bool isDisabled = false,
+    Color? color,
   }) {
-    final bool isSet = value != null;
+    final effectiveColor = color ?? accent;
     return SizedBox(
-      width: 200,
+      width: 175,
+      height: 52, // Hepsini aynı yüksekliğe sabitliyoruz
       child: Opacity(
         opacity: isDisabled ? 0.45 : 1.0,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
           onTap: isDisabled ? null : onTap,
+          borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              // Metin alanlarıyla aynı dolgu; koyu temada zeminden ayrışır.
-              color: context.isDark ? context.cardColor : context.pageColor,
+              color: isSet
+                  ? effectiveColor.withValues(alpha: 0.1)
+                  : (context.isDark ? Colors.black26 : Colors.white),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: isSet ? accent : context.moduleBorderColor(accent),
+                  color: isSet ? effectiveColor : context.moduleBorderColor(effectiveColor),
                   width: 2.5),
             ),
             child: Row(
+              mainAxisAlignment: (label == null && icon == null) 
+                  ? MainAxisAlignment.center 
+                  : MainAxisAlignment.start,
               children: <Widget>[
-                Icon(Icons.schedule_outlined,
-                    size: 20, color: isSet ? accent : context.mutedColor),
-                const SizedBox(width: 10),
+                if (icon != null) ...[
+                  Icon(icon, size: 20, color: isSet ? effectiveColor : context.mutedColor),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: (label == null && icon == null) 
+                        ? CrossAxisAlignment.center 
+                        : CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(label,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: context.isDark
-                                  ? Colors.white
-                                  : context.mutedColor)),
-                      const SizedBox(height: 2),
+                      if (label != null) ...[
+                        Text(label,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: context.isDark ? Colors.white : context.mutedColor)),
+                        const SizedBox(height: 2),
+                      ],
                       Text(
-                        isSet
-                            ? _formatTime(value)
-                            : (isDisabled ? 'Önce başl. seçin' : 'Saat seçin'),
+                        value,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: context.isDark
                               ? Colors.white
                               : (isSet ? null : context.mutedColor),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
-                ),
-                Icon(
-                  isDisabled ? Icons.lock_outline : Icons.keyboard_arrow_down,
-                  size: 20,
-                  color: context.mutedColor,
                 ),
               ],
             ),
@@ -547,13 +771,22 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   /// Görsel ve açıklama kartları.
   Widget _buildCards(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Expanded(child: _buildImageCard(context)),
-        const SizedBox(width: 20),
-        Expanded(child: _buildDescriptionCard(context)),
-      ],
+    // Fotoğraf ve açıklama kısımları ancak bitiş saati girilince açılır (buğulu kalkar).
+    final bool isUnlocked = !widget.showServiceHours || _endTime != null;
+    
+    return IgnorePointer(
+      ignoring: !isUnlocked,
+      child: Opacity(
+        opacity: isUnlocked ? 1.0 : 0.45,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Expanded(child: _buildImageCard(context)),
+            const SizedBox(width: 20),
+            Expanded(child: _buildDescriptionCard(context)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -564,7 +797,8 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         if (_images.isNotEmpty ||
             _description.text.isNotEmpty ||
             _startTime != null ||
-            _endTime != null)
+            _endTime != null ||
+            _cart.isNotEmpty)
           TextButton.icon(
             onPressed: _sending
                 ? null
@@ -573,15 +807,16 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                       _description.clear();
                       _startTime = null;
                       _endTime = null;
+                      _cart.clear(); // Sepeti de temizle
                     }),
             icon: const Icon(Icons.restart_alt),
-            label: const Text('Raporu temizle'),
+            label: const Text('Tümünü Temizle'),
           ),
         const SizedBox(width: 12),
         SizedBox(
           width: 260,
           child: FilledButton.icon(
-            onPressed: _sending ? null : _send,
+            onPressed: (_cart.isEmpty || _endTime == null || _sending) ? null : _send,
             style: FilledButton.styleFrom(
               backgroundColor: accent,
               minimumSize: const Size(0, 56),
@@ -594,7 +829,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                         CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.send),
-            label: Text(_sending ? 'Gönderiliyor...' : 'Raporu Gönder'),
+            label: Text(_sending ? 'Gönderiliyor...' : 'Tümünü Gönder'),
           ),
         ),
       ],
