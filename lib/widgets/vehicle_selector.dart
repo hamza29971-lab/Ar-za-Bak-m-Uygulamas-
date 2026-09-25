@@ -101,7 +101,6 @@ class _VehicleSelectorState extends State<VehicleSelector> {
 
   void _select(Vehicle vehicle) {
     _typing = false;
-    _controller.text = vehicle.code;
     widget.onSelected(vehicle);
     _focusNode.unfocus();
     _removeOverlay();
