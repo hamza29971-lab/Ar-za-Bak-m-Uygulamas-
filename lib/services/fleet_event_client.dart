@@ -168,7 +168,9 @@ class HttpFleetEventClient implements FleetEventClient {
         return FleetResult.success(id);
       }
       debugPrint('[Fleet] gönderim reddedildi: HTTP ${response.statusCode} ${response.body}');
-      return FleetResult.failure(_messageFor(response.statusCode));
+      return FleetResult.failure(
+        messageFor(response.statusCode, utf8.decode(response.bodyBytes)),
+      );
     } on Object catch (e) {
       debugPrint('[Fleet] gönderim hatası: $e');
       return const FleetResult.failure(
@@ -189,14 +191,33 @@ class HttpFleetEventClient implements FleetEventClient {
     }
   }
 
-  /// Dokümandaki hata tablosunun Türkçe karşılıkları.
-  static String _messageFor(int status) => switch (status) {
-        400 => 'Kayıt eksik veya hatalı; gönderilemedi.',
-        401 => 'Sunucu anahtarı geçersiz. Yöneticinize bildirin.',
-        405 => 'Sunucu bu isteği kabul etmedi.',
-        503 => 'Sunucu şu an hizmet veremiyor. Daha sonra deneyin.',
-        _ => 'Sunucu kaydı alamadı (HTTP $status).',
-      };
+  /// Sunucu cevabının kullanıcıya gösterilecek Türkçe karşılığı.
+  ///
+  /// mining-be 401'i iki farklı durumda döndürüyor: token hiç yoksa JSON
+  /// `{"code":"UNAUTHORIZED"}`, token geçerli ama yetki yoksa düz metin
+  /// "You do not have permission...". Süresi dolmuş/geçersiz token ise 440.
+  @visibleForTesting
+  static String messageFor(int status, String body) {
+    String? code;
+    try {
+      final Object? decoded = jsonDecode(body);
+      if (decoded is Map<String, Object?>) code = decoded['code'] as String?;
+    } on FormatException {
+      // Düz metin gövde (izin reddi); kod yok.
+    }
+
+    return switch (status) {
+      400 => 'Kayıt eksik veya hatalı; gönderilemedi.',
+      401 when code == 'UNAUTHORIZED' =>
+        'Oturum bilgisi gönderilemedi. Lütfen çıkış yapıp tekrar giriş yapın.',
+      401 => 'Sunucu bu hesaba işlem kaydetme yetkisi vermiyor. '
+          'Yöneticinize bildirin.',
+      440 => 'Oturum süresi doldu. Lütfen tekrar giriş yapın.',
+      405 => 'Sunucu bu isteği kabul etmedi.',
+      503 => 'Sunucu şu an hizmet veremiyor. Daha sonra deneyin.',
+      _ => 'Sunucu kaydı alamadı (HTTP $status).',
+    };
+  }
 }
 
 /// Ağa çıkmayan istemci: testler ve çevrimdışı geliştirme için.

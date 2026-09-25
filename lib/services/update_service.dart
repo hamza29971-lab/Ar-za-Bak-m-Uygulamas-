@@ -1,19 +1,20 @@
 // lib/services/update_service.dart
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'kiosk_service.dart';
 
 class UpdateService {
   static const String _token1 = 'ghp_1seMoPinB3kQjaml';
   static const String _token2 = '4fAY4gblfmNnHI14atAX';
   static String get _token => _token1 + _token2;
-  
+
   static const String _owner = 'hamza29971-lab';
   static const String _repo = 'Nimo_bak-m_g-ncelleme';
-  static const String _prefKey = 'last_downloaded_build_nimo';
   static const String _ignoredKey = 'last_ignored_build_nimo';
 
   static Map<String, String> get _headers => {
@@ -35,56 +36,48 @@ class UpdateService {
     throw Exception('version.json okunamadi: ${response.statusCode}');
   }
 
-  /// Tabletteki yerel build_number'i okur.
-  /// SharedPreferences ve assets/version.txt içindeki en büyük sayıyı döndürür.
-  static Future<int> getLocalBuildNumber() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getInt(_prefKey) ?? 1;
-      final content = await rootBundle.loadString('assets/version.txt');
-      final assetVersion = int.tryParse(content.trim()) ?? 1;
-      
-      return saved > assetVersion ? saved : assetVersion;
-    } catch (_) {
-      return 1;
-    }
-  }
-
   /// Kullanıcı 'Şimdi Değil' derse, bu build numarasını bir daha sormaması için kaydeder.
   static Future<void> ignoreBuild(int buildNumber) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_ignoredKey, buildNumber);
   }
 
-  /// Basarili indirme sonrasi build_number'i kaydeder.
-  static Future<void> saveLocalBuildNumber(int buildNumber) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefKey, buildNumber);
-  }
+  /// Güncelleme önerilmeli mi?
+  ///
+  /// Karşılaştırma tabletteki GERÇEK versionCode ile yapılır; indirme ya da
+  /// kurulum denemesi hiçbir şeyi "kuruldu" saymaz. Böylece başarısız bir
+  /// kurulum sonraki kontrolde yeniden önerilir. Daha eski bir sürüm hiçbir
+  /// zaman önerilmez (Android zaten reddeder).
+  @visibleForTesting
+  static bool shouldOffer({
+    required int remote,
+    required int installed,
+    required int ignored,
+  }) =>
+      remote > installed && remote != ignored;
 
-  /// Guncelleme gerekip gerekmedigini kontrol eder.
-  /// remote != local ise guncelleme var demektir.
-  /// Ancak remote == ignored_build ise guncelleme ekranı çıkmaz.
   static Future<({bool available, int remoteBuild})> checkUpdate() async {
     try {
+      final int? installed = await KioskService.instance.installedVersionCode();
+      if (installed == null) return (available: false, remoteBuild: 0);
+
       final remote = await getRemoteBuildNumber();
-      final local = await getLocalBuildNumber();
-      
       final prefs = await SharedPreferences.getInstance();
       final ignored = prefs.getInt(_ignoredKey) ?? 0;
 
-      if (remote == ignored) {
-        return (available: false, remoteBuild: remote); // Görmezden gelinen sürüm, gösterme
-      }
-
-      return (available: remote != local, remoteBuild: remote);
+      return (
+        available: shouldOffer(remote: remote, installed: installed, ignored: ignored),
+        remoteBuild: remote,
+      );
     } catch (_) {
       return (available: false, remoteBuild: 0);
     }
   }
 
   /// APK'yi indirir ve indirme ilerlemesini bildirir (0.0 - 1.0).
-  /// Indirme bittikten sonra build_number'i SharedPreferences'a kaydeder.
+  ///
+  /// Dosya belleğe alınmadan doğrudan diske yazılır: ~85 MB'lık APK'yı bir
+  /// `List<int>` içinde biriktirmek yüzlerce MB RAM harcıyordu.
   static Future<File> downloadApk(
       int newBuildNumber, void Function(double progress) onProgress) async {
     final ts = DateTime.now().millisecondsSinceEpoch;
@@ -101,37 +94,32 @@ class UpdateService {
       throw Exception('APK indirilemedi: ${response.statusCode}');
     }
 
+    final dir = await getExternalStorageDirectory();
+    if (dir == null) throw Exception('İndirme klasörü bulunamadı.');
+
+    // Eski kurulum dosyalarını temizle
+    for (final f in dir.listSync()) {
+      if (f is File && f.path.contains('nimo_update_')) {
+        try {
+          f.deleteSync();
+        } catch (_) {}
+      }
+    }
+
+    final file = File('${dir.path}/nimo_update_$newBuildNumber.apk');
+    final IOSink sink = file.openWrite();
     final contentLength = response.contentLength ?? 0;
     int downloaded = 0;
-    final bytes = <int>[];
-
-    await for (final chunk in response.stream) {
-      bytes.addAll(chunk);
-      downloaded += chunk.length;
-      if (contentLength > 0) {
-        onProgress(downloaded / contentLength);
+    try {
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        downloaded += chunk.length;
+        if (contentLength > 0) onProgress(downloaded / contentLength);
       }
+      await sink.flush();
+    } finally {
+      await sink.close();
     }
-
-    final dir = await getExternalStorageDirectory();
-    if (dir != null) {
-      // Eski kurulum dosyalarını temizle
-      final files = dir.listSync();
-      for (var f in files) {
-        if (f is File && f.path.contains('nimo_update_')) {
-          try {
-            f.deleteSync();
-          } catch (_) {}
-        }
-      }
-    }
-
-    final savePath = '${dir!.path}/nimo_update_$newBuildNumber.apk';
-    final file = File(savePath);
-    
-    await file.writeAsBytes(bytes, flush: true);
-    // Indirilen build numarasini kaydet (bir sonraki kontrolde kullanilir)
-    await saveLocalBuildNumber(newBuildNumber);
     return file;
   }
 }

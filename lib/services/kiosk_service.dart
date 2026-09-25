@@ -114,4 +114,49 @@ class KioskService {
       return KioskUnlockResult.noOwner;
     }
   }
+
+  /// Kurulu uygulamanin versionCode'u (pubspec'teki `+N`). OTA'daki
+  /// `version.json` `build_number` ile karsilastirilir. Android disinda null.
+  Future<int?> installedVersionCode() async {
+    if (!_supported) return null;
+    try {
+      return await _channel.invokeMethod<int>('installedVersionCode');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  /// Indirilen APK'yi sistem yukleyici ekranini acmadan kurar (device owner
+  /// sessiz kurulum). Sonuc asenkron gelir: basariliysa uygulama yeniden
+  /// baslar, basarisizsa [consumeInstallError] mesaji dondurur.
+  ///
+  /// Kurulum baslatilamazsa hata mesajini, baslatildiysa null doner.
+  Future<String?> installUpdate(String apkPath) async {
+    if (!_supported) return 'Güncelleme yalnızca Android tablette kurulabilir.';
+    try {
+      await _channel.invokeMethod<bool>(
+        'installUpdate',
+        <String, Object?>{'path': apkPath},
+      );
+      return null;
+    } on PlatformException catch (e) {
+      return 'Kurulum başlatılamadı: ${e.message ?? e.code}';
+    } on MissingPluginException {
+      return 'Kurulum bu cihazda desteklenmiyor.';
+    }
+  }
+
+  /// Son basarisiz kurulumun mesaji (bir kez okunur).
+  Future<String?> consumeInstallError() async {
+    if (!_supported) return null;
+    try {
+      return await _channel.invokeMethod<String>('consumeInstallError');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
 }

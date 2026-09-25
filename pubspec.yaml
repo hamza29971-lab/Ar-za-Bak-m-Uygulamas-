@@ -1,7 +1,7 @@
 name: nimo_arizabakim
 description: "NIMO Arıza Bakım Tablet Uygulaması"
 publish_to: 'none'
-version: 1.0.0+69
+version: 1.0.0+71
 
 environment:
   sdk: ^3.11.5
@@ -24,7 +24,6 @@ dependencies:
   http_parser: ^4.1.2
   battery_plus: ^7.1.1
   path_provider: ^2.1.6
-  open_file: ^4.0.0
   connectivity_plus: ^7.3.1
 
 dev_dependencies:
@@ -40,6 +39,5 @@ flutter:
     - assets/images/anasayfa/
     - assets/images/sol/
     - assets/images/sag/
-    - assets/version.txt
 
 

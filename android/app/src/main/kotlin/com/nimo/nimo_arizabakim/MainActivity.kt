@@ -51,6 +51,26 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "status" -> result.success(statusMap())
                     "unlock" -> handleUnlock(call.argument<String>("password"), result)
+                    "installUpdate" -> {
+                        val path = call.argument<String>("path")
+                        if (path == null) {
+                            result.error("INVALID_ARGUMENTS", "APK yolu eksik.", null)
+                        } else {
+                            // ~85 MB oturuma kopyalanir; ana is parcaciginda
+                            // yapilirsa arayuz donar.
+                            Thread {
+                                val outcome = runCatching { ApkInstaller.install(this, path) }
+                                runOnUiThread {
+                                    outcome
+                                        .onSuccess { result.success(true) }
+                                        .onFailure { result.error("INSTALL_FAILED", it.message, null) }
+                                }
+                            }.start()
+                        }
+                    }
+                    "installedVersionCode" ->
+                        result.success(ApkInstaller.installedVersionCode(this))
+                    "consumeInstallError" -> result.success(ApkInstaller.consumeError(this))
                     else -> result.notImplemented()
                 }
             }
