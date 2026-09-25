@@ -1,7 +1,7 @@
 name: nimo_arizabakim
 description: "NIMO Arıza Bakım Tablet Uygulaması"
 publish_to: 'none'
-version: 1.0.0+71
+version: 1.0.0+72
 
 environment:
   sdk: ^3.11.5
