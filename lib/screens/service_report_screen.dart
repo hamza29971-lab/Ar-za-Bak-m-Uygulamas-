@@ -301,7 +301,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                               content: SizedBox(
                                 width: 400,
                                 child: Text(
-                                  'Bu araç için "$service" işlemi sepette zaten eklenmiş. Lütfen farklı bir servis türü seçin.',
+                                  'Bu araç için "$service" işlemi devam eden servis kayıtları arasında bulunmaktadır. Lütfen farklı bir işlem seçiniz.',
                                   style: const TextStyle(fontSize: 16),
                                 ),
                               ),
@@ -378,6 +378,8 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           startTime: _startTime,
           endTime: _endTime,
         );
+        // Düzenlenen kayıt kaydedildikten sonra form ekranda kalsın, sadece düzenleme modundan çıkalım.
+        _editingIndex = null;
       } else {
         _cart.add(_ServiceCartItem(
           vehicle: vehicle!,
@@ -387,16 +389,16 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           startTime: _startTime,
           endTime: _endTime,
         ));
+        
+        // Yeni bir kayıt sıfırdan ekleniyorsa formu sıfırla
+        state.selectVehicle(null);
+        _images.clear();
+        _description.clear();
+        _selectedService = null;
+        _startTime = null;
+        _endTime = null;
+        _editingIndex = null;
       }
-      
-      // Formu sıfırla
-      state.selectVehicle(null);
-      _images.clear();
-      _description.clear();
-      _selectedService = null;
-      _startTime = null;
-      _endTime = null;
-      _editingIndex = null;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -704,8 +706,8 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                       borderAccent: borderAccent,
                       width: 360,
                       onSelected: (Vehicle? newVehicle) {
-                        if (newVehicle != null && _editingIndex != null) {
-                          if (newVehicle.code != _cart[_editingIndex!].vehicle.code) {
+                        if (newVehicle != null) {
+                          if (_editingIndex != null && newVehicle.code != _cart[_editingIndex!].vehicle.code) {
                             showDialog<void>(
                               context: context,
                               builder: (ctx) => AlertDialog(
@@ -724,6 +726,18 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                               ),
                             );
                             return;
+                          }
+
+                          // Eğer araç gerçekten değişiyorsa formu sıfırla
+                          if (state.selectedVehicle?.code != newVehicle.code) {
+                            setState(() {
+                              _images.clear();
+                              _description.clear();
+                              _startTime = null;
+                              _endTime = null;
+                              _selectedService = null;
+                              _editingIndex = null;
+                            });
                           }
                         }
                         state.selectVehicle(newVehicle);
