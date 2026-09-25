@@ -703,6 +703,8 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       details: <String, String>{
         'Araç': vehicle.code,
         'Servis': sentServiceName,
+        if (startText != null) 'Başlangıç': startText,
+        if (endText != null) 'Bitiş': endText,
       },
     );
   }
