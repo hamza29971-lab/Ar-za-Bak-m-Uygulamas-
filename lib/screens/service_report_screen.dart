@@ -347,7 +347,13 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       }
     );
     if (picked != null) {
-      setState(() => _selectedService = picked);
+      setState(() {
+        if (_selectedService != picked) {
+          _startTime = null;
+          _endTime = null;
+        }
+        _selectedService = picked;
+      });
     }
   }
 
@@ -365,6 +371,35 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
     if (errors.isNotEmpty) {
       _showValidationPopup(errors);
+      return;
+    }
+
+    // Sepette (düzenlenen hariç) aynı araç ve aynı servis var mı kontrolü
+    final bool isDuplicate = _cart.asMap().entries.any((entry) {
+      if (_editingIndex == entry.key) return false;
+      return entry.value.vehicle.code == vehicle!.code && entry.value.serviceType == _selectedService;
+    });
+
+    if (isDuplicate) {
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: SizedBox(
+            width: 400,
+            child: Text(
+              'Bu araç için "$_selectedService" işlemi devam eden servis kayıtları arasında bulunmaktadır. Lütfen farklı bir işlem seçiniz.',
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tamam', style: TextStyle(fontSize: 16)),
+            )
+          ],
+        ),
+      );
       return;
     }
 
