@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
@@ -5,7 +7,6 @@ import '../state/app_state.dart' show AppState, PendingOperation;
 import 'fleet_event_client.dart';
 import 'fleet_event_mapper.dart';
 import 'service_locator.dart';
-import 'image_upload_client.dart';
 
 class PublishService {
   PublishService._();
@@ -32,32 +33,27 @@ class PublishService {
     String? startTime,
     String? endTime,
   }) async {
-    // 1. Resimleri yükle
+    // 1. Resimleri Base64 formatına çevir
     List<String> uploadedImageUrls = [];
     if (imagePaths.isNotEmpty) {
-      final ImageUploadClient uploadClient = HttpImageUploadClient();
       final List<String> pathsToProcess = imagePaths.take(5).toList();
       for (String path in pathsToProcess) {
         try {
-          final UploadResult uploadResult = await uploadClient.upload(path);
-          if (uploadResult.ok && uploadResult.url != null) {
-            uploadedImageUrls.add(uploadResult.url!);
-          } else {
-            debugPrint('Resim yüklenemedi: ${uploadResult.error}');
-            return PublishResult(
-              topic: baseTopic,
-              payload: '',
-              success: false,
-              error: uploadResult.error ?? 'Fotoğraf yüklenemedi.',
-            );
+          final File file = File(path);
+          if (file.existsSync()) {
+            final List<int> bytes = file.readAsBytesSync();
+            final String ext = path.split('.').last.toLowerCase();
+            final String mimeType = (ext == 'png' || ext == 'webp') ? 'image/$ext' : 'image/jpeg';
+            final String base64Str = base64Encode(bytes);
+            uploadedImageUrls.add('data:$mimeType;base64,$base64Str');
           }
         } catch (e) {
-          debugPrint('Resim yükleme hatası: $e');
+          debugPrint('Resim okuma hatası: $e');
           return PublishResult(
             topic: baseTopic,
             payload: '',
             success: false,
-            error: 'Fotoğraf yükleme hatası: İnternetinizi kontrol edin.',
+            error: 'Fotoğraf okunamadı: Cihaz hafızasına erişilemiyor.',
           );
         }
       }
