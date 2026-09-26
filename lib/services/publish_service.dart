@@ -44,9 +44,21 @@ class PublishService {
             uploadedImageUrls.add(uploadResult.url!);
           } else {
             debugPrint('Resim yüklenemedi: ${uploadResult.error}');
+            return PublishResult(
+              topic: baseTopic,
+              payload: '',
+              success: false,
+              error: uploadResult.error ?? 'Fotoğraf yüklenemedi.',
+            );
           }
         } catch (e) {
           debugPrint('Resim yükleme hatası: $e');
+          return PublishResult(
+            topic: baseTopic,
+            payload: '',
+            success: false,
+            error: 'Fotoğraf yükleme hatası: İnternetinizi kontrol edin.',
+          );
         }
       }
     }

@@ -957,7 +957,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         SizedBox(
           width: 260,
           child: FilledButton.icon(
-            onPressed: (_endTime == null || _sending) ? null : _send,
+            onPressed: ((widget.showServiceHours && _endTime == null) || _sending) ? null : _send,
             style: FilledButton.styleFrom(
               backgroundColor: accent,
               minimumSize: const Size(0, 56),
