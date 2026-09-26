@@ -590,7 +590,9 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
     final List<String> errors = <String>[];
     if (vehicle == null) errors.add('Lütfen işlem yapılacak aracı seçin.');
-    if (_selectedService == null) errors.add('Lütfen yapılan servisi seçin.');
+    if (widget.showServiceHours && _selectedService == null) {
+      errors.add('Lütfen yapılan servisi seçin.');
+    }
     if (widget.showServiceHours && _startTime == null) {
       errors.add('Başlangıç saatini seçmediniz.');
     }
