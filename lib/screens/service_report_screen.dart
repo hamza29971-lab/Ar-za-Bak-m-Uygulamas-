@@ -682,7 +682,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     );
 
     if (!mounted) return;
-    final String sentServiceName = _selectedService ?? '-';
+    final String? sentServiceName = _selectedService;
 
     setState(() {
       _sending = false;
@@ -704,7 +704,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       subtitle: formatDateTime(sentAt),
       details: <String, String>{
         'Araç': vehicle.code,
-        'Servis': sentServiceName,
+        if (sentServiceName != null) 'Servis': sentServiceName,
         if (startText != null) 'Başlangıç': startText,
         if (endText != null) 'Bitiş': endText,
       },
