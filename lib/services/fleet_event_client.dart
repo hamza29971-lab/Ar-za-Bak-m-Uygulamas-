@@ -216,8 +216,10 @@ class HttpFleetEventClient implements FleetEventClient {
             body: jsonEncode({
               "vehicleUUID": vehicleUUID,
               "pageNumber": 0,
-              "pageSize": 100,
-              "filters": []
+              "pageSize": 50,
+              "filters": [
+                { "key": "name", "operation": ":", "type": "string", "value": "" }
+              ]
             }),
           )
           .timeout(AppConfig.requestTimeout);
@@ -228,16 +230,24 @@ class HttpFleetEventClient implements FleetEventClient {
           final Object? data = body['data'] ?? body['content'] ?? body;
           if (data is List) {
             return data.map((e) {
-              if (e is Map) return e['name']?.toString() ?? e['serviceName']?.toString() ?? '';
+              if (e is Map) {
+                return e['name']?.toString() ?? 
+                       e['label']?.toString() ?? 
+                       e['serviceName']?.toString() ?? 
+                       e['title']?.toString() ?? 
+                       '';
+              }
               return e.toString();
             }).where((e) => e.isNotEmpty).toList();
           }
         }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('[Fleet] fetchServices hatası: $e');
+      throw Exception(e.toString());
     }
-    return <String>[];
   }
 
   /// Sunucu cevabının kullanıcıya gösterilecek Türkçe karşılığı.

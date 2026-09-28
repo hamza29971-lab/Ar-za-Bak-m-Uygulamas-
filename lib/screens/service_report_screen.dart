@@ -255,6 +255,14 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       }
     } catch (e) {
       debugPrint('Servis çekme hatası: $e');
+      if (!mounted) return;
+      setState(() {
+        _fetchingServices = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+      );
+      return;
     } finally {
       setState(() {
         _fetchingServices = false;
