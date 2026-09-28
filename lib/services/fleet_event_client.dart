@@ -21,6 +21,7 @@ class FleetEvent {
     this.vehicleUUID,
     this.operatorLabel,
     this.occurredAt,
+    this.service,
     this.fields = const <String, Object?>{},
   });
 
@@ -40,6 +41,7 @@ class FleetEvent {
   final String? deviceId;
   final String? vehicleUUID;
   final String? operatorLabel;
+  final String? service;
   final DateTime? occurredAt;
 
   /// Ek anahtar/değer. Sunucu yalnızca string, number ve boolean kabul eder;
@@ -59,9 +61,13 @@ class FleetEvent {
       'type': type,
       if (note.trim().isNotEmpty) 'note': _clamp(note.trim(), maxNote),
       if (deviceId != null && deviceId!.isNotEmpty) 'deviceId': deviceId,
+      if (service != null && service!.isNotEmpty) 'service': service,
       if (vehicleUUID != null && vehicleUUID!.isNotEmpty)
         'vehicleUUID': vehicleUUID,
-      'operatorLabel': (operatorLabel != null && operatorLabel!.trim().isNotEmpty) ? operatorLabel : '-',
+      'operatorLabel':
+          (operatorLabel != null && operatorLabel!.trim().isNotEmpty)
+          ? operatorLabel
+          : '-',
       // Yerel saatin ISO çıktısında dilim eki olmadığı için UTC gönderilir.
       if (occurredAt != null)
         'occurredAt': occurredAt!.toUtc().toIso8601String(),
@@ -104,13 +110,9 @@ class FleetEvent {
 /// Tek bir gönderimin sonucu.
 @immutable
 class FleetResult {
-  const FleetResult.success(this.id)
-      : ok = true,
-        error = null;
+  const FleetResult.success(this.id) : ok = true, error = null;
 
-  const FleetResult.failure(this.error)
-      : ok = false,
-        id = null;
+  const FleetResult.failure(this.error) : ok = false, id = null;
 
   final bool ok;
 
@@ -125,6 +127,9 @@ class FleetResult {
 /// [MockFleetEventClient] yerleştirilir.
 abstract interface class FleetEventClient {
   Future<FleetResult> send(FleetEvent event, {String? accessToken});
+  
+  /// Seçili araç için hizmet (servis) listesini arar/getirir.
+  Future<List<String>> fetchServices(String vehicleUUID, {String? accessToken});
 
   /// Bağlantı sınaması; anahtar gerektirmez.
   Future<bool> health();
@@ -132,7 +137,8 @@ abstract interface class FleetEventClient {
 
 /// Gerçek uç noktaya POST eden istemci.
 class HttpFleetEventClient implements FleetEventClient {
-  HttpFleetEventClient({http.Client? client}) : _client = client ?? http.Client();
+  HttpFleetEventClient({http.Client? client})
+    : _client = client ?? http.Client();
 
   final http.Client _client;
 
@@ -168,7 +174,9 @@ class HttpFleetEventClient implements FleetEventClient {
         debugPrint('[Fleet] gönderim başarılı, kayıt id: $id');
         return FleetResult.success(id);
       }
-      debugPrint('[Fleet] gönderim reddedildi: HTTP ${response.statusCode} ${response.body}');
+      debugPrint(
+        '[Fleet] gönderim reddedildi: HTTP ${response.statusCode} ${response.body}',
+      );
       return FleetResult.failure(
         messageFor(response.statusCode, utf8.decode(response.bodyBytes)),
       );
@@ -192,6 +200,46 @@ class HttpFleetEventClient implements FleetEventClient {
     }
   }
 
+  @override
+  Future<List<String>> fetchServices(String vehicleUUID, {String? accessToken}) async {
+    try {
+      final Uri url = Uri.parse(AppConfig.fleetEventUrl)
+          .replace(path: '/services/public/search-autocomplete-filter');
+      final http.Response response = await _client
+          .post(
+            url,
+            headers: <String, String>{
+              'Content-Type': 'application/json',
+              if (accessToken != null && accessToken.isNotEmpty)
+                'Authorization': 'Bearer $accessToken',
+            },
+            body: jsonEncode({
+              "vehicleUUID": vehicleUUID,
+              "pageNumber": 0,
+              "pageSize": 100,
+              "filters": []
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final Object? body = jsonDecode(utf8.decode(response.bodyBytes));
+        if (body is Map<String, Object?>) {
+          final Object? data = body['data'] ?? body['content'] ?? body;
+          if (data is List) {
+            return data.map((e) {
+              if (e is Map) return e['name']?.toString() ?? e['serviceName']?.toString() ?? '';
+              return e.toString();
+            }).where((e) => e.isNotEmpty).toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[Fleet] fetchServices hatası: $e');
+    }
+    return <String>[];
+  }
+
   /// Sunucu cevabının kullanıcıya gösterilecek Türkçe karşılığı.
   ///
   /// mining-be 401'i iki farklı durumda döndürüyor: token hiç yoksa JSON
@@ -211,8 +259,9 @@ class HttpFleetEventClient implements FleetEventClient {
       400 => 'Kayıt eksik veya hatalı; gönderilemedi.',
       401 when code == 'UNAUTHORIZED' =>
         'Oturum bilgisi gönderilemedi. Lütfen çıkış yapıp tekrar giriş yapın.',
-      401 => 'Sunucu bu hesaba işlem kaydetme yetkisi vermiyor. '
-          'Yöneticinize bildirin.',
+      401 =>
+        'Sunucu bu hesaba işlem kaydetme yetkisi vermiyor. '
+            'Yöneticinize bildirin.',
       440 => 'Oturum süresi doldu. Lütfen tekrar giriş yapın.',
       405 => 'Sunucu bu isteği kabul etmedi.',
       503 => 'Sunucu şu an hizmet veremiyor. Daha sonra deneyin.',
@@ -240,6 +289,11 @@ class MockFleetEventClient implements FleetEventClient {
     if (failWith != null) return FleetResult.failure(failWith);
     debugPrint('[Fleet] ${jsonEncode(event.toJson())}');
     return FleetResult.success('mock-${++_counter}');
+  }
+
+  @override
+  Future<List<String>> fetchServices(String vehicleUUID, {String? accessToken}) async {
+    return ['Test Servis 1', 'Test Servis 2'];
   }
 
   @override

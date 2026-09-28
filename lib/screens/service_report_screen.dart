@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/models.dart';
 import '../services/publish_service.dart';
+import '../services/fleet_event_client.dart';
+import '../services/service_locator.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/formats.dart';
@@ -94,47 +96,14 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   TimeOfDay? _endTime;
 
   String? _selectedService;
-  List<String> _fetchedServices = [
-    'Yağ Bakımı',
-    'Fren Bakımı',
-    'Lastik Değişimi',
-    'Genel Arıza',
-    'Periyodik Bakım',
-    'Akü Değişimi',
-  ];
+  List<String> _fetchedServices = [];
+  bool _fetchingServices = false;
 
   final List<_ServiceCartItem> _cart = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchServices();
-  }
-
-  Future<void> _fetchServices() async {
-    try {
-      final url = Uri.parse('https://mining-be.ndmo.com.tr/services/public/search-autocomplete-filter');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "pageNumber": 0,
-          "pageSize": 20,
-          "filters": []
-        }),
-      );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          final items = data['data'] as List;
-          setState(() {
-            _fetchedServices = items.map((e) => e['label'].toString()).toList();
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Servisler çekilemedi: $e');
-    }
   }
   int? _editingIndex;
 
@@ -263,6 +232,44 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   // ------------------------------------------------------------------ sepet fonksiyonları
   Future<void> _pickService() async {
     FocusManager.instance.primaryFocus?.unfocus();
+    final AppState state = AppScope.read(context);
+    final vehicle = state.selectedVehicle;
+    if (vehicle == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen önce araç seçin.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    setState(() {
+      _fetchingServices = true;
+    });
+
+    try {
+      final String? accessToken = await ServiceLocator.tokens.readAccessToken();
+      final FleetEventClient client = HttpFleetEventClient();
+      // Vehicle UUID is parsed from code/id. Wait, state.vehicleUuidFor(vehicle.code)
+      final String? uuid = state.vehicleUuidFor(vehicle.code);
+      if (uuid != null) {
+        _fetchedServices = await client.fetchServices(uuid, accessToken: accessToken);
+      }
+    } catch (e) {
+      debugPrint('Servis çekme hatası: $e');
+    } finally {
+      setState(() {
+        _fetchingServices = false;
+      });
+    }
+
+    if (!mounted) return;
+
+    if (_fetchedServices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bu araç için servis bulunamadı veya bağlantı hatası oluştu.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
     final String? picked = await showDialog<String>(
       context: context,
       builder: (BuildContext ctx) {
@@ -626,6 +633,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     final PublishResult result = await PublishService.instance.publishReport(
       state: state,
       reportType: widget.type.label,
+      service: _selectedService,
       description: fullDescription,
       imagePaths: imagePaths,
       items: const <Map<String, Object?>>[],
@@ -822,10 +830,10 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         _buildActionBox(
           context,
           label: 'Servis Seç',
-          value: _selectedService ?? 'Servis seçin',
-          icon: Icons.build_circle_outlined,
+          value: _fetchingServices ? 'Yükleniyor...' : (_selectedService ?? 'Servis seçin'),
+          icon: _fetchingServices ? Icons.hourglass_empty : Icons.build_circle_outlined,
           isSet: _selectedService != null,
-          isDisabled: _editingIndex != null,
+          isDisabled: _editingIndex != null || _fetchingServices,
           onTap: _pickService,
         ),
         // 3. Başlangıç Saati

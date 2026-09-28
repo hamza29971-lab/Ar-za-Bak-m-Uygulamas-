@@ -25,6 +25,7 @@ class PublishService {
   Future<PublishResult> publishReport({
     required AppState state,
     required String reportType,
+    required String? service,
     required String description,
     required List<String> imagePaths,
     List<Map<String, Object?>> items = const <Map<String, Object?>>[],
@@ -71,6 +72,7 @@ class PublishService {
 
     final FleetEvent event = FleetEventMapper.fromReport(
       reportType: reportType,
+      service: service,
       description: description,
       imageCount: uploadedImageUrls.length,
       imageNames: uploadedImageUrls, // Yüklenen resimlerin URL'lerini API'ye gönder

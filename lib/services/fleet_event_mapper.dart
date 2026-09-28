@@ -58,6 +58,7 @@ class FleetEventMapper {
   /// Servis Raporu / Mekanik Operasyon ekranından gönderilen rapor.
   static FleetEvent fromReport({
     required String reportType,
+    required String? service,
     required String description,
     required int imageCount,
     required List<String> imageNames,
@@ -75,6 +76,7 @@ class FleetEventMapper {
       deviceId: deviceId,
       vehicleUUID: vehicleUUID,
       operatorLabel: operatorLabel,
+      service: service,
       occurredAt: occurredAt,
       fields: <String, Object?>{
         'raporTuru': reportType,
@@ -92,7 +94,7 @@ class FleetEventMapper {
   // ------------------------------------------------------------------ eşleme
 
   static const Map<String, String> _reportTypes = <String, String>{
-    'Servis Raporu': 'genel',
+    'Servis Raporu': 'bakım',
     'Mekanik Operasyon': 'bakim',
   };
 

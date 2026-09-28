@@ -66,6 +66,6 @@ class AppConfig {
   /// Nimo Fleet Source.
   static const String fleetSource = String.fromEnvironment(
     'NIMO_FLEET_SOURCE',
-    defaultValue: 'tablet',
+    defaultValue: 'MANUAL',
   );
 }
