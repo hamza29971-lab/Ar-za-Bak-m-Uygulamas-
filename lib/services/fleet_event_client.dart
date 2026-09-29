@@ -241,13 +241,20 @@ class HttpFleetEventClient implements FleetEventClient {
             }).where((e) => e.isNotEmpty).toList();
           }
         }
+      } else if (response.statusCode == 404) {
+        final Object? body = jsonDecode(utf8.decode(response.bodyBytes));
+        if (body is Map<String, Object?> && body['message'] != null) {
+          throw Exception(body['message']);
+        }
+        throw Exception('Bu araç için kayıt bulunamadı (404).');
       } else {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('[Fleet] fetchServices hatası: $e');
-      throw Exception(e.toString());
+      rethrow;
     }
+    return <String>[];
   }
 
   /// Sunucu cevabının kullanıcıya gösterilecek Türkçe karşılığı.

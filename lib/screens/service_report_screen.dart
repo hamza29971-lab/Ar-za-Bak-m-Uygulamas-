@@ -259,8 +259,22 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       setState(() {
         _fetchingServices = false;
       });
+      
+      String errorMsg = e.toString().replaceAll('Exception: ', '');
+      
+      if (errorMsg.contains('acik bakim kaydi')) {
+        errorMsg = 'Bu araca ait açık bakım kaydı bulunamadı.';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(
+            errorMsg,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ), 
+          backgroundColor: Colors.orange.shade800,
+          duration: const Duration(seconds: 4),
+        ),
       );
       return;
     } finally {
