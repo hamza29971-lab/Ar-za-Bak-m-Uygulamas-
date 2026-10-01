@@ -2,6 +2,7 @@ package com.nimo.nimo_arizabakim
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.telephony.SmsManager
 import android.util.Log
@@ -56,6 +57,21 @@ class MainActivity : FlutterActivity() {
                         if (path == null) {
                             result.error("INVALID_ARGUMENTS", "APK yolu eksik.", null)
                         } else {
+                            // Play Protect'in kurulum-oncesi dogrulama ekrani
+                            // (PlayProtectDialogsActivity) PackageInstaller
+                            // callback zincirinin DISINDA, sistem tarafindan
+                            // dogrudan acilmaya calisiliyor — bize
+                            // STATUS_PENDING_USER_ACTION olarak hic haber
+                            // gelmiyor. Ekran kilitliyken acilamayip session
+                            // 75 saniye sonra INSTALL_FAILED_VERIFICATION_FAILURE
+                            // ile reddediliyordu. Kilit bu yuzden onay
+                            // istegini beklemeden, kurulumdan ONCE kaldirilir;
+                            // onResume() kurulum bitince (basarili ya da
+                            // basarisiz) otomatik geri kurar.
+                            if (KioskPolicy.isDeviceOwner(this)) {
+                                runCatching { stopLockTask() }
+                                    .onFailure { Log.w(TAG, "Kilit kaldirilamadi", it) }
+                            }
                             // ~85 MB oturuma kopyalanir; ana is parcaciginda
                             // yapilirsa arayuz donar.
                             Thread {
@@ -76,6 +92,12 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePendingInstallConfirmation()
+    }
+
     override fun onResume() {
         super.onResume()
         if (!KioskPolicy.isDeviceOwner(this)) return
@@ -86,8 +108,41 @@ class MainActivity : FlutterActivity() {
             KioskPolicy.applyAll(this)
             Log.i(TAG, "Ayarlar kapandi; kiosk geri kuruldu")
         }
+        // Bekleyen bir kurulum onay ekrani varsa kilit dahil edilmeden once
+        // acilmasina izin ver; aksi halde Play Protect ekrani lock-task
+        // ihlaliyle sessizce engellenir (bkz. ApkInstaller).
+        if (handlePendingInstallConfirmation()) return
         enterLockTask()
     }
+
+    /**
+     * [ApkInstaller]'in ilettigi kurulum onay ekranini acar. Sistemin kendi
+     * ekranini gosterebilmesi icin kilit GECICI olarak kaldirilir; ekran
+     * kapanip buraya donulunce onResume() kilidi otomatik yeniden kurar.
+     *
+     * @return bir onay ekrani acildiysa true (bu durumda [enterLockTask]
+     *   cagrilmamali).
+     */
+    private fun handlePendingInstallConfirmation(): Boolean {
+        val confirm = intent?.getParcelableExtraCompat(EXTRA_INSTALL_CONFIRM_INTENT) ?: return false
+        intent.removeExtra(EXTRA_INSTALL_CONFIRM_INTENT)
+        if (KioskPolicy.isDeviceOwner(this)) {
+            runCatching { stopLockTask() }
+                .onFailure { Log.w(TAG, "Kilit kaldirilamadi", it) }
+        }
+        confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { startActivity(confirm) }
+            .onFailure { Log.e(TAG, "Kurulum onay ekrani acilamadi", it) }
+            .isSuccess
+    }
+
+    private fun Intent.getParcelableExtraCompat(name: String): Intent? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableExtra(name, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableExtra(name)
+        }
 
     /** Zaten kilitliyse tekrar cagirmak zararsizdir; kilitli degilse kilitler. */
     private fun enterLockTask() {
@@ -157,6 +212,9 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val TAG = "KioskMode"
+
+        /** [ApkInstaller]'dan gelen kurulum onay ekranini tasiyan extra adi. */
+        const val EXTRA_INSTALL_CONFIRM_INTENT = "install_confirm_intent"
 
         /** Ayarlar'a cikis: uygulama silme ve sifirlama KAPALI kalir. */
         private const val OPERATOR_PASSWORD = "482910"

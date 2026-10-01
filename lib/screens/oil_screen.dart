@@ -407,7 +407,11 @@ class _OilScreenState extends State<OilScreen> {
     if (pending.isEmpty) return;
 
     final PendingSendChoice? choice =
-        await showPendingSendDialog(context: context, pending: pending);
+        await showPendingSendDialog(
+          context: context,
+          pending: pending,
+          unmatchedVehicles: state.unmatchedVehicleCodes,
+        );
 
     if (choice == PendingSendChoice.discard) {
       final int discarded = state.discardPendingOil();

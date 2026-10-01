@@ -53,6 +53,17 @@ android {
         versionName = flutter.versionName
     }
 
+    // Sahadaki tabletler (Lenovo TB336ZU) arm64-v8a. Uc mimarinin kodunu
+    // birlikte tasimak APK'yi buyutup OTA indirmesini yavaslatiyordu; x86_64
+    // yalnizca emulatorlerde kullanilir. (ndk.abiFilters Flutter'in kendi hedef
+    // listesiyle ezildigi icin paketleme asamasinda dislaniyor; duz
+    // `flutter build apk --release` ile de calisir.)
+    packaging {
+        jniLibs {
+            excludes += listOf("lib/armeabi-v7a/**", "lib/x86_64/**")
+        }
+    }
+
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {

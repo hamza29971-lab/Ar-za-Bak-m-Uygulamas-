@@ -24,7 +24,7 @@ rem  ayarlanmiyor: "adb shell dpm set-lock-task-packages" diye bir alt
 rem  komut YOK, oyle bir satir sessizce hicbir sey yapmaz ve kurulumun
 rem  dogru bittigi yanilsamasi yaratir. O is uygulamanin kendi kodunda
 rem  (KioskPolicy.applyAll) yapiliyor; bu script uygulamayi baslatip
-rem  [8/8] adiminda sonucu DOGRULUYOR.
+rem  [9/9] adiminda sonucu DOGRULUYOR.
 rem ============================================================
 
 set "PACKAGE=com.nimo.nimo_arizabakim"
@@ -33,6 +33,7 @@ set "BOOTSTRAP_ACTIVITY=%PACKAGE%/.KioskBootstrapActivity"
 set "MAIN_ACTIVITY=%PACKAGE%/.MainActivity"
 set "START_STATUS=%TEMP%\nimobakim-kiosk-start-%RANDOM%-%RANDOM%.txt"
 set "LOCK_STATUS=%TEMP%\nimobakim-kiosk-lock-%RANDOM%-%RANDOM%.txt"
+set "INSTALL_LOG=%TEMP%\nimobakim-kiosk-install-%RANDOM%-%RANDOM%.txt"
 
 rem adb: once klasordeki platform-tools, sonra sistemdekiler
 set "ADB=%~dp0platform-tools\adb.exe"
@@ -90,7 +91,7 @@ echo.
 pause
 
 echo.
-echo [1/8] Tablet baglantisi kontrol ediliyor...
+echo [1/9] Tablet baglantisi kontrol ediliyor...
 rem Sunucuyu once baslat: ilk komut daemon'u ayaga kaldirirken cihaz
 rem numaralandirmasi henuz bitmemis olabiliyor ve yanlis "cihaz yok"
 rem hatasi uretiyordu.
@@ -155,7 +156,7 @@ if errorlevel 1 (
 echo   OK
 
 echo.
-echo [2/8] Mevcut kurulum durumu belirleniyor...
+echo [2/9] Mevcut kurulum durumu belirleniyor...
 rem "dpm list-owners" kullaniliyor, "dumpsys device_policy" DEGIL:
 rem dumpsys ciktisinda sahip HIC YOKKEN bile "Device Owner Type: -1"
 rem satiri bulunuyor ve duz bir "Device Owner" aramasi yanlis pozitif
@@ -186,7 +187,7 @@ echo   Mod: !MODE!
 if "!MODE!"=="GUNCELLEME" goto skip_account_check
 
 echo.
-echo [3/8] Cihazda hesap var mi kontrol ediliyor...
+echo [3/9] Cihazda hesap var mi kontrol ediliyor...
 rem Device Owner yalnizca HIC hesap eklenmemis cihaza atanabilir.
 rem Bu kontrol olmadan hata 5. adimda ortaya cikiyor ve tablete bastan
 rem format atmak gerekiyor - kurulumun en sik zaman kaybi budur.
@@ -206,30 +207,51 @@ goto account_done
 
 :skip_account_check
 echo.
-echo [3/8] Hesap kontrolu atlandi ^(guncelleme modu^).
+echo [3/9] Hesap kontrolu atlandi ^(guncelleme modu^).
 
 :account_done
 
 echo.
-echo [4/8] Uygulama kuruluyor...
-"%ADB%" install -r "%APK%"
+echo [4/9] Uygulama kuruluyor...
+"%ADB%" install -r "%APK%" >"%INSTALL_LOG%" 2>&1
+type "%INSTALL_LOG%"
+
+rem YENI kurulumda (henuz cihaz sahibi/hesap yok, veri kaybi riski olmayan
+rem bir "sifirdan kurulum" durumu) tablette bu APK'dan DAHA YENI bir surum
+rem kaliyorsa Android normal kurulumu VERSION_DOWNGRADE ile reddeder. Test
+rem icin ("once eski surumu kur, sonra OTA ile guncelle") ya da elde
+rem farkli bir APK kalmis olma ihtimaline karsi, YENI modda kaldirip
+rem yeniden kurmayi bir kez dener. GUNCELLEME modunda BUNU YAPMAZ: sahadaki
+rem tabletin verisini/ayarlarini bozmamak icin oldugu gibi hata verip durur.
+findstr /I /C:"VERSION_DOWNGRADE" "%INSTALL_LOG%" >nul
+if not errorlevel 1 if "!MODE!"=="YENI" (
+  echo   Tablette bu APK'dan daha yeni bir surum kurulu; YENI kurulum
+  echo   oldugu icin kaldirilip yeniden kuruluyor...
+  "%ADB%" uninstall %PACKAGE% >nul 2>nul
+  "%ADB%" install -r "%APK%" >"%INSTALL_LOG%" 2>&1
+  type "%INSTALL_LOG%"
+)
+
+findstr /I /C:"Success" "%INSTALL_LOG%" >nul
 if errorlevel 1 (
   echo   [HATA] APK kurulamadi.
   echo   Imza uyusmazligi olabilir: tablette farkli bir anahtarla
   echo   imzalanmis bir surum varsa once onu kaldirmak gerekir.
   echo.
+  del /Q "%INSTALL_LOG%" 1>nul 2>nul
   pause
   exit /b 1
 )
+del /Q "%INSTALL_LOG%" 1>nul 2>nul
 echo   OK
 
 echo.
 if "!MODE!"=="GUNCELLEME" (
-  echo [5/8] Cihaz sahipligi zaten atanmis, atlaniyor.
+  echo [5/9] Cihaz sahipligi zaten atanmis, atlaniyor.
   goto owner_done
 )
 
-echo [5/8] Cihaz sahipligi ^(Device Owner^) ataniyor...
+echo [5/9] Cihaz sahipligi ^(Device Owner^) ataniyor...
 "%ADB%" shell dpm set-device-owner %DEVICE_ADMIN%
 if errorlevel 1 (
   echo   [HATA] Device Owner atanamadi.
@@ -244,12 +266,23 @@ echo   OK
 :owner_done
 
 echo.
-echo [6/8] Sarjdayken ekran acik kalacak sekilde ayarlaniyor...
+echo [6/9] Sarjdayken ekran acik kalacak sekilde ayarlaniyor...
 "%ADB%" shell settings put global stay_on_while_plugged_in 3
 echo   OK
 
 echo.
-echo [7/8] Guvenli bootstrap baslatiliyor...
+echo [7/9] Play Protect kurulum taramasi kapatiliyor...
+rem Google Play Protect, imzasi Google'a bilinmeyen her APK icin ("Bu
+rem uygulama Play Protect tarafindan engellendi") bir onay ekrani aciyor.
+rem Bu ekran kiosk ekran kilidinde acilamiyor ve OTA guncellemesi ~80sn
+rem sonra "Kurulum Iptal Edildi" ile basarisiz oluyor. Cihaz sahibi
+rem API'si bunu artik kapatamiyor ("device owners cannot update
+rem package_verifier_enable"); dogrudan ayar olarak yaziliyor.
+"%ADB%" shell settings put global package_verifier_enable 0
+echo   OK
+
+echo.
+echo [8/9] Guvenli bootstrap baslatiliyor...
 rem MainActivity ASLA dogrudan baslatilmaz. Bootstrap once device-owner
 rem politikasini ve isLockTaskPermitted sonucunu dogrular, sonra arayuzu
 rem ActivityOptions.setLockTaskEnabled ile kilitli acar.
@@ -307,7 +340,7 @@ del /Q "%START_STATUS%" 1>nul 2>nul
 echo   OK - gercek LOCKED modu dogrulandi
 
 echo.
-echo [8/8] Dogrulama...
+echo [9/9] Dogrulama...
 rem Buradaki komutlarin hepsi GERCEK komutlar. "dpm is-device-owner-app" ve
 rem "dpm set-lock-task-packages" gibi var olmayan alt komutlar sessizce
 rem basarisiz olur ve kurulumun dogru bittigi yanilsamasini yaratir.

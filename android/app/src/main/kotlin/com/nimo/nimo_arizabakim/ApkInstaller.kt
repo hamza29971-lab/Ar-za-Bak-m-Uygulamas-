@@ -109,18 +109,50 @@ class InstallResultReceiver : BroadcastReceiver() {
         when (status) {
             PackageInstaller.STATUS_SUCCESS -> Log.i(TAG, "Guncelleme kuruldu")
 
-            // Cihaz device owner degilse (gelistirme cihazi) sessiz kurulum
-            // yapilamaz; sistemin onay ekrani acilir.
+            // Android sessiz kurulumu reddedip kullanici onayi istedi. En sik
+            // sebep: Play Protect'in kurulum-oncesi dogrulamasi imzayi
+            // taniyamiyor (verdict=3) ve kendi onay ekranini
+            // (PlayProtectDialogsActivity) acmaya calisiyor. Cihaz sahibi
+            // olarak bu dogrulamayi kapatmak mumkun degil (Android
+            // "device owners cannot update package_verifier_enable" diyerek
+            // reddediyor); o yuzden ekran acilsin diye kiosk kilidi GECICI
+            // olarak kaldirilir. Ekran kapanip MainActivity'ye donuldugunde
+            // onResume() kilidi kendiliginden geri kurar.
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                val confirm = confirmationIntent(intent) ?: return
-                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { context.startActivity(confirm) }
-                    .onFailure { Log.e(TAG, "Onay ekrani acilamadi", it) }
+                val deviceOwner = KioskPolicy.isDeviceOwner(context)
+                val confirm = confirmationIntent(intent)
+                Log.w(TAG, "Kurulum onay istedi: deviceOwner=$deviceOwner")
+
+                if (confirm == null) {
+                    ApkInstaller.recordError(context, "Kurulum onay ekranı hazırlanamadı.")
+                    return
+                }
+                if (!deviceOwner) {
+                    ApkInstaller.recordError(
+                        context,
+                        "Bu tablette sessiz kurulum izni yok: uygulama cihaz sahibi (device owner) " +
+                            "değil. Tabletin kiosk kurulumu kurulum script'iyle yeniden yapılmalı.",
+                    )
+                    return
+                }
+                // MainActivity zaten on planda (kullanici az once "Guncelle"ye
+                // bastigi icin); confirm intent'i ona iletip kilidi orada
+                // kaldiriyoruz. BroadcastReceiver'in kendi context'i bir
+                // Activity olmadigi icin stopLockTask() burada cagrilamaz.
+                val relay = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_INSTALL_CONFIRM_INTENT, confirm)
+                }
+                runCatching { context.startActivity(relay) }
+                    .onFailure {
+                        Log.e(TAG, "Onay ekrani acilamadi", it)
+                        ApkInstaller.recordError(context, "Kurulum onay ekranı açılamadı.")
+                    }
             }
 
             else -> {
                 Log.e(TAG, "Guncelleme kurulamadi: durum=$status, ayrinti=$detail")
-                ApkInstaller.recordError(context, messageFor(status))
+                ApkInstaller.recordError(context, messageFor(status, detail))
             }
         }
     }
@@ -133,12 +165,26 @@ class InstallResultReceiver : BroadcastReceiver() {
             intent.getParcelableExtra(Intent.EXTRA_INTENT)
         }
 
-    private fun messageFor(status: Int): String = when (status) {
+    // Android birden fazla nedeni ayni durum koduyla bildiriyor (or. surum
+    // dusurme de STATUS_FAILURE_INVALID geliyor); once ayrintiya bakilir.
+    private fun messageFor(status: Int, detail: String?): String = when {
+        detail?.contains("VERSION_DOWNGRADE") == true ->
+            "Sunucudaki güncelleme dosyası tablettekinden daha eski bir sürüm " +
+                "(version.json ile yüklenen APK'nın sürüm numarası uyuşmuyor)."
+        detail?.contains("UPDATE_INCOMPATIBLE") == true ||
+            detail?.contains("SIGNATURE") == true ->
+            "Güncelleme farklı bir imza anahtarıyla imzalanmış; ortak anahtarla (nimo-release.jks) derlenmeli."
+        detail?.contains("NO_MATCHING_ABIS") == true ->
+            "Güncelleme bu tabletin işlemci mimarisiyle uyumsuz."
+        else -> messageForStatus(status)
+    }
+
+    private fun messageForStatus(status: Int): String = when (status) {
         PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
             "Güncelleme bu tabletteki sürümle uyumsuz (imza anahtarı farklı ya da sürüm daha eski)."
         PackageInstaller.STATUS_FAILURE_STORAGE -> "Tablette yeterli depolama alanı yok."
         PackageInstaller.STATUS_FAILURE_BLOCKED -> "Kurulum cihaz tarafından engellendi."
-        PackageInstaller.STATUS_FAILURE_INVALID -> "İndirilen güncelleme dosyası bozuk."
+        PackageInstaller.STATUS_FAILURE_INVALID -> "İndirilen güncelleme dosyası geçersiz (bozuk ya da tamamlanmamış olabilir)."
         PackageInstaller.STATUS_FAILURE_ABORTED -> "Kurulum iptal edildi."
         else -> "Güncelleme kurulamadı (kod $status)."
     }

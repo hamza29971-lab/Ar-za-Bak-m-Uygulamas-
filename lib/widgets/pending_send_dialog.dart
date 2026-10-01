@@ -17,11 +17,15 @@ enum PendingSendChoice { send, discard }
 Future<PendingSendChoice?> showPendingSendDialog({
   required BuildContext context,
   required List<PendingOperation> pending,
+  List<String> unmatchedVehicles = const <String>[],
 }) {
   return showDialog<PendingSendChoice>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.35),
-    builder: (BuildContext context) => _PendingSendDialog(pending: pending),
+    builder: (BuildContext context) => _PendingSendDialog(
+      pending: pending,
+      unmatchedVehicles: unmatchedVehicles,
+    ),
   );
 }
 
@@ -47,9 +51,26 @@ Future<void> showPendingSentDialog({
     };
 
 class _PendingSendDialog extends StatelessWidget {
-  const _PendingSendDialog({required this.pending});
+  const _PendingSendDialog({
+    required this.pending,
+    this.unmatchedVehicles = const <String>[],
+  });
 
   final List<PendingOperation> pending;
+
+  /// Sunucuyla eşleşmemiş araç kodları. Bu kayıtlar panele araçsız
+  /// düşeceği için kullanıcı gönderimden ÖNCE uyarılır.
+  final List<String> unmatchedVehicles;
+
+  /// Gönderilecek işlemler arasında eşleşmeyen araç var mı?
+  List<String> get _affected {
+    final Set<String> codes =
+        pending.map((PendingOperation p) => p.vehicleCode).toSet();
+    return <String>[
+      for (final String code in unmatchedVehicles)
+        if (codes.contains(code)) code,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +121,7 @@ class _PendingSendDialog extends StatelessWidget {
               ),
             ),
             Divider(height: 1, color: context.borderColor),
+            if (_affected.isNotEmpty) _warning(context, _affected),
             // Gönderilecek işlemlerin listesi
             Flexible(
               child: ListView.separated(
@@ -165,6 +187,45 @@ class _PendingSendDialog extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Araç sunucuyla eşleşmediğinde gösterilen uyarı şeridi.
+Widget _warning(BuildContext context, List<String> codes) {
+  final Color tone = context.accent(AppColors.fault);
+  return Container(
+    width: double.infinity,
+    color: tone.withValues(alpha: context.isDark ? 0.16 : 0.10),
+    padding: const EdgeInsets.fromLTRB(28, 16, 28, 16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Icon(Icons.warning_amber_rounded, color: tone, size: 24),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                codes.length == 1
+                    ? '${codes.first} sunucuyla eşleşmedi'
+                    : '${codes.length} araç sunucuyla eşleşmedi',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: tone),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bu araçlara ait kayıtlar panele araç bilgisi olmadan '
+                'düşecek: ${codes.join(', ')}. Yine de gönderebilirsiniz, '
+                'ancak yetkiliye bildirmeniz önerilir.',
+                style: TextStyle(
+                    fontSize: 14, height: 1.4, color: context.mutedColor),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Gönderim tamamlandığında gösterilen sonuç penceresi.

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/mock_data.dart';
 import '../models/models.dart';
 import '../services/auth_models.dart';
+import '../services/vehicle_binding_store.dart';
 import '../services/vehicle_directory_service.dart';
 import '../utils/formats.dart';
 import '../services/service_locator.dart';
@@ -156,14 +157,34 @@ class AppState extends ChangeNotifier {
 
   // ------------------------------------------------------ araç UUID dizini
   final VehicleDirectoryService _vehicleDirectoryService = VehicleDirectoryService();
-  Map<String, String> _vehicleUuidByCode = <String, String>{};
 
-  /// `Vehicle.code`'u mining-be'deki araç UUID'sine çevirir. Dizin henüz
-  /// yüklenmemişse ya da eşleşme bulunamazsa `null` döner.
+  /// Araç bağları. Kimlik UUID'dir; sunucudaki isim değişse de bağ kopmaz.
+  late final VehicleBindingStore _bindings =
+      VehicleBindingStore(canonicalKey: _canonicalKey);
+
+  /// Son dizin çekiminin sonucu; `null` ise henüz çekilmedi.
+  VehicleDirectorySync? _lastSync;
+  VehicleDirectorySync? get lastVehicleSync => _lastSync;
+
+  /// Sunucuyla eşleşmemiş araç kodları. Gönderim ekranları bunu okuyup
+  /// kullanıcıyı uyarır; eskiden eşleşmeme sessizce geçiyordu.
+  List<String> get unmatchedVehicleCodes =>
+      _lastSync?.unmatched ?? const <String>[];
+
+  /// `Vehicle.code`'u mining-be'deki araç UUID'sine çevirir. Bağ yoksa `null`.
   String? vehicleUuidFor(String? vehicleCode) {
     if (vehicleCode == null || vehicleCode.trim().isEmpty) return null;
-    final String? key = _canonicalKey(vehicleCode);
-    return key == null ? null : _vehicleUuidByCode[key];
+    return _bindings.uuidFor(vehicleCode.trim());
+  }
+
+  /// Araç sunucuyla eşleşmiş mi? Gönderim öncesi uyarı için.
+  bool isVehicleBound(String? vehicleCode) => vehicleUuidFor(vehicleCode) != null;
+
+  /// Kayıtlı bağları diskten yükler. Ağ yokken bile UUID elde kalsın diye
+  /// açılışta çağrılır.
+  Future<void> loadVehicleBindings() async {
+    await _bindings.load();
+    notifyListeners();
   }
 
   /// Sunucudaki isimlendirme yerel kodlardan tamamen farklı:
@@ -225,37 +246,83 @@ class AppState extends ChangeNotifier {
     return '$brand#${int.parse(digits)}';
   }
 
-  /// Testler için: dizini ağdan çekmeden UUID önbelleğini doldurur.
+  /// Testler için: dizini ağdan çekmeden bağ kurar. Anahtar sunucu etiketi,
+  /// değer UUID'dir; yerel araçlarla isim üzerinden eşleştirilir.
   @visibleForTesting
   void seedVehicleDirectory(Map<String, String> uuidByLabel) {
-    _vehicleUuidByCode = <String, String>{
-      for (final MapEntry<String, String> e in uuidByLabel.entries)
-        if (_canonicalKey(e.key) case final String key) key: e.value,
-    };
+    _lastSync = _bindings.reconcile(
+      entries: <VehicleDirectoryEntry>[
+        for (final MapEntry<String, String> e in uuidByLabel.entries)
+          VehicleDirectoryEntry(id: e.value, label: e.key),
+      ],
+      localCodes: <String>[for (final Vehicle v in _vehicles) v.code],
+    );
   }
 
   /// mining-be'den araç listesini çekip yerel filoyla eşleştirir.
   /// `applySession` içinde girişten hemen sonra tetiklenir.
   Future<void> loadVehicleDirectory() async {
+    await _bindings.load();
+
     final String? accessToken = await ServiceLocator.tokens.readAccessToken();
     final List<VehicleDirectoryEntry> entries =
         await _vehicleDirectoryService.fetchAll(accessToken: accessToken);
-    if (entries.isEmpty) return;
-
-    final Map<String, String> byKey = <String, String>{};
-    for (final VehicleDirectoryEntry entry in entries) {
-      final String? key = _canonicalKey(entry.label);
-      if (key != null) byKey[key] = entry.id;
+    // Boş liste "araç kalmadı" demek değil, çoğunlukla ağ/yetki sorunudur.
+    // Mevcut bağlara dokunulmaz.
+    if (entries.isEmpty) {
+      debugPrint('[FleetUUID] dizin boş döndü; kayıtlı bağlar korundu');
+      notifyListeners();
+      return;
     }
-    _vehicleUuidByCode = byKey;
 
-    for (final Vehicle vehicle in _vehicles) {
-      final String? key = _canonicalKey(vehicle.code);
-      if (key == null || !byKey.containsKey(key)) {
-        debugPrint('[FleetUUID] eşleşmedi: ${vehicle.code}');
-      }
+    final VehicleDirectorySync sync = _bindings.reconcile(
+      entries: entries,
+      localCodes: <String>[for (final Vehicle v in _vehicles) v.code],
+    );
+    _lastSync = sync;
+    await _bindings.save();
+
+    _reportDirectoryChanges(sync);
+    notifyListeners();
+  }
+
+  /// Dizin değişikliklerini kayıt altına alır. Yeniden adlandırmalar
+  /// "Geçmiş" listesine düşer; eşleşmeyenler [unmatchedVehicleCodes] ile
+  /// gönderim ekranlarında uyarıya dönüşür.
+  void _reportDirectoryChanges(VehicleDirectorySync sync) {
+    for (final VehicleRename rename in sync.renamed) {
+      debugPrint(
+        '[FleetUUID] yeniden adlandırıldı: ${rename.localCode} '
+        '"${rename.from}" -> "${rename.to}"',
+      );
+      addNotification(
+        NotificationItem(
+          title: 'Araç adı sunucuda değişti',
+          message: '${rename.localCode} • "${rename.from}" → "${rename.to}"',
+          date: DateTime.now(),
+          kind: NotificationKind.info,
+          vehicleCode: rename.localCode,
+          details: <String, String>{
+            'Araç': rename.localCode,
+            'Eski sunucu adı': rename.from,
+            'Yeni sunucu adı': rename.to,
+            'Etki': 'Kayıt bağı korundu; gönderim etkilenmedi.',
+          },
+        ),
+      );
     }
-    debugPrint('[FleetUUID] ${byKey.length} araç eşleştirildi');
+
+    for (final String code in sync.missing) {
+      debugPrint('[FleetUUID] sunucu listesinde görünmüyor: $code');
+    }
+    for (final String code in sync.unmatched) {
+      debugPrint('[FleetUUID] eşleşmedi: $code');
+    }
+    debugPrint(
+      '[FleetUUID] ${_bindings.bindings.length} araç bağlı, '
+      '${sync.newlyBound.length} yeni, ${sync.renamed.length} yeniden adlandırma, '
+      '${sync.unmatched.length} eşleşmeyen',
+    );
   }
 
   // -------------------------------------------------------------- işlemler

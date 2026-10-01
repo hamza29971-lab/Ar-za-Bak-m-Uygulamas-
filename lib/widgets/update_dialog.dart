@@ -13,12 +13,30 @@ class UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
-  /// Kurulum sonucunun bekleneceği en uzun süre.
-  static const int _installWaitSeconds = 120;
+  /// Kurulum sonucunun bekleneceği en uzun süre. Düşük donanımlı tablette
+  /// ~85 MB'lık APK'nın kurulumu (derleme dahil) 2 dakikayı aşabiliyor.
+  static const int _installWaitSeconds = 300;
 
   bool _isDownloading = false;
   double _progress = 0.0;
   String _statusText = '';
+
+  /// Tabletin kiosk durumu; sessiz kurulum yalnızca cihaz sahibinde çalışır.
+  KioskStatus? _kiosk;
+
+  @override
+  void initState() {
+    super.initState();
+    KioskService.instance.status().then((KioskStatus s) {
+      if (mounted) setState(() => _kiosk = s);
+    });
+  }
+
+  String get _ownerText => switch (_kiosk?.deviceOwner) {
+        true => 'cihaz sahibi: evet',
+        false => 'cihaz sahibi: HAYIR',
+        null => 'cihaz sahibi: bilinmiyor',
+      };
 
   /// Hata gösterilir ve düğmeler geri gelir; güncelleme "kuruldu" sayılmadığı
   /// için bir sonraki kontrolde yeniden önerilir.
@@ -53,7 +71,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
       setState(() => _statusText = 'Kurulum başlatılıyor...');
 
       // Sistem yükleyici ekranı kiosk kilidinde açılamadığı için kurulum
-      // Android tarafında sessizce yapılır (device owner).
+      // Android tarafında sessizce yapılır (device owner). Play Protect
+      // imzayı tanımazsa Android kendi onay ekranını açabilir; bu durumda
+      // MainActivity kilidi geçici kaldırıp ekranı gösterir, kullanıcı bir
+      // kez dokunur.
       final String? startError =
           await KioskService.instance.installUpdate(file.path);
       if (!mounted) return;
@@ -62,12 +83,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
         return;
       }
 
-      setState(() => _statusText =
-          'Güncelleme kuruluyor. Uygulama birazdan kendiliğinden yeniden açılacak.');
-
       // Başarılı kurulumda uygulama süreci sonlandırılıp yeniden açılır ve bu
       // döngü hiç bitmez. Bitiyorsa kurulum başarısız olmuştur.
       for (int i = 0; i < _installWaitSeconds; i++) {
+        setState(() => _statusText =
+            'Güncelleme kuruluyor (${i}s). Uygulama birazdan kendiliğinden yeniden açılacak.');
         await Future<void>.delayed(const Duration(seconds: 1));
         if (!mounted) return;
         final String? error = await KioskService.instance.consumeInstallError();
@@ -77,7 +97,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
         }
       }
       if (mounted) {
-        _fail('Kurulum tamamlanamadı. Lütfen daha sonra tekrar deneyin.');
+        _fail('Kurulum $_installWaitSeconds saniyede tamamlanmadı ($_ownerText). '
+            'Tablet cihaz sahibi değilse kiosk kurulumu yeniden yapılmalı.');
       }
     } catch (e) {
       if (mounted) _fail('$e');
@@ -107,6 +128,18 @@ class _UpdateDialogState extends State<UpdateDialog> {
               'Yeni sürüm mevcut (Build ${widget.remoteBuildNumber}).\nGüncellemek ister misiniz?',
               style: TextStyle(fontSize: 16, color: context.text.bodyMedium?.color),
             ),
+            if (_kiosk != null && !_kiosk!.deviceOwner) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Uyarı: Uygulama bu tablette cihaz sahibi değil. Sessiz kurulum '
+                'yapılamaz; kiosk kurulumu script ile yeniden yapılmalı.',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
             if (_isDownloading) ...[
               const SizedBox(height: 20),
               LinearProgressIndicator(

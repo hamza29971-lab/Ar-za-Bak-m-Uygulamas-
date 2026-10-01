@@ -306,6 +306,14 @@ double vehicleImageXShift(String asset) =>
 ///
 /// [code] araç adıdır: `Euclid-1`, `Liugong-16` … (harf büyüklüğü önemsiz).
 String? vehicleOwnPhoto(String code) {
+  final String lower = code.toLowerCase();
+  // Paletli araçlar: model grubu başına ortak görsel.
+  if (lower.startsWith('hitachi-490')) return 'assets/images/Hitachi 490.png';
+  if (lower.startsWith('hitachi-')) return 'assets/images/Hitachi-1800.png';
+  if (lower.startsWith('sany-') || lower.startsWith('komatsu-')) {
+    return 'assets/images/Sany.png';
+  }
+
   final RegExpMatch? match =
       RegExp(r'^(euclid|liugong)-(\d+)$').firstMatch(code.toLowerCase());
   if (match == null) return null;
