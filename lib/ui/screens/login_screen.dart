@@ -376,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen>
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 80),
                           child: Image.asset(
-                            'assets/images/truck_damper.png',
+                            'assets/images/yesil_arac.png',
                             fit: BoxFit.contain,
                             alignment: Alignment.center,
                           ),

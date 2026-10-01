@@ -31,6 +31,9 @@ class _NimoAppState extends State<NimoApp> {
   @override
   void initState() {
     super.initState();
+    // Kayıtlı araç bağları ağdan bağımsız; girişten önce yüklenir ki
+    // çevrimdışıyken de araç UUID'leri elde olsun.
+    unawaited(_state.loadVehicleBindings());
     // OTA yalnızca Android tablette anlamlı (APK kurar). Windows'ta
     // geliştirme sırasında kontrol hiç çalıştırılmaz.
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;

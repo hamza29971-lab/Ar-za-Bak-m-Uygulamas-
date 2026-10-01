@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Görsel şeffaf zeminli olduğu için çerçevesiz, olduğu gibi yerleştirilir.
     final Widget art = Image.asset(
-      'assets/images/anasayfa/EuclidAnasayfa.png',
+      'assets/images/yesil_arac.png',
       fit: BoxFit.contain,
       errorBuilder: (BuildContext context, Object e, StackTrace? s) =>
           const SizedBox.shrink(),

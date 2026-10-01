@@ -35,6 +35,9 @@ class FleetEventMapper {
       // ayrıca alan olarak gider; `operatorLabel` yalnızca okunabilir metin.
       fields: <String, Object?>{
         'islem': op,
+        // UUID çözülemediyse kayıt araçsız gidiyor demektir. Sessiz
+        // kalmak yerine panelde filtrelenebilir bir işaret bırakılır.
+        if (vehicleUUID == null || vehicleUUID.isEmpty) 'aracEslesmedi': true,
         if (user != null && user.fullName.trim().isNotEmpty)
           'operatorAdi': user.fullName.trim(),
         if (user != null && user.registryNo.trim().isNotEmpty)
@@ -79,6 +82,7 @@ class FleetEventMapper {
       fields: <String, Object?>{
         'raporTuru': reportType,
         'gorselSayisi': imageCount,
+        if (vehicleUUID == null || vehicleUUID.isEmpty) 'aracEslesmedi': true,
         // Uç nokta dosya yüklemiyor; yalnızca hangi dosyaların eklendiği
         // bilgisi taşınabiliyor (bkz. docs/fleet-entegrasyon-plani.md).
         if (imageNames.isNotEmpty) 'gorseller': imageNames,
