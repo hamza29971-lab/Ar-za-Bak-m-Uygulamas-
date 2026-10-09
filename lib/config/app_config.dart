@@ -63,6 +63,33 @@ class AppConfig {
     defaultValue: 'nimo-fleet-test-tablet-key',
   );
 
+  /// Uygulamaya giriş yapabilen rol türleri. Kullanıcının `userData`'sında
+  /// bu değer geçiyorsa (rolün türü/grubu) rolü ne olursa olsun girebilir;
+  /// böylece bu türe sonradan eklenen roller de kendiliğinden kabul edilir.
+  /// Karşılaştırma büyük/küçük harf ve Türkçe karakter farkını yok sayar.
+  static const List<String> allowedRoleTypes = <String>[
+    'Atölye Bakım Personeli',
+    'Bakım Yöneticisi',
+    // "Bakım Yöneticisi" rozetli rol; rozet gelmezse rol adından tanınsın.
+    'Atölye Bakım Yöneticisi',
+  ];
+
+  /// "Atölye Bakım Personeli" türündeki bilinen roller. API rol türünü
+  /// göndermediğinde rol adından karar verilir.
+  static const List<String> workshopRoles = <String>[
+    'Akaryakıt Dağıtım Ekibi',
+    'Kaynak İşleri Ekibi',
+    'Akaryakıt Takip Uzmanı',
+    'Planlı Bakım Kalker',
+    'Mekanik Bakım Kalker',
+    'Elektrik Bakım Ekibi 380V',
+    'Boya/Kaporta İşleri',
+    'Elektrik Bakım Ekibi Oto 24V',
+    'Mekanik Bakım Marn',
+    'Planlı Bakım Marn',
+    'Atölye Bakım',
+  ];
+
   /// Nimo Fleet Source.
   static const String fleetSource = String.fromEnvironment(
     'NIMO_FLEET_SOURCE',

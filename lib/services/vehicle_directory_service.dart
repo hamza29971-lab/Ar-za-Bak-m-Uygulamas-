@@ -54,50 +54,69 @@ class VehicleDirectoryService {
   final http.Client _client;
 
   static const String _path = '/devices/vehicles/search-auto-complete';
+  static const int _pageSize = 100;
 
+  /// Sunucu sayfa numarasını yok sayıp hep aynı sayfayı dönerse sonsuz
+  /// döngüye girmemek için üst sınır.
+  static const int _maxPages = 50;
+
+  /// Tüm sayfaları çeker. Herhangi bir sayfa başarısız olursa boş liste
+  /// döner: yarım liste, eksik araçları yanlışlıkla "kayıp" gösterirdi.
   Future<List<VehicleDirectoryEntry>> fetchAll({required String? accessToken}) async {
+    final Map<String, VehicleDirectoryEntry> byId = <String, VehicleDirectoryEntry>{};
     try {
-      final http.Response response = await _client
-          .post(
-            Uri.parse('${AuthApiService.baseUrl}$_path'),
-            headers: <String, String>{
-              'Content-Type': 'application/json',
-              if (accessToken != null && accessToken.isNotEmpty)
-                'Authorization': 'Bearer $accessToken',
-            },
-            body: jsonEncode(const <String, Object?>{
-              'filters': <Object?>[],
-              'pageNumber': 0,
-              'pageSize': 100,
-              'sortType': 'ASC',
-            }),
-          )
-          .timeout(AppConfig.requestTimeout);
+      for (int page = 0; page < _maxPages; page++) {
+        final List<Object?>? rawList = await _fetchPage(page, accessToken);
+        if (rawList == null) return const <VehicleDirectoryEntry>[];
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        debugPrint(
-          '[VehicleDirectory] HTTP ${response.statusCode}: ${response.body}',
-        );
-        return const <VehicleDirectoryEntry>[];
-      }
-
-      final Object? decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      // Keşif amaçlı: gerçek alan adları doğrulanana kadar ham cevabı loglar.
-      debugPrint('[VehicleDirectory] ham cevap: $decoded');
-
-      final List<Object?> rawList = _extractList(decoded);
-      final List<VehicleDirectoryEntry> entries = <VehicleDirectoryEntry>[];
-      for (final Object? item in rawList) {
-        if (item is Map<String, Object?>) {
-          final VehicleDirectoryEntry? entry = VehicleDirectoryEntry.fromJson(item);
-          if (entry != null) entries.add(entry);
+        int fresh = 0;
+        for (final Object? item in rawList) {
+          if (item is Map<String, Object?>) {
+            final VehicleDirectoryEntry? entry = VehicleDirectoryEntry.fromJson(item);
+            if (entry != null && byId.putIfAbsent(entry.id, () => entry) == entry) {
+              fresh++;
+            }
+          }
         }
+        if (rawList.length < _pageSize || fresh == 0) break;
       }
-      return entries;
+      return byId.values.toList();
     } on Object catch (e) {
       debugPrint('[VehicleDirectory] gönderim hatası: $e');
       return const <VehicleDirectoryEntry>[];
     }
+  }
+
+  /// Tek sayfa; HTTP hatasında `null`.
+  Future<List<Object?>?> _fetchPage(int page, String? accessToken) async {
+    final http.Response response = await _client
+        .post(
+          Uri.parse('${AuthApiService.baseUrl}$_path'),
+          headers: <String, String>{
+            'Content-Type': 'application/json',
+            if (accessToken != null && accessToken.isNotEmpty)
+              'Authorization': 'Bearer $accessToken',
+          },
+          body: jsonEncode(<String, Object?>{
+            'filters': const <Object?>[],
+            'pageNumber': page,
+            'pageSize': _pageSize,
+            'sortType': 'ASC',
+          }),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint(
+        '[VehicleDirectory] HTTP ${response.statusCode} (sayfa $page): ${response.body}',
+      );
+      return null;
+    }
+
+    final Object? decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    // Keşif amaçlı: gerçek alan adları doğrulanana kadar ham cevabı loglar.
+    debugPrint('[VehicleDirectory] ham cevap (sayfa $page): $decoded');
+    return _extractList(decoded);
   }
 
   /// Sunucu listeyi doğrudan, `data` altında ya da `data.content` altında

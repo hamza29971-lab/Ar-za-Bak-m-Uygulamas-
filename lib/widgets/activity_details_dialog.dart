@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
+import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/formats.dart';
 import 'common.dart';
@@ -108,7 +109,7 @@ class _TireDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        InfoLine(label: 'Aracın adı', value: activity.vehicleCode, labelWidth: 180),
+        InfoLine(label: 'Aracın adı', value: AppScope.read(context).displayNameFor(activity.vehicleCode), labelWidth: 180),
         InfoLine(
           label: 'Değişen lastik sayısı',
           value: '${activity.tires.length}',
@@ -178,7 +179,7 @@ class _OilDetails extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        InfoLine(label: 'Aracın adı', value: activity.vehicleCode, labelWidth: 180),
+        InfoLine(label: 'Aracın adı', value: AppScope.read(context).displayNameFor(activity.vehicleCode), labelWidth: 180),
         InfoLine(label: 'Takviye yapılan bölge', value: activity.area, labelWidth: 180),
         InfoLine(label: 'Yağ takviyesi türü', value: activity.oilType, labelWidth: 180),
         InfoLine(
@@ -217,7 +218,7 @@ class _ReportDetails extends StatelessWidget {
           ),
         InfoLine(
           label: 'Araç',
-          value: activity.vehicleCode.isEmpty ? '-' : activity.vehicleCode,
+          value: activity.vehicleCode.isEmpty ? '-' : AppScope.read(context).displayNameFor(activity.vehicleCode),
           labelWidth: 180,
         ),
         InfoLine(
@@ -318,7 +319,7 @@ class _SubTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      text.toUpperCase(),
+      upperTr(text),
       style: TextStyle(
         fontSize: 12,
         letterSpacing: 0.8,

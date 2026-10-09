@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nimo_arizabakim/data/fleet.dart';
 import 'package:nimo_arizabakim/models/models.dart';
 import 'package:nimo_arizabakim/models/tire_change_model.dart';
 import 'package:nimo_arizabakim/providers/tire_change_provider.dart';
@@ -221,6 +222,61 @@ void main() {
     }
     // Komatsu K8: Ekskavatör Elektrikli.
     expect(typeLabelOf('Komatsu-K8'), 'Ekskavatör Elektrikli');
+  });
+
+  test('sunucuda yeniden adlandirilan arac listede yerini korur', () {
+    final AppState state = AppState();
+
+    // Euclid-7/8/9 ve bir paletli arac, sunucudaki ilk adlariyla baglanir.
+    state.seedVehicleDirectory(<String, String>{
+      '05-01-IM-KK-EUCLID.07': 'uuid-e7',
+      '05-01-IM-KK-EUCLID.08': 'uuid-e8',
+      '05-01-IM-KK-HTC.EUC.09': 'uuid-e9',
+      '05-05-IM-PM-SY.385H.68': 'uuid-s68',
+    });
+    final List<String> before =
+        state.vehicles.map((Vehicle v) => v.code).toList();
+    expect(before.indexOf('Euclid-8'), before.indexOf('Euclid-7') + 1);
+
+    // Ayni UUID sunucuda "EUIGLID 8" diye yeniden adlandirilir. Gorunen ad
+    // "0..." ile baslayan etiketlerden sonra gelir; alfabetik siralama olsaydi
+    // arac listenin sonuna dusecekti.
+    state.seedVehicleDirectory(<String, String>{
+      '05-01-IM-KK-EUCLID.07': 'uuid-e7',
+      'EUIGLID 8': 'uuid-e8',
+      '05-01-IM-KK-HTC.EUC.09': 'uuid-e9',
+      '05-05-IM-PM-SY.385H.68': 'uuid-s68',
+    });
+
+    final Vehicle renamed =
+        state.vehicles.firstWhere((Vehicle v) => v.code == 'Euclid-8');
+    expect(renamed.name, 'EUIGLID 8');
+    expect(
+      state.vehicles.map((Vehicle v) => v.code).toList(),
+      before,
+      reason: 'isim degisince arac yer degistirmemeli',
+    );
+  });
+
+  test('arac listesi filo tanimindaki siradadir, gorunen ada gore degil', () {
+    final AppState state = AppState();
+    state.seedVehicleDirectory(<String, String>{
+      '05-05-IM-PM-SY.385H.68': 'uuid-s68',
+      '05-01-IM-KK-EUCLID.02': 'uuid-e2',
+      '05-01-IM-KK-EUCLID.01': 'uuid-e1',
+    });
+
+    // Beklenen sira: Fleet.vehicles() siralamasi (sunucudan geliş sırası ve
+    // gorunen ad onemsiz).
+    final List<String> expected = <String>[
+      for (final Vehicle v in Fleet.vehicles())
+        if (<String>{'Euclid-1', 'Euclid-2', 'Sany-68'}.contains(v.code)) v.code,
+    ];
+    expect(expected, <String>['Euclid-1', 'Euclid-2', 'Sany-68']);
+    expect(
+      state.vehicles.map((Vehicle v) => v.code).toList(),
+      expected,
+    );
   });
 
   test('her yag olayi secili aracin UUIDsini tasir', () {

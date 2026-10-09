@@ -57,13 +57,31 @@ class Vehicle {
     required this.site,
     required this.tirePositions,
     required this.oilAreas,
+    this.displayName,
   });
 
   /// Kayıt anahtarı.
   final String id;
 
-  /// Ekranda görünen araç adı, ör. Euclid-1
+  /// Uygulama içi sabit araç kodu, ör. `Euclid-1`. Kayıtlar, UUID bağı ve
+  /// fotoğraf eşleştirmesi buna bağlıdır; sunucudaki isim değişse de değişmez.
   final String code;
+
+  /// Sunucudaki (mining-be) araç adı, ör. `05-01-IM-KK-EUCLID.02`.
+  final String? displayName;
+
+  /// Ekranda gösterilen ad: sunucu adı varsa o, yoksa yerel kod.
+  String get name => displayName ?? code;
+
+  Vehicle withDisplayName(String? displayName) => Vehicle(
+        id: id,
+        code: code,
+        type: type,
+        site: site,
+        tirePositions: tirePositions,
+        oilAreas: oilAreas,
+        displayName: displayName,
+      );
 
   /// ROCK_TRUCK, MINING_TRUCK, EXCAVATOR ...
   final String type;
@@ -91,6 +109,7 @@ class Vehicle {
         'SHOVEL' => 'Shovel',
         'EXCAVATOR_DIESEL' => 'Ekskavatör Dizel',
         'EXCAVATOR_ELECTRIC' => 'Ekskavatör Elektrikli',
+        '' => 'Tip tanımsız',
         _ => type,
       };
 
@@ -228,11 +247,33 @@ class UserProfile {
         fullName: json['fullName'] as String? ?? json['name'] as String? ?? json['firstName'] as String? ?? '',
         email: json['email'] as String? ?? json['mail'] as String? ?? '',
         phone: json['phone'] as String? ?? json['phoneNumber'] as String? ?? '',
-        role: (json['role'] is Map ? json['role']['name'] as String? : json['role'] as String?) ?? json['title'] as String? ?? '',
+        role: roleFromJson(json),
         registryNo: json['registryNo'] as String? ?? json['id']?.toString() ?? '',
         machineCode: json['machineCode'] as String? ?? '',
         machineType: json['machineType'] as String? ?? '',
       );
+
+  /// Rol alanının adayları, öncelik sırasıyla.
+  static const List<String> roleKeys = <String>[
+    'role',
+    'roleName',
+    'userRole',
+    'userType',
+    'title',
+  ];
+
+  /// Rolü kullanıcı gövdesinden okur. Değer düz metin ya da
+  /// `{name|label|title: ...}` biçiminde bir nesne olabilir.
+  static String roleFromJson(Map<String, dynamic> json) {
+    for (final String key in roleKeys) {
+      final Object? value = json[key];
+      final Object? text = value is Map
+          ? value['name'] ?? value['label'] ?? value['title']
+          : value;
+      if (text is String && text.trim().isNotEmpty) return text.trim();
+    }
+    return '';
+  }
 
   Map<String, dynamic> toJson() => {
         'fullName': fullName,

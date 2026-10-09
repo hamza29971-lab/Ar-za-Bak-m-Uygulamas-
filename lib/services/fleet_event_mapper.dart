@@ -121,6 +121,17 @@ class FleetEventMapper {
         'position' => 'konum',
         'serialNo' => 'seriNo',
         'previousSerialNo' => 'oncekiSeriNo',
+        'pressure' => 'havaBasinci',
+        'pressureUnit' => 'basincBirimi',
+        'brand' => 'lastikMarkasi',
+        // Web paneli lastik başına kaplama sayısını bu 1/0 değerlerinden
+        // hesaplar; ad panelle kararlaştırıldığı gibi "Kaplama".
+        'coating' => 'Kaplama',
+        'previousPressure' => 'oncekiHavaBasinci',
+        'previousBrand' => 'oncekiLastikMarkasi',
+        'previousCoating' => 'oncekiKaplama',
+        'previousMountedAt' => 'oncekiTakilmaTarihi',
+        'previousRemovedAt' => 'oncekiCikarilmaTarihi',
         'items' => 'kontroller',
         'airCompleted' => 'havaTamamlandi',
         'repairDone' => 'tamiratYapildi',

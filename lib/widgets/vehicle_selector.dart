@@ -49,15 +49,17 @@ class _VehicleSelectorState extends State<VehicleSelector> {
   @override
   void initState() {
     super.initState();
-    _controller.text = widget.selected?.code ?? '';
+    _controller.text = widget.selected?.name ?? '';
     _focusNode.addListener(_onFocusChanged);
   }
 
   @override
   void didUpdateWidget(covariant VehicleSelector oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selected?.id != oldWidget.selected?.id && !_focusNode.hasFocus) {
-      _controller.text = widget.selected?.code ?? '';
+    if ((widget.selected?.id != oldWidget.selected?.id ||
+            widget.selected?.name != oldWidget.selected?.name) &&
+        !_focusNode.hasFocus) {
+      _controller.text = widget.selected?.name ?? '';
     }
   }
 
@@ -84,7 +86,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
       _typing = false;
       _removeOverlay();
       final Vehicle? selected = widget.selected;
-      if (selected != null) _controller.text = selected.code;
+      if (selected != null) _controller.text = selected.name;
     }
   }
 
@@ -101,7 +103,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
 
   void _select(Vehicle vehicle) {
     _typing = false;
-    _controller.text = vehicle.code;
+    _controller.text = vehicle.name;
     widget.onSelected(vehicle);
     _focusNode.unfocus();
     _removeOverlay();
@@ -253,7 +255,7 @@ class _VehicleSelectorState extends State<VehicleSelector> {
                                                   CrossAxisAlignment.start,
                                               children: <Widget>[
                                                 Text(
-                                                  v.code,
+                                                  v.name,
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.w600,

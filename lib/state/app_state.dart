@@ -15,7 +15,8 @@ import '../services/service_locator.dart';
 /// MQTT/backend eklenince bu sınıfın metotları servis çağrılarını tetikleyecek.
 class AppState extends ChangeNotifier {
   AppState() {
-    _vehicles = MockData.vehicles();
+    _baseVehicles = MockData.vehicles();
+    _vehicles = List<Vehicle>.of(_baseVehicles);
     _notifications = <NotificationItem>[];
     _activities = MockData.activities(_vehicles);
   }
@@ -60,6 +61,13 @@ class AppState extends ChangeNotifier {
     // Giriş akışını bloklamaz; hata olursa vehicleUuidFor eşleşme bulamaz
     // ve loadVehicleDirectory'nin kendi debugPrint'i sebebi gösterir.
     unawaited(loadVehicleDirectory());
+    // Uygulama açık kaldıkça sunucudaki isim değişikliği ve yeni araçlar
+    // da yakalansın.
+    _directoryTimer?.cancel();
+    _directoryTimer = Timer.periodic(
+      _directoryRefreshInterval,
+      (_) => unawaited(loadVehicleDirectory()),
+    );
   }
 
   /// Eksik profil bilgilerini elle girildiğinde kaydetmek için kullanılır.
@@ -100,6 +108,8 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    _directoryTimer?.cancel();
+    _directoryTimer = null;
     _user = null;
     _session = null;
     _selectedVehicle = null;
@@ -119,6 +129,12 @@ class AppState extends ChangeNotifier {
   static const String appVersion = '1.0.0';
 
   // ----------------------------------------------------------------- araç
+  /// Uygulamada tanımlı filo; lastik konumu, yağ alanı ve fotoğraf şablonu
+  /// olarak kullanılır. Ekrandaki liste [_vehicles]'tır.
+  late final List<Vehicle> _baseVehicles;
+
+  /// Ekranlarda listelenen araçlar: sunucu dizini bilindiğinde yalnızca
+  /// sunucudaki araçlar, sunucudaki adlarıyla.
   late List<Vehicle> _vehicles;
   List<Vehicle> get vehicles => List<Vehicle>.unmodifiable(_vehicles);
 
@@ -143,7 +159,7 @@ class AppState extends ChangeNotifier {
     if (q.isEmpty) return vehicles;
     return _vehicles
         .where((Vehicle v) =>
-            v.code.toLowerCase().contains(q) ||
+            v.name.toLowerCase().contains(q) ||
             v.typeLabel.toLowerCase().contains(q) ||
             v.site.toLowerCase().contains(q))
         .toList();
@@ -180,10 +196,53 @@ class AppState extends ChangeNotifier {
   /// Araç sunucuyla eşleşmiş mi? Gönderim öncesi uyarı için.
   bool isVehicleBound(String? vehicleCode) => vehicleUuidFor(vehicleCode) != null;
 
+  /// Ekranda gösterilecek araç adı: sunucu adı, yoksa yerel kod.
+  String displayNameFor(String code) => _bindings.labelFor(code) ?? code;
+
+  /// Sunucu dizini en az bir kez alınmış mı? Alınmadıysa (ilk açılış,
+  /// çevrimdışı) yerel filo olduğu gibi gösterilir.
+  bool get vehicleDirectoryKnown => _bindings.bindings.isNotEmpty;
+
+  /// Sunucudaki bir araca bağlı yerel kodlar.
+  Set<String> get boundVehicleCodes => _bindings.bindings.keys.toSet();
+
+  /// Sunucuda olup yerel filoda karşılığı olmayan araçların kod öneki.
+  static const String _adoptedPrefix = 'api-';
+
+  static const Duration _directoryRefreshInterval = Duration(minutes: 5);
+  Timer? _directoryTimer;
+  bool _loadingDirectory = false;
+
+  /// Ekrandaki listeyi bağlardan yeniden kurar.
+  void _rebuildVehicles() {
+    final Map<String, VehicleBinding> bindings = _bindings.bindings;
+    final bool known = bindings.isNotEmpty;
+
+    // Uygulamada karşılığı olmayan sunucu araçları ([_adoptedPrefix]) tipi
+    // bilinmediği için listelenmez.
+    final List<Vehicle> next = <Vehicle>[
+      for (final Vehicle v in _baseVehicles)
+        if (!known || bindings.containsKey(v.code))
+          v.withDisplayName(_bindings.labelFor(v.code)),
+    ];
+    // Sıra, filo tanımındaki (Fleet.vehicles) sıradır ve SUNUCUDAKİ ADA
+    // BAĞLI DEĞİLDİR. Eskiden görünen ada göre alfabetik sıralanıyordu;
+    // sunucuda bir araç yeniden adlandırılınca ("EUIGLID 8" gibi) listede
+    // yer değiştiriyor ve Lastik Değişimi ekranıyla tutarsız oluyordu.
+    _vehicles = next;
+
+    final String? selectedId = _selectedVehicle?.id;
+    if (selectedId != null) {
+      _selectedVehicle =
+          next.where((Vehicle v) => v.id == selectedId).firstOrNull;
+    }
+  }
+
   /// Kayıtlı bağları diskten yükler. Ağ yokken bile UUID elde kalsın diye
   /// açılışta çağrılır.
   Future<void> loadVehicleBindings() async {
     await _bindings.load();
+    _rebuildVehicles();
     notifyListeners();
   }
 
@@ -255,35 +314,54 @@ class AppState extends ChangeNotifier {
         for (final MapEntry<String, String> e in uuidByLabel.entries)
           VehicleDirectoryEntry(id: e.value, label: e.key),
       ],
-      localCodes: <String>[for (final Vehicle v in _vehicles) v.code],
+      localCodes: <String>[for (final Vehicle v in _baseVehicles) v.code],
+      adoptCodeFor: _adoptCodeFor,
     );
+    _rebuildVehicles();
   }
+
+  static String _adoptCodeFor(VehicleDirectoryEntry e) => '$_adoptedPrefix${e.id}';
 
   /// mining-be'den araç listesini çekip yerel filoyla eşleştirir.
   /// `applySession` içinde girişten hemen sonra tetiklenir.
   Future<void> loadVehicleDirectory() async {
-    await _bindings.load();
+    if (_loadingDirectory) return;
+    _loadingDirectory = true;
+    try {
+      await _bindings.load();
 
-    final String? accessToken = await ServiceLocator.tokens.readAccessToken();
-    final List<VehicleDirectoryEntry> entries =
-        await _vehicleDirectoryService.fetchAll(accessToken: accessToken);
-    // Boş liste "araç kalmadı" demek değil, çoğunlukla ağ/yetki sorunudur.
-    // Mevcut bağlara dokunulmaz.
-    if (entries.isEmpty) {
-      debugPrint('[FleetUUID] dizin boş döndü; kayıtlı bağlar korundu');
+      final String? accessToken = await ServiceLocator.tokens.readAccessToken();
+      final List<VehicleDirectoryEntry> entries =
+          await _vehicleDirectoryService.fetchAll(accessToken: accessToken);
+      // Boş liste "araç kalmadı" demek değil, çoğunlukla ağ/yetki sorunudur.
+      // Mevcut bağlara dokunulmaz.
+      if (entries.isEmpty) {
+        debugPrint('[FleetUUID] dizin boş döndü; kayıtlı bağlar korundu');
+        _rebuildVehicles();
+        notifyListeners();
+        return;
+      }
+
+      final VehicleDirectorySync sync = _bindings.reconcile(
+        entries: entries,
+        localCodes: <String>[for (final Vehicle v in _baseVehicles) v.code],
+        adoptCodeFor: _adoptCodeFor,
+      );
+      _lastSync = sync;
+      await _bindings.save();
+
+      _rebuildVehicles();
+      _reportDirectoryChanges(sync);
       notifyListeners();
-      return;
+    } finally {
+      _loadingDirectory = false;
     }
+  }
 
-    final VehicleDirectorySync sync = _bindings.reconcile(
-      entries: entries,
-      localCodes: <String>[for (final Vehicle v in _vehicles) v.code],
-    );
-    _lastSync = sync;
-    await _bindings.save();
-
-    _reportDirectoryChanges(sync);
-    notifyListeners();
+  @override
+  void dispose() {
+    _directoryTimer?.cancel();
+    super.dispose();
   }
 
   /// Dizin değişikliklerini kayıt altına alır. Yeniden adlandırmalar
@@ -298,18 +376,21 @@ class AppState extends ChangeNotifier {
       addNotification(
         NotificationItem(
           title: 'Araç adı sunucuda değişti',
-          message: '${rename.localCode} • "${rename.from}" → "${rename.to}"',
+          message: '"${rename.from}" → "${rename.to}"',
           date: DateTime.now(),
           kind: NotificationKind.info,
           vehicleCode: rename.localCode,
           details: <String, String>{
-            'Araç': rename.localCode,
             'Eski sunucu adı': rename.from,
             'Yeni sunucu adı': rename.to,
-            'Etki': 'Kayıt bağı korundu; gönderim etkilenmedi.',
+            'Etki': 'Araç listesinde yeni adıyla görünüyor; kayıt bağı korundu.',
           },
         ),
       );
+    }
+
+    for (final String code in sync.added) {
+      debugPrint('[FleetUUID] tipi tanımsız, listelenmedi: ${displayNameFor(code)}');
     }
 
     for (final String code in sync.missing) {
@@ -355,7 +436,7 @@ class AppState extends ChangeNotifier {
     addNotification(
       NotificationItem(
         title: 'Lastik değişimi kaydedildi',
-        message: '${vehicle.code} • ${record.position} (${record.tireId})'
+        message: '${vehicle.name} • ${record.position} (${record.tireId})'
             ' • Seri No: ${record.serialNo}',
         date: now,
         kind: NotificationKind.tire,
@@ -398,7 +479,7 @@ class AppState extends ChangeNotifier {
     addNotification(
       NotificationItem(
         title: 'Lastik kontrolü tamamlandı',
-        message: '${vehicle.code} • ${record.position} (${record.tireId})'
+        message: '${vehicle.name} • ${record.position} (${record.tireId})'
             '$detail$noteText',
         date: now,
         kind: NotificationKind.tire,
@@ -470,7 +551,7 @@ class AppState extends ChangeNotifier {
     addNotification(
       NotificationItem(
         title: 'Yağ takviyesi kaydedildi',
-        message: '${vehicle.code} • ${record.label}'
+        message: '${vehicle.name} • ${record.label}'
             ' • ${amount.toStringAsFixed(1)} L'
             '${product.isEmpty ? '' : ' • $product'}',
         date: now,
@@ -647,7 +728,7 @@ class AppState extends ChangeNotifier {
     addNotification(
       NotificationItem(
         title: 'Kontroller tamamlandı',
-        message: '${vehicle.code} • ${record.label}',
+        message: '${vehicle.name} • ${record.label}',
         date: now,
         kind: NotificationKind.oil,
         vehicleCode: vehicle.code,
@@ -725,6 +806,18 @@ class AppState extends ChangeNotifier {
 
   void addPending(PendingOperation operation) {
     _pending.add(operation);
+    notifyListeners();
+  }
+
+  /// Gönderilmemiş bir işlemi aynı kimlikle günceller; bulunamazsa eklenir.
+  void replacePending(PendingOperation operation) {
+    final int index =
+        _pending.indexWhere((PendingOperation p) => p.id == operation.id);
+    if (index < 0) {
+      _pending.add(operation);
+    } else {
+      _pending[index] = operation;
+    }
     notifyListeners();
   }
 

@@ -370,7 +370,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                         backgroundColor: accent,
                         child: Text('${index + 1}', style: const TextStyle(color: Colors.white)),
                       ),
-                      title: Text('${item.vehicle.code} - ${item.serviceType ?? ""}'),
+                      title: Text('${item.vehicle.name} - ${item.serviceType ?? ""}'),
                       subtitle: Text(timeStr),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
@@ -507,7 +507,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(
             content: Text(
-              '${item.vehicle.code} gönderilirken hata oluştu: ${result.error ?? "bilinmeyen hata"}. Sepettekiler duruyor, tekrar deneyebilirsiniz.',
+              '${item.vehicle.name} gönderilirken hata oluştu: ${result.error ?? "bilinmeyen hata"}. Sepettekiler duruyor, tekrar deneyebilirsiniz.',
             ),
           ));
         return; // Hata durumunda döngüyü durdur
@@ -531,14 +531,14 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
         NotificationItem(
           title: 'Servis raporu gönderildi',
           message: '${widget.type.label} • ${imagePaths.length} görsel'
-              ' • ${item.vehicle.code}'
+              ' • ${item.vehicle.name}'
               '${hours.isEmpty ? '' : ' • $hours'}',
           date: sentAt,
           kind: NotificationKind.form,
           vehicleCode: item.vehicle.code,
           details: <String, String>{
             'Rapor türü': widget.type.label,
-            'Araç': item.vehicle.code,
+            'Araç': item.vehicle.name,
             'Başlangıç saati': startText ?? '-',
             'Bitiş saati': endText ?? '-',
             'Gönderilen görsel': '${imagePaths.length}',

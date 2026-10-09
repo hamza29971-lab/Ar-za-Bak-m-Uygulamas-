@@ -8,14 +8,14 @@ import '../../services/auth_api_service.dart';
 import '../../services/auth_models.dart';
 import '../../state/app_state.dart';
 import '../../models/models.dart';
+import '../../services/role_policy.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
-  final String correctCode;
   final String? otpRequestId;
   final String? password; // API isteğinden dönen ID
   
-  const OtpScreen({super.key, required this.phoneNumber, required this.correctCode, this.otpRequestId, this.password});
+  const OtpScreen({super.key, required this.phoneNumber, this.otpRequestId, this.password});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -79,81 +79,136 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
   Future<void> _verifyCode() async {
-    if (AuthApiService.useRealApi && _currentOtpRequestId != null) {
-      // Gerçek API Doğrulaması
-      final data = await AuthApiService.verifyOtp(
-        _currentOtpRequestId!, 
-        widget.phoneNumber, 
-        _enteredCode,
-      );
-      
-      if (!mounted) return;
-      
-      if (data != null) {
-        // Profil bilgisini state'e kaydet (eğer API JSON'u AuthSession'a uyumluysa)
-        try {
-          final payload = data['data'] ?? data;
-          final userJson = payload['userData'] ?? payload['user'] ?? payload['profile'] ?? payload;
-          final Map<String, dynamic> safeUser = userJson is Map<String, dynamic> ? userJson : {};
-          
-          final session = AuthSession(
-            accessToken: (payload['accessToken'] ?? payload['token'] ?? '').toString(),
-            refreshToken: (payload['refreshToken'] ?? '').toString(),
-            user: UserProfile.fromJson(safeUser),
-          );
-          if (kDebugMode) {
-            // Yetki teşhisi: yalnızca anahtar adları ve claim özeti; ham token
-            // asla yazılmaz.
-            debugPrint('[Auth] giriş cevabı anahtarları: '
-                '${payload is Map ? payload.keys.toList() : payload.runtimeType}');
-            debugPrint('[Auth] token '
-                '${session.accessToken.isEmpty ? 'BOŞ' : 'var (${session.accessToken.length} karakter)'}'
-                '; claim özeti: ${jwtAuthSummary(session.accessToken)}');
-          }
-          AppScope.read(context).applySession(session);
-        } catch (e) {
-          debugPrint('AuthSession Parse Hatası: $e');
-          // Dummy verilerle test login
-          AppScope.read(context).signIn(phone: widget.phoneNumber);
-        }
-        
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const ShellScreen(),
-            transitionsBuilder: (context, anim, secondaryAnim, child) {
-              return FadeTransition(opacity: anim, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
-      } else {
-        setState(() {
-          _errorMessage = 'Doğrulama kodu hatalı veya süresi dolmuş.';
-        });
-      }
+    final String? requestId = _currentOtpRequestId;
+    if (requestId == null) {
+      setState(() => _errorMessage = 'Doğrulama isteği bulunamadı. Lütfen tekrar giriş yapın.');
       return;
     }
 
-    // --- Eski Mantık ---
-    if (_enteredCode == widget.correctCode) {
-      // Eski test/dummy mantığıyla giriş yap
-      AppScope.read(context).signIn(phone: widget.phoneNumber);
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const ShellScreen(),
-          transitionsBuilder: (context, anim, secondaryAnim, child) {
-            return FadeTransition(opacity: anim, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    } else {
-      setState(() {
-        _errorMessage = 'Doğrulama kodu hatalı';
-      });
+    final Map<String, dynamic>? data = await AuthApiService.verifyOtp(
+      requestId,
+      widget.phoneNumber,
+      _enteredCode,
+    );
+    if (!mounted) return;
+
+    if (data == null) {
+      setState(() => _errorMessage = 'Doğrulama kodu hatalı veya süresi dolmuş.');
+      return;
     }
+
+    final ({AuthSession session, Map<String, dynamic> userJson})? parsed =
+        _sessionFrom(data);
+    if (parsed == null) {
+      setState(() => _errorMessage = 'Giriş bilgileri okunamadı. Lütfen tekrar deneyin.');
+      return;
+    }
+    final AuthSession session = parsed.session;
+
+    // Rol türü uygun değilse oturum açılmaz, token saklanmaz.
+    final String? rule = RolePolicy.matchedRule(parsed.userJson);
+    if (kDebugMode) {
+      debugPrint('[Auth] giriş ${rule == null ? 'REDDEDİLDİ' : 'kabul: $rule'}'
+          ' (rol: "${session.user.role}")');
+    }
+    if (rule == null) {
+      await _showAccessDenied();
+      if (!mounted) return;
+      _backToLogin();
+      return;
+    }
+
+    AppScope.read(context).applySession(session);
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const ShellScreen(),
+        transitionsBuilder: (context, anim, secondaryAnim, child) {
+          return FadeTransition(opacity: anim, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
+  }
+
+  /// Doğrulama cevabından oturumu kurar; kullanıcı bilgisi yoksa `null`.
+  ({AuthSession session, Map<String, dynamic> userJson})? _sessionFrom(
+      Map<String, dynamic> data) {
+    final Object? payload = data['data'] ?? data;
+    if (payload is! Map<String, dynamic>) return null;
+    final Object? userJson =
+        payload['userData'] ?? payload['user'] ?? payload['profile'];
+    if (userJson is! Map<String, dynamic>) return null;
+
+    final AuthSession session = AuthSession(
+      accessToken: '${payload['accessToken'] ?? payload['token'] ?? ''}',
+      refreshToken: '${payload['refreshToken'] ?? ''}',
+      user: UserProfile.fromJson(userJson),
+    );
+    if (kDebugMode) {
+      // Yetki teşhisi: anahtar adları, rol ve claim özeti; ham token ve
+      // kişisel bilgiler yazılmaz.
+      debugPrint('[Auth] giriş cevabı anahtarları: ${payload.keys.toList()}');
+      debugPrint('[Auth] userData (kişisel alanlar gizli): ${_redact(userJson)}');
+      debugPrint('[Auth] token '
+          '${session.accessToken.isEmpty ? 'BOŞ' : 'var (${session.accessToken.length} karakter)'}'
+          '; claim özeti: ${jwtAuthSummary(session.accessToken)}');
+    }
+    return (session: session, userJson: userJson);
+  }
+
+  /// Rol yapısını log'da görebilmek için kişisel bilgileri gizler.
+  static Object? _redact(Object? node, [String key = '']) {
+    const List<String> personal = <String>[
+      'phone', 'mail', 'tc', 'identity', 'password', 'token', 'address',
+      'birth', 'iban', 'firstname', 'lastname', 'fullname', 'surname',
+    ];
+    final String k = key.toLowerCase();
+    if (node is Map) {
+      return <String, Object?>{
+        for (final MapEntry<dynamic, dynamic> e in node.entries)
+          '${e.key}': _redact(e.value, '${e.key}'),
+      };
+    }
+    if (node is List) return node.map((Object? e) => _redact(e, key)).toList();
+    if (node is String && personal.any(k.contains)) return '***';
+    return node;
+  }
+
+  Future<void> _showAccessDenied() {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => Theme(
+        data: AppTheme.light(),
+        child: AlertDialog(
+          title: const Text('Giriş Yetkisi Yok'),
+          content: const Text(
+            'Bu uygulamaya yalnızca Atölye Bakım Personeli ve Bakım '
+            'Yöneticisi giriş yapabilir.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _backToLogin() {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const LoginScreen(),
+        transitionsBuilder: (context, anim, secondaryAnim, child) {
+          return FadeTransition(opacity: anim, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   String get _maskedPhone {
