@@ -1,15 +1,11 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import '../models/models.dart';
 import '../services/publish_service.dart';
-import '../services/fleet_event_client.dart';
-import '../services/service_locator.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../utils/formats.dart';
@@ -96,16 +92,16 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   TimeOfDay? _endTime;
 
   String? _selectedService;
-  List<String> _fetchedServices = [];
-  bool _fetchingServices = false;
+  static const List<String> _defaultServices = [
+    'Yağ Bakımı',
+    'Fren Bakımı',
+    'Lastik Değişimi',
+    'Genel Arıza',
+    'Periyodik Bakım',
+    'Akü Değişimi',
+  ];
 
   final List<_ServiceCartItem> _cart = [];
-
-  @override
-  void initState() {
-    super.initState();
-  }
-  int? _editingIndex;
 
   bool _sending = false;
 
@@ -232,66 +228,6 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   // ------------------------------------------------------------------ sepet fonksiyonları
   Future<void> _pickService() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final AppState state = AppScope.read(context);
-    final vehicle = state.selectedVehicle;
-    if (vehicle == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lütfen önce araç seçin.'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    setState(() {
-      _fetchingServices = true;
-    });
-
-    try {
-      final String? accessToken = await ServiceLocator.tokens.readAccessToken();
-      final FleetEventClient client = HttpFleetEventClient();
-      // Vehicle UUID is parsed from code/id. Wait, state.vehicleUuidFor(vehicle.code)
-      final String? uuid = state.vehicleUuidFor(vehicle.code);
-      if (uuid != null) {
-        _fetchedServices = await client.fetchServices(uuid, accessToken: accessToken);
-      }
-    } catch (e) {
-      debugPrint('Servis çekme hatası: $e');
-      if (!mounted) return;
-      setState(() {
-        _fetchingServices = false;
-      });
-      
-      String errorMsg = e.toString().replaceAll('Exception: ', '');
-      
-      if (errorMsg.contains('acik bakim kaydi')) {
-        errorMsg = 'Bu araca ait açık bakım kaydı bulunamadı.';
-      }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            errorMsg,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ), 
-          backgroundColor: Colors.orange.shade800,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-      return;
-    } finally {
-      setState(() {
-        _fetchingServices = false;
-      });
-    }
-
-    if (!mounted) return;
-
-    if (_fetchedServices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bu araç için servis bulunamadı veya bağlantı hatası oluştu.'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
     final String? picked = await showDialog<String>(
       context: context,
       builder: (BuildContext ctx) {
@@ -309,44 +245,12 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
               clipBehavior: Clip.antiAlias,
               child: ListView.builder(
                 itemExtent: 44, // Saat seçici ile aynı satır yüksekliği
-                itemCount: _fetchedServices.length,
+                itemCount: _defaultServices.length,
                 itemBuilder: (context, index) {
-                  final String service = _fetchedServices[index];
+                  final String service = _defaultServices[index];
                   final bool isSelected = _selectedService == service;
                   return InkWell(
-                    onTap: () {
-                      final vehicle = AppScope.read(context).selectedVehicle;
-                      if (vehicle != null) {
-                        final bool isDuplicate = _cart.asMap().entries.any((entry) {
-                          if (_editingIndex == entry.key) return false;
-                          return entry.value.vehicle.code == vehicle.code && entry.value.serviceType == service;
-                        });
-
-                        if (isDuplicate) {
-                          showDialog<void>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              content: SizedBox(
-                                width: 400,
-                                child: Text(
-                                  'Bu araç için "$service" işlemi devam eden servis kayıtları arasında bulunmaktadır. Lütfen farklı bir işlem seçiniz.',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx),
-                                  child: const Text('Tamam', style: TextStyle(fontSize: 16)),
-                                )
-                              ],
-                            ),
-                          );
-                          return;
-                        }
-                      }
-                      Navigator.pop(ctx, service);
-                    },
+                    onTap: () => Navigator.pop(ctx, service),
                     child: Container(
                       alignment: Alignment.center,
                       color: isSelected ? accent : null,
@@ -376,16 +280,18 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       }
     );
     if (picked != null) {
-      setState(() {
-        if (_selectedService != picked) {
-          _startTime = null;
-          _endTime = null;
-        }
-        _selectedService = picked;
-      });
+      setState(() => _selectedService = picked);
     }
   }
 
+
+  void _approveAndPickEndTime() {
+    if (_cart.isEmpty) {
+      _showValidationPopup(['Lütfen önce işlem yapılacak araçları (İşlemi Kaydet ile) sepete ekleyin.']);
+      return;
+    }
+    _pickTime(isStart: false);
+  }
 
   void _saveToCart() {
     final AppState state = AppScope.of(context);
@@ -403,71 +309,28 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       return;
     }
 
-    // Sepette (düzenlenen hariç) aynı araç ve aynı servis var mı kontrolü
-    final bool isDuplicate = _cart.asMap().entries.any((entry) {
-      if (_editingIndex == entry.key) return false;
-      return entry.value.vehicle.code == vehicle!.code && entry.value.serviceType == _selectedService;
-    });
-
-    if (isDuplicate) {
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: SizedBox(
-            width: 400,
-            child: Text(
-              'Bu araç için "$_selectedService" işlemi devam eden servis kayıtları arasında bulunmaktadır. Lütfen farklı bir işlem seçiniz.',
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Tamam', style: TextStyle(fontSize: 16)),
-            )
-          ],
-        ),
-      );
-      return;
-    }
-
     setState(() {
-      if (_editingIndex != null && _editingIndex! < _cart.length) {
-        _cart[_editingIndex!] = _ServiceCartItem(
-          vehicle: vehicle!,
-          images: List.from(_images),
-          description: _description.text.trim(),
-          serviceType: _selectedService,
-          startTime: _startTime,
-          endTime: _endTime,
-        );
-        // Düzenlenen kayıt kaydedildikten sonra form ekranda kalsın, sadece düzenleme modundan çıkalım.
-        _editingIndex = null;
-      } else {
-        _cart.add(_ServiceCartItem(
-          vehicle: vehicle!,
-          images: List.from(_images),
-          description: _description.text.trim(),
-          serviceType: _selectedService,
-          startTime: _startTime,
-          endTime: _endTime,
-        ));
-        
-        // Yeni bir kayıt sıfırdan ekleniyorsa formu sıfırla
-        state.selectVehicle(null);
-        _images.clear();
-        _description.clear();
-        _selectedService = null;
-        _startTime = null;
-        _endTime = null;
-        _editingIndex = null;
-      }
+      _cart.add(_ServiceCartItem(
+        vehicle: vehicle!,
+        images: List.from(_images),
+        description: _description.text.trim(),
+        serviceType: _selectedService,
+        startTime: _startTime,
+        endTime: _endTime,
+      ));
+      
+      // Formu sıfırla
+      state.selectVehicle(null);
+      _images.clear();
+      _description.clear();
+      _selectedService = null;
+      _startTime = null;
+      _endTime = null;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('İşlem başarıyla kaydedildi!'),
+        content: Text('İşlem başarıyla kaydedildi! Yeni bir araç girebilirsiniz.'),
         backgroundColor: Colors.green,
       ),
     );
@@ -487,7 +350,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Devam Eden Servisler',
+                'Bekleyen Raporlar',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
@@ -503,33 +366,16 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                         ? '(${_formatTime(item.startTime!)} - ${_formatTime(item.endTime!)})'
                         : '';
                     return ListTile(
-                      onTap: () {
-                        setState(() {
-                          _editingIndex = index;
-                          AppScope.read(context).selectVehicle(item.vehicle);
-                          _images.clear();
-                          _images.addAll(item.images);
-                          _description.text = item.description;
-                          _selectedService = item.serviceType;
-                          _startTime = item.startTime;
-                          _endTime = item.endTime;
-                        });
-                        Navigator.pop(ctx);
-                      },
                       leading: CircleAvatar(
                         backgroundColor: accent,
                         child: Text('${index + 1}', style: const TextStyle(color: Colors.white)),
                       ),
-                      title: Text('${item.vehicle.code} - ${item.serviceType ?? ""}'),
+                      title: Text('${item.vehicle.name} - ${item.serviceType ?? ""}'),
                       subtitle: Text(timeStr),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () {
-                          setState(() {
-                            _cart.removeAt(index);
-                            if (_editingIndex == index) _editingIndex = null;
-                            else if (_editingIndex != null && _editingIndex! > index) _editingIndex = _editingIndex! - 1;
-                          });
+                          setState(() => _cart.removeAt(index));
                           Navigator.pop(ctx);
                           if (_cart.isNotEmpty) _showCart();
                         },
@@ -614,129 +460,111 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
   }
 
   Future<void> _send() async {
-    final AppState state = AppScope.read(context);
-    final Vehicle? vehicle = state.selectedVehicle;
-
-    final List<String> errors = <String>[];
-    if (vehicle == null) errors.add('Lütfen işlem yapılacak aracı seçin.');
-    if (widget.showServiceHours && _selectedService == null) {
-      errors.add('Lütfen yapılan servisi seçin.');
-    }
-    if (widget.showServiceHours && _startTime == null) {
-      errors.add('Başlangıç saatini seçmediniz.');
-    }
-    if (widget.showServiceHours && _endTime == null) {
-      errors.add('Bitiş saatini seçmediniz.');
-    }
-
-    if (errors.isNotEmpty) {
-      _showValidationPopup(errors);
+    if (_cart.isEmpty) {
+      _showValidationPopup(['Bekleyen Raporlar listenizde gönderilecek hiçbir işlem yok. Lütfen önce bir araca işlem yapıp "Kaydet"e basın.']);
       return;
     }
 
     setState(() => _sending = true);
+    final AppState state = AppScope.read(context);
 
-    final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
+    int successCount = 0;
     
-    final String? startText = widget.showServiceHours && _startTime != null
-        ? _formatTime(_startTime!)
-        : null;
-    final String? endText = widget.showServiceHours && _endTime != null
-        ? _formatTime(_endTime!)
-        : null;
-    final String hours = startText == null && endText == null
-        ? ''
-        : '${startText ?? '-'} - ${endText ?? '-'}';
+    for (int i = 0; i < _cart.length; i++) {
+      final item = _cart[i];
+      final List<String> imagePaths = _images.map((XFile f) => f.path).toList();
+      
+      final String? startText = widget.showServiceHours && item.startTime != null
+          ? _formatTime(item.startTime!)
+          : null;
+      final String? endText = widget.showServiceHours && _endTime != null
+          ? _formatTime(_endTime!)
+          : null;
+      final String hours = startText == null && endText == null
+          ? ''
+          : '${startText ?? '-'} - ${endText ?? '-'}';
 
-    final String fullDescription = _selectedService != null && _selectedService!.isNotEmpty
-        ? '[$_selectedService] - ${_description.text}'
-        : _description.text;
+      final String fullDescription = item.serviceType != null && item.serviceType!.isNotEmpty
+          ? '[${item.serviceType}] - ${_description.text}'
+          : _description.text;
 
-    final PublishResult result = await PublishService.instance.publishReport(
-      state: state,
-      reportType: widget.type.label,
-      service: _selectedService,
-      description: fullDescription,
-      imagePaths: imagePaths,
-      items: const <Map<String, Object?>>[],
-      vehicleCode: vehicle!.code,
-      userRegistryNo: state.user?.registryNo,
-      startTime: startText,
-      endTime: endText,
-    );
-
-    if (!result.success) {
-      if (!mounted) return;
-      setState(() => _sending = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(
-            '${vehicle.code} gönderilirken hata oluştu: ${result.error ?? "bilinmeyen hata"}.',
-          ),
-        ));
-      return;
-    }
-
-    final DateTime sentAt = DateTime.now();
-    state.addActivity(
-      ServiceReportActivity(
-        id: 'rapor-${sentAt.microsecondsSinceEpoch}',
-        vehicleCode: vehicle.code,
-        date: sentAt,
+      final PublishResult result = await PublishService.instance.publishReport(
+        state: state,
         reportType: widget.type.label,
         description: fullDescription,
         imagePaths: imagePaths,
-        itemCount: 0,
-      ),
-    );
-    state.addNotification(
-      NotificationItem(
-        title: 'Servis raporu gönderildi',
-        message: '${widget.type.label} • ${imagePaths.length} görsel'
-            ' • ${vehicle.code}'
-            '${hours.isEmpty ? '' : ' • $hours'}',
-        date: sentAt,
-        kind: NotificationKind.form,
-        vehicleCode: vehicle.code,
-        details: <String, String>{
-          'Rapor türü': widget.type.label,
-          'Araç': vehicle.code,
-          'Başlangıç saati': startText ?? '-',
-          'Bitiş saati': endText ?? '-',
-          'Gönderilen görsel': '${imagePaths.length}',
-          'Açıklama': fullDescription,
-          'Gönderim tarihi': formatDateTime(sentAt),
-        },
-      ),
-    );
+        items: const <Map<String, Object?>>[],
+        vehicleCode: item.vehicle.code,
+        userRegistryNo: state.user?.registryNo,
+        startTime: startText,
+        endTime: endText,
+      );
+
+      if (!result.success) {
+        if (!mounted) return;
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(
+              '${item.vehicle.name} gönderilirken hata oluştu: ${result.error ?? "bilinmeyen hata"}. Sepettekiler duruyor, tekrar deneyebilirsiniz.',
+            ),
+          ));
+        return; // Hata durumunda döngüyü durdur
+      }
+
+      successCount++;
+      
+      final DateTime sentAt = DateTime.now();
+      state.addActivity(
+        ServiceReportActivity(
+          id: 'rapor-${sentAt.microsecondsSinceEpoch}',
+          vehicleCode: item.vehicle.code,
+          date: sentAt,
+          reportType: widget.type.label,
+          description: fullDescription,
+          imagePaths: imagePaths,
+          itemCount: 0,
+        ),
+      );
+      state.addNotification(
+        NotificationItem(
+          title: 'Servis raporu gönderildi',
+          message: '${widget.type.label} • ${imagePaths.length} görsel'
+              ' • ${item.vehicle.name}'
+              '${hours.isEmpty ? '' : ' • $hours'}',
+          date: sentAt,
+          kind: NotificationKind.form,
+          vehicleCode: item.vehicle.code,
+          details: <String, String>{
+            'Rapor türü': widget.type.label,
+            'Araç': item.vehicle.name,
+            'Başlangıç saati': startText ?? '-',
+            'Bitiş saati': endText ?? '-',
+            'Gönderilen görsel': '${imagePaths.length}',
+            'Açıklama': fullDescription,
+            'Gönderim tarihi': formatDateTime(sentAt),
+          },
+        ),
+      );
+    }
 
     if (!mounted) return;
-    final String? sentServiceName = _selectedService;
-
     setState(() {
       _sending = false;
-      if (_editingIndex != null && _editingIndex! < _cart.length) {
-        _cart.removeAt(_editingIndex!);
-      }
+      _cart.clear(); // Hepsini başarıyla gönderince sepeti sıfırla
       _images.clear();
       _description.clear();
       _endTime = null;
-      _startTime = null;
-      _selectedService = null;
-      _editingIndex = null;
-      state.selectVehicle(null);
     });
 
+    final DateTime now = DateTime.now();
     await showResultDialog(
       context,
-      title: 'Gönderim Başarılı',
-      subtitle: formatDateTime(sentAt),
+      title: 'Toplu Gönderim Başarılı',
+      subtitle: formatDateTime(now),
       details: <String, String>{
-        'Araç': vehicle.code,
-        if (sentServiceName != null) 'Servis': sentServiceName,
-        if (startText != null) 'Başlangıç': startText,
-        if (endText != null) 'Bitiş': endText,
+        'Gönderilen Toplam Rapor': '$successCount adet',
       },
     );
   }
@@ -776,43 +604,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                       accentColor: accent,
                       borderAccent: borderAccent,
                       width: 360,
-                      onSelected: (Vehicle? newVehicle) {
-                        if (newVehicle != null) {
-                          if (_editingIndex != null && newVehicle.code != _cart[_editingIndex!].vehicle.code) {
-                            showDialog<void>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                title: const Text('İşlem Tamamlanmadı', style: TextStyle(fontSize: 22)),
-                                content: const SizedBox(
-                                  width: 400,
-                                  child: Text('Lütfen önce yaptığınız işlemi kaydedin.', style: TextStyle(fontSize: 16)),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: const Text('Tamam', style: TextStyle(fontSize: 16)),
-                                  )
-                                ],
-                              ),
-                            );
-                            return;
-                          }
-
-                          // Eğer araç gerçekten değişiyorsa formu sıfırla
-                          if (state.selectedVehicle?.code != newVehicle.code) {
-                            setState(() {
-                              _images.clear();
-                              _description.clear();
-                              _startTime = null;
-                              _endTime = null;
-                              _selectedService = null;
-                              _editingIndex = null;
-                            });
-                          }
-                        }
-                        state.selectVehicle(newVehicle);
-                      },
+                      onSelected: state.selectVehicle,
                     ),
                     if (widget.showServiceHours) _buildServiceHours(context),
                   ],
@@ -838,24 +630,22 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       spacing: 12,
       runSpacing: 12,
       children: <Widget>[
-        // 1. Kayıt Göstergesi
+        // 1. Kayıt Göstergesi (Eski Sepet)
         _buildActionBox(
           context,
           label: null,
-          value: _cart.isEmpty ? 'Servis kaydı bulunmamaktadır' : 'Devam Eden Servisler (${_cart.length})',
+          value: _cart.isEmpty ? 'Kayıt Yok' : 'Kayıt (${_cart.length})',
           icon: Icons.assignment_outlined,
           isSet: _cart.isNotEmpty,
-          width: 280,
           onTap: _showCart,
         ),
         // 2. Servis Seç
         _buildActionBox(
           context,
           label: 'Servis Seç',
-          value: _fetchingServices ? 'Yükleniyor...' : (_selectedService ?? 'Servis seçin'),
-          icon: _fetchingServices ? Icons.hourglass_empty : Icons.build_circle_outlined,
+          value: _selectedService ?? 'Servis seçin',
+          icon: Icons.build_circle_outlined,
           isSet: _selectedService != null,
-          isDisabled: _editingIndex != null || _fetchingServices,
           onTap: _pickService,
         ),
         // 3. Başlangıç Saati
@@ -865,20 +655,9 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           value: _startTime != null ? _formatTime(_startTime!) : 'Saat seçin',
           icon: Icons.schedule_outlined,
           isSet: _startTime != null,
-          isDisabled: _editingIndex != null,
           onTap: () => _pickTime(isStart: true),
         ),
-        // 4. Bitiş Saati
-        _buildActionBox(
-          context,
-          label: 'Bitiş Saati',
-          value: _endTime != null ? _formatTime(_endTime!) : 'Saat seçin',
-          icon: Icons.schedule_outlined,
-          isSet: _endTime != null,
-          color: Colors.green,
-          onTap: () => _pickTime(isStart: false),
-        ),
-        // 5. İşlemi Kaydet (Toplu işlem için sepete atar veya günceller)
+        // 4. İşlemi Kaydet (Toplu işlem için sepete atar)
         _buildActionBox(
           context,
           label: null,
@@ -888,6 +667,27 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
           color: Colors.blue,
           onTap: _saveToCart,
         ),
+        // 5. Onayla VEYA Bitiş Saati
+        if (_endTime == null)
+          _buildActionBox(
+            context,
+            label: null,
+            value: 'Onayla',
+            icon: Icons.check_circle_outline,
+            isSet: true,
+            color: Colors.green,
+            onTap: _approveAndPickEndTime,
+          )
+        else
+          _buildActionBox(
+            context,
+            label: 'Bitiş Saati',
+            value: _formatTime(_endTime!),
+            icon: Icons.schedule_outlined,
+            isSet: true,
+            color: Colors.green,
+            onTap: () => _pickTime(isStart: false),
+          ),
       ],
     );
   }
@@ -902,11 +702,10 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     bool isSet = false,
     bool isDisabled = false,
     Color? color,
-    double width = 175,
   }) {
     final effectiveColor = color ?? accent;
     return SizedBox(
-      width: width,
+      width: 175,
       height: 52, // Hepsini aynı yüksekliğe sabitliyoruz
       child: Opacity(
         opacity: isDisabled ? 0.45 : 1.0,
@@ -972,13 +771,22 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
 
   /// Görsel ve açıklama kartları.
   Widget _buildCards(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Expanded(child: _buildImageCard(context)),
-        const SizedBox(width: 20),
-        Expanded(child: _buildDescriptionCard(context)),
-      ],
+    // Fotoğraf ve açıklama kısımları ancak bitiş saati girilince açılır (buğulu kalkar).
+    final bool isUnlocked = !widget.showServiceHours || _endTime != null;
+    
+    return IgnorePointer(
+      ignoring: !isUnlocked,
+      child: Opacity(
+        opacity: isUnlocked ? 1.0 : 0.45,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Expanded(child: _buildImageCard(context)),
+            const SizedBox(width: 20),
+            Expanded(child: _buildDescriptionCard(context)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -986,10 +794,29 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: <Widget>[
+        if (_images.isNotEmpty ||
+            _description.text.isNotEmpty ||
+            _startTime != null ||
+            _endTime != null ||
+            _cart.isNotEmpty)
+          TextButton.icon(
+            onPressed: _sending
+                ? null
+                : () => setState(() {
+                      _images.clear();
+                      _description.clear();
+                      _startTime = null;
+                      _endTime = null;
+                      _cart.clear(); // Sepeti de temizle
+                    }),
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('Tümünü Temizle'),
+          ),
+        const SizedBox(width: 12),
         SizedBox(
           width: 260,
           child: FilledButton.icon(
-            onPressed: ((widget.showServiceHours && _endTime == null) || _sending) ? null : _send,
+            onPressed: (_cart.isEmpty || _endTime == null || _sending) ? null : _send,
             style: FilledButton.styleFrom(
               backgroundColor: accent,
               minimumSize: const Size(0, 56),
@@ -1002,7 +829,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
                         CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.send),
-            label: Text(_sending ? 'Gönderiliyor...' : 'Gönder'),
+            label: Text(_sending ? 'Gönderiliyor...' : 'Tümünü Gönder'),
           ),
         ),
       ],

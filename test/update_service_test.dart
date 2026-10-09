@@ -20,6 +20,26 @@ void main() {
     expect(UpdateService.shouldOffer(remote: 71, installed: 70, ignored: 71), isFalse);
   });
 
+  test('APK dosya adi version.json daki apk alanindan okunur', () {
+    expect(UpdateService.apkFileFrom(<String, Object?>{'build_number': 93, 'apk': 'nimo_93.apk'}),
+        'nimo_93.apk');
+  });
+
+  test('apk alani yoksa ya da gecersizse latest.apk kullanilir', () {
+    for (final Object? apk in <Object?>[
+      null,
+      '',
+      93,
+      'nimo_93.zip',
+      '../nimo_93.apk',
+      'klasor/nimo_93.apk',
+      'https://ornek.com/nimo_93.apk',
+    ]) {
+      expect(UpdateService.apkFileFrom(<String, Object?>{'build_number': 93, 'apk': apk}),
+          'latest.apk', reason: '$apk');
+    }
+  });
+
   test('basarisiz kurulum sonrasi ayni surum yeniden onerilir', () {
     // Eski kod indirme bitince build numarasini "kuruldu" diye kaydediyordu ve
     // pencere bir daha cikmiyordu. Artik karar yalnizca gercek versionCode'a

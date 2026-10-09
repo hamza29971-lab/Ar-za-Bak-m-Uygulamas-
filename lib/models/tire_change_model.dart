@@ -104,11 +104,64 @@ class VehicleModel {
   }
 }
 
+/// Lastik hava basıncının birimi; ekranda ve gönderimde kullanılır.
+const String tirePressureUnit = 'PSI';
+
+/// Basıncın ekranda gösterimi: `100 PSI`, girilmemişse `---`.
+String formatTirePressure(double? pressure) {
+  if (pressure == null) return '---';
+  final String value = pressure == pressure.roundToDouble()
+      ? pressure.toStringAsFixed(0)
+      : pressure.toStringAsFixed(1);
+  return '$value $tirePressureUnit';
+}
+
+/// Sökülmüş bir lastiğin kaydı: takıldığı andaki bilgileriyle.
+class TireMount {
+  final String serialNumber;
+  final double? pressure;
+  final String brand;
+  final bool? coated; // Takılırken kaplama yapıldı mı? (eski kayıtlarda yok)
+  final DateTime mountedAt;
+  final DateTime removedAt;
+
+  const TireMount({
+    required this.serialNumber,
+    required this.pressure,
+    required this.brand,
+    this.coated,
+    required this.mountedAt,
+    required this.removedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'serialNumber': serialNumber,
+        'pressure': pressure,
+        'brand': brand,
+        'coated': coated,
+        'mountedAt': mountedAt.toIso8601String(),
+        'removedAt': removedAt.toIso8601String(),
+      };
+
+  factory TireMount.fromJson(Map<String, dynamic> json) => TireMount(
+        serialNumber: json['serialNumber'] as String? ?? '---',
+        pressure: (json['pressure'] as num?)?.toDouble(),
+        brand: json['brand'] as String? ?? '',
+        coated: json['coated'] as bool?,
+        mountedAt: DateTime.parse(json['mountedAt'] as String),
+        removedAt: DateTime.parse(json['removedAt'] as String),
+      );
+}
+
 class TireRecord {
   final int tireNumber;
   String serialNumber;
+  double? pressure; // Takılırken basılan hava basıncı ([tirePressureUnit])
+  String brand; // Lastik markası
+  bool? coated; // Takılırken kaplama yapıldı mı? (eski kayıtlarda yok)
   DateTime lastChangedDate; // Seri No'nun son değiştirilme tarihi
   List<TireActionRecord> actionHistory; // Tüm kontrol aksiyonları (her biri kendi tarihiyle)
+  List<TireMount> previousTires; // Bu konumdan sökülen lastikler (eskiden yeniye)
   bool isChanged; // Bu oturumda değiştirildi mi?
   bool hasInitialRecord; // İlk lastik kaydı yapıldı mı?
 
@@ -116,10 +169,15 @@ class TireRecord {
     required this.tireNumber,
     required this.serialNumber,
     required this.lastChangedDate,
+    this.pressure,
+    this.brand = '',
+    this.coated,
     List<TireActionRecord>? actionHistory,
+    List<TireMount>? previousTires,
     this.isChanged = false,
     this.hasInitialRecord = false,
-  }) : actionHistory = actionHistory ?? [];
+  })  : actionHistory = actionHistory ?? [],
+        previousTires = previousTires ?? [];
 
   /// Son kontrol aksiyonu (varsa)
   TireActionRecord? get lastAction =>
@@ -127,16 +185,24 @@ class TireRecord {
 
   TireRecord copyWith({
     String? serialNumber,
+    double? pressure,
+    String? brand,
+    bool? coated,
     DateTime? lastChangedDate,
     List<TireActionRecord>? actionHistory,
+    List<TireMount>? previousTires,
     bool? isChanged,
     bool? hasInitialRecord,
   }) {
     return TireRecord(
       tireNumber: tireNumber,
       serialNumber: serialNumber ?? this.serialNumber,
+      pressure: pressure ?? this.pressure,
+      brand: brand ?? this.brand,
+      coated: coated ?? this.coated,
       lastChangedDate: lastChangedDate ?? this.lastChangedDate,
       actionHistory: actionHistory ?? List.from(this.actionHistory),
+      previousTires: previousTires ?? List.from(this.previousTires),
       isChanged: isChanged ?? this.isChanged,
       hasInitialRecord: hasInitialRecord ?? this.hasInitialRecord,
     );

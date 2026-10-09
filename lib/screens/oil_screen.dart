@@ -235,7 +235,7 @@ class _OilScreenState extends State<OilScreen> {
                     icon: Icons.fact_check_outlined,
                     accent: AppColors.form,
                     details: <String, String>{
-                      'Araç': vehicle.code,
+                      'Araç': vehicle.name,
                       _category.columnLabel: r.label,
                       'Kontrol tarihi': formatDateTime(DateTime.now()),
                     },
@@ -286,7 +286,7 @@ class _OilScreenState extends State<OilScreen> {
         icon: Icons.delete_outline,
         accent: AppColors.emergency,
         details: <String, String>{
-          'Araç': vehicle.code,
+          'Araç': vehicle.name,
           _category.columnLabel: record.label,
         },
         note: 'Gönderilmeyi bekleyen kayıt silindi.',
@@ -329,7 +329,7 @@ class _OilScreenState extends State<OilScreen> {
     _RefillRequest request,
   ) {
     return <String, String>{
-      'Araç': vehicle.code,
+      'Araç': vehicle.name,
       _category.columnLabel: record.label,
       _manualCategory ? 'Kullanılan yağ miktarı' : 'Takviye miktarı':
           '${request.amount.toStringAsFixed(1)} L',
@@ -352,7 +352,7 @@ class _OilScreenState extends State<OilScreen> {
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Tümünü Kontrol Et'),
         content: Text(
-          '${vehicle.code} aracının listelenen ${records.length} alanı '
+          '${vehicle.name} aracının listelenen ${records.length} alanı '
           'kontrol edilmiş olarak işaretlenecek. Onaylıyor musunuz?',
         ),
         actions: <Widget>[
@@ -450,7 +450,7 @@ class _OilScreenState extends State<OilScreen> {
     state.addNotification(
       NotificationItem(
         title: 'Yağ işlemleri gönderildi',
-        message: '$count işlem${vehicle != null ? ' • ${vehicle.code}' : ''}',
+        message: '$count işlem${vehicle != null ? ' • ${vehicle.name}' : ''}',
         date: DateTime.now(),
         kind: NotificationKind.oil,
         vehicleCode: vehicle?.code,
@@ -460,7 +460,7 @@ class _OilScreenState extends State<OilScreen> {
           // Hangi işlemlerin gönderildiği sonradan da görülebilsin.
           for (int i = 0; i < pending.length; i++)
             '${i + 1}. işlem':
-                '${pending[i].vehicleCode} • ${pending[i].label}',
+                '${AppScope.read(context).displayNameFor(pending[i].vehicleCode)} • ${pending[i].label}',
           'Gönderim tarihi': formatDateTime(DateTime.now()),
         },
       ),
@@ -571,7 +571,7 @@ class _RefillDialogState extends State<_RefillDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(widget.vehicle.code,
+            Text(widget.vehicle.name,
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 18),
             Text(widget.category.columnLabel, style: const TextStyle(fontSize: 13)),
@@ -734,7 +734,7 @@ class _VehicleDisplay extends StatelessWidget {
           // Yağ ekranında lastik sayısının bir anlamı yok; yalnızca araç kodu
           // gösterilir.
           Text(
-            vehicle.code,
+            vehicle.name,
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),

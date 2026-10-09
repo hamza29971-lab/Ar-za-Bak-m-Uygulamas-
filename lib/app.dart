@@ -25,12 +25,26 @@ class NimoApp extends StatefulWidget {
 
 class _NimoAppState extends State<NimoApp> {
   final AppState _state = AppState();
+  final TireChangeProvider _tireProvider = TireChangeProvider();
   Timer? _updateTimer;
   bool _isCheckingUpdate = false;
+
+  /// Lastik Değişimi ekranının ayrı araç listesi de sunucu adlarını ve
+  /// sunucudaki araç kümesini izlesin.
+  void _syncTireDirectory() {
+    _tireProvider.applyDirectory(
+      serverNames: <String, String>{
+        for (final String code in _state.boundVehicleCodes)
+          code: _state.displayNameFor(code),
+      },
+      boundCodes: _state.vehicleDirectoryKnown ? _state.boundVehicleCodes : null,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    _state.addListener(_syncTireDirectory);
     // Kayıtlı araç bağları ağdan bağımsız; girişten önce yüklenir ki
     // çevrimdışıyken de araç UUID'leri elde olsun.
     unawaited(_state.loadVehicleBindings());
@@ -60,7 +74,10 @@ class _NimoAppState extends State<NimoApp> {
           await showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (_) => UpdateDialog(remoteBuildNumber: result.remoteBuild),
+            builder: (_) => UpdateDialog(
+              remoteBuildNumber: result.remoteBuild,
+              apkFile: result.apkFile,
+            ),
           );
         }
       }
@@ -77,6 +94,8 @@ class _NimoAppState extends State<NimoApp> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _state.removeListener(_syncTireDirectory);
+    _tireProvider.dispose();
     _state.dispose();
     super.dispose();
   }
@@ -85,7 +104,7 @@ class _NimoAppState extends State<NimoApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => TireChangeProvider()),
+        ChangeNotifierProvider<TireChangeProvider>.value(value: _tireProvider),
       ],
       child: AppScope(
         state: _state,

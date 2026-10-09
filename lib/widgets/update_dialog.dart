@@ -6,7 +6,14 @@ import '../theme/app_theme.dart';
 
 class UpdateDialog extends StatefulWidget {
   final int remoteBuildNumber;
-  const UpdateDialog({super.key, required this.remoteBuildNumber});
+
+  /// Depodan indirilecek APK'nın dosya adı, ör. `nimo_93.apk`.
+  final String apkFile;
+  const UpdateDialog({
+    super.key,
+    required this.remoteBuildNumber,
+    required this.apkFile,
+  });
 
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
@@ -56,6 +63,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     try {
       final file = await UpdateService.downloadApk(
         widget.remoteBuildNumber,
+        widget.apkFile,
         (progress) {
           if (mounted) {
             setState(() {

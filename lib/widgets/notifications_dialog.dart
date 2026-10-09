@@ -387,7 +387,7 @@ class _NotificationDetailsDialog extends StatelessWidget {
                         item.vehicleCode!.isNotEmpty)
                       InfoLine(
                         label: 'Araç',
-                        value: item.vehicleCode!,
+                        value: AppScope.read(context).displayNameFor(item.vehicleCode!),
                         labelWidth: 180,
                       ),
                     InfoLine(
@@ -453,7 +453,7 @@ class _SubTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      text.toUpperCase(),
+      upperTr(text),
       style: TextStyle(
         fontSize: 12,
         letterSpacing: 0.8,

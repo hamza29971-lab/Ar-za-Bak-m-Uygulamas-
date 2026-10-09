@@ -8,32 +8,57 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'kiosk_service.dart';
 
+/// Güncellemeler herkese açık GitHub deposundan anahtarsız alınır. Uygulamaya
+/// gömülü bir anahtar iptal edildiğinde kurulu tabletler bir daha güncelleme
+/// alamıyordu; açık depoda iptal edilecek bir anahtar yoktur.
 class UpdateService {
-  static const String _token1 = 'ghp_1seMoPinB3kQjaml';
-  static const String _token2 = '4fAY4gblfmNnHI14atAX';
-  static String get _token => _token1 + _token2;
-
   static const String _owner = 'hamza29971-lab';
   static const String _repo = 'Nimo_bak-m_g-ncelleme';
   static const String _ignoredKey = 'last_ignored_build_nimo';
 
-  static Map<String, String> get _headers => {
-        'Authorization': 'Bearer $_token',
-        'Accept': 'application/vnd.github.raw+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      };
+  /// GitHub API yerine doğrudan dosya adresi kullanılır: API anahtarsız
+  /// isteklerde IP başına saatte 60 istekle sınırlı, tabletler ise 30
+  /// saniyede bir kontrol ediyor.
+  static const String _rawBase =
+      'https://raw.githubusercontent.com/$_owner/$_repo/main';
 
-  /// GitHub daki build_number i getirir (cache bypass ile)
-  static Future<int> getRemoteBuildNumber() async {
+  /// `version.json`'da `apk` alanı yoksa indirilen dosya.
+  static const String _fallbackApk = 'latest.apk';
+
+  /// Depodaki yayın: `{"build_number": 93, "apk": "nimo_93.apk"}`.
+  ///
+  /// GitHub'ın dosya sunucusu dosyaları ~5 dakika önbellekte tutuyor ve
+  /// sorgu parametresini yok sayıyor. APK hep aynı adla yüklenseydi tablet
+  /// yeni numarayı görüp önbellekteki eski APK'yı indirebilirdi; her sürüm
+  /// kendi adıyla yüklendiğinde bu olamaz.
+  static Future<({int build, String apk})> getRemoteRelease() async {
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final url = Uri.parse(
-        'https://api.github.com/repos/$_owner/$_repo/contents/version.json?t=$ts');
-    final response = await http.get(url, headers: _headers);
+    final url = Uri.parse('$_rawBase/version.json?t=$ts');
+    final response = await http.get(url, headers: const <String, String>{
+      'Cache-Control': 'no-cache',
+    });
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['build_number'] as num).toInt();
+      final Object? data = jsonDecode(response.body);
+      if (data is Map && data['build_number'] is num) {
+        return (
+          build: (data['build_number'] as num).toInt(),
+          apk: apkFileFrom(data),
+        );
+      }
+      throw Exception('version.json biçimi hatalı: ${response.body}');
     }
     throw Exception('version.json okunamadi: ${response.statusCode}');
+  }
+
+  /// `apk` alanındaki dosya adı. Yalnızca düz bir `.apk` dosya adı kabul
+  /// edilir (klasör ya da adres değil); geçersizse [_fallbackApk].
+  @visibleForTesting
+  static String apkFileFrom(Map<dynamic, dynamic> data) {
+    final Object? apk = data['apk'];
+    if (apk is String && RegExp(r'^[A-Za-z0-9._-]+\.apk$').hasMatch(apk.trim())) {
+      return apk.trim();
+    }
+    return _fallbackApk;
   }
 
   /// Kullanıcı 'Şimdi Değil' derse, bu build numarasını bir daha sormaması için kaydeder.
@@ -56,21 +81,24 @@ class UpdateService {
   }) =>
       remote > installed && remote != ignored;
 
-  static Future<({bool available, int remoteBuild})> checkUpdate() async {
+  static Future<({bool available, int remoteBuild, String apkFile})> checkUpdate() async {
+    const none = (available: false, remoteBuild: 0, apkFile: _fallbackApk);
     try {
       final int? installed = await KioskService.instance.installedVersionCode();
-      if (installed == null) return (available: false, remoteBuild: 0);
+      if (installed == null) return none;
 
-      final remote = await getRemoteBuildNumber();
+      final remote = await getRemoteRelease();
       final prefs = await SharedPreferences.getInstance();
       final ignored = prefs.getInt(_ignoredKey) ?? 0;
 
       return (
-        available: shouldOffer(remote: remote, installed: installed, ignored: ignored),
-        remoteBuild: remote,
+        available: shouldOffer(remote: remote.build, installed: installed, ignored: ignored),
+        remoteBuild: remote.build,
+        apkFile: remote.apk,
       );
-    } catch (_) {
-      return (available: false, remoteBuild: 0);
+    } catch (e) {
+      debugPrint('[Update] güncelleme kontrolü başarısız: $e');
+      return none;
     }
   }
 
@@ -79,17 +107,14 @@ class UpdateService {
   /// Dosya belleğe alınmadan doğrudan diske yazılır: ~85 MB'lık APK'yı bir
   /// `List<int>` içinde biriktirmek yüzlerce MB RAM harcıyordu.
   static Future<File> downloadApk(
-      int newBuildNumber, void Function(double progress) onProgress) async {
+    int newBuildNumber,
+    String apkFile,
+    void Function(double progress) onProgress,
+  ) async {
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final url = Uri.parse(
-        'https://raw.githubusercontent.com/$_owner/$_repo/main/latest.apk?t=$ts');
+    final url = Uri.parse('$_rawBase/$apkFile?t=$ts');
 
-    final request = http.Request('GET', url);
-    request.headers.addAll({
-      'Authorization': 'Bearer $_token',
-    });
-
-    final response = await request.send();
+    final response = await http.Request('GET', url).send();
     if (response.statusCode != 200) {
       throw Exception('APK indirilemedi: ${response.statusCode}');
     }

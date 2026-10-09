@@ -90,6 +90,7 @@ class VehicleDirectorySync {
     this.missing = const <String>[],
     this.unmatched = const <String>[],
     this.serverOnly = const <String>[],
+    this.added = const <String>[],
     this.fetchedAt,
   });
 
@@ -108,10 +109,16 @@ class VehicleDirectorySync {
   /// Sunucuda olup hiçbir yerel araca bağlanmayan isimler.
   final List<String> serverOnly;
 
+  /// Sunucuda yeni görülüp filoya eklenen araçların yerel kodları.
+  final List<String> added;
+
   final DateTime? fetchedAt;
 
   bool get hasChanges =>
-      renamed.isNotEmpty || newlyBound.isNotEmpty || missing.isNotEmpty;
+      renamed.isNotEmpty ||
+      newlyBound.isNotEmpty ||
+      missing.isNotEmpty ||
+      added.isNotEmpty;
 }
 
 /// Araç bağlarını saklayan ve sunucu dizini ile uzlaştıran depo.
@@ -132,6 +139,12 @@ class VehicleBindingStore {
 
   Map<String, VehicleBinding> get bindings =>
       Map<String, VehicleBinding>.unmodifiable(_byLocalCode);
+
+  /// Sunucuda en son görülen isim; bağ yoksa `null`.
+  String? labelFor(String localCode) {
+    final String? label = _byLocalCode[localCode]?.serverLabel;
+    return (label == null || label.isEmpty) ? null : label;
+  }
 
   /// Araç koduna karşılık gelen UUID.
   ///
@@ -193,9 +206,12 @@ class VehicleBindingStore {
   ///  * İsim eşleştirmesi yalnızca **henüz bağlanmamış** araçlar için çalışır.
   ///    Bağlı araçlar UUID üzerinden takip edilir, isim değişikliği bağı
   ///    bozmaz; yalnızca kaydedilir.
+  ///  * [adoptCodeFor] verilirse, hiçbir yerel araca bağlanmayan sunucu
+  ///    kayıtları o kodla yeni araç olarak bağlanır ve kalıcı olur.
   VehicleDirectorySync reconcile({
     required List<VehicleDirectoryEntry> entries,
     required List<String> localCodes,
+    String Function(VehicleDirectoryEntry entry)? adoptCodeFor,
     DateTime? now,
   }) {
     final DateTime stamp = now ?? DateTime.now();
@@ -268,12 +284,30 @@ class VehicleBindingStore {
         if (!boundUuids.contains(e.id)) e.label,
     ];
 
+    // 4) Bunları yeni araç olarak filoya ekle.
+    final List<String> added = <String>[];
+    if (adoptCodeFor != null) {
+      for (final VehicleDirectoryEntry e in entries) {
+        if (boundUuids.contains(e.id)) continue;
+        final String code = adoptCodeFor(e);
+        if (_byLocalCode.containsKey(code)) continue;
+        _byLocalCode[code] = VehicleBinding(
+          localCode: code,
+          uuid: e.id,
+          serverLabel: e.label,
+        );
+        boundUuids.add(e.id);
+        added.add(code);
+      }
+    }
+
     return VehicleDirectorySync(
       renamed: renamed,
       newlyBound: newlyBound,
       missing: missing,
       unmatched: unmatched,
       serverOnly: serverOnly,
+      added: added,
       fetchedAt: stamp,
     );
   }

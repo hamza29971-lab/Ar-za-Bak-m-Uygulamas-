@@ -1,12 +1,9 @@
 // lib/ui/screens/login_screen.dart
 
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/numeric_keypad.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
-import '../../screens/shell_screen.dart';
 import 'otp_screen.dart';
 import '../../services/auth_api_service.dart';
 
@@ -19,7 +16,6 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
-  static const platform = MethodChannel('com.nimo.nimo_arizabakim/sms');
 
   late final AnimationController _animController;
   late final Animation<double> _fadeAnim;
@@ -82,128 +78,49 @@ class _LoginScreenState extends State<LoginScreen>
         : _emailController.text.trim();
     final String password = _passwordController.text.trim();
 
-    if (AuthApiService.useRealApi) {
-      // Gerçek API ile Login
-      try {
-        final otpRequestId = await AuthApiService.loginWithPhone(loginId, password);
-        
-        if (!mounted) return;
-        
-        if (otpRequestId != null) {
-          // OTP Ekranına yönlendir
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  OtpScreen(phoneNumber: loginId, correctCode: '', otpRequestId: otpRequestId, password: password),
-              transitionsBuilder: (context, anim, secondaryAnim, child) {
-                return FadeTransition(opacity: anim, child: child);
-              },
-              transitionDuration: const Duration(milliseconds: 500),
-            ),
-          );
-        }
-      } catch (e) {
-        if (!mounted) return;
-        String errorMsg = e.toString();
-        if (errorMsg.startsWith('Exception: ')) {
-          errorMsg = errorMsg.substring(11);
-        }
-        showDialog(
-            context: context,
-            // Giriş ekranı hep açık temada olduğu için diyalogu da açık
-            // temaya sabitliyoruz; aksi halde uygulama koyu moddayken
-            // pencere koyu gelirdi.
-            builder: (context) => Theme(
-              data: AppTheme.light(),
-              child: AlertDialog(
-                title: const Text('Giriş Hatası'),
-                content: Text(errorMsg),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Tamam'),
-                  ),
-                ],
-              ),
-            ),
-          );
-      }
-      return;
-    }
-
-    // --- Eski Bypass/SMS Mantığı (useRealApi = false) ---
-    if (_selectedTab == 0) {
-      // Telefon ile giriş
-      final cleanPhone = loginId;
+    try {
+      final otpRequestId = await AuthApiService.loginWithPhone(loginId, password);
       
-      // Rastgele 6 haneli kod üret
-      final otp = (100000 + Random().nextInt(900000)).toString();
-      final message = 'DTSPRO Giriş doğrulama kodunuz: $otp B021';
-
-      // Bypass şifresi (SMS çalışmadığında kullanılır)
-      const String bypassCode = '000000';
-      String correctCode = bypassCode;
-
-      try {
-        // SMS İzni İste (Sadece Android'de)
-        if (Theme.of(context).platform == TargetPlatform.android) {
-          var status = await Permission.sms.request();
-          if (status.isGranted) {
-            await platform.invokeMethod('sendSms', {
-              'phone': cleanPhone,
-              'message': message,
-            });
-            correctCode = otp; // SMS gittiyse gerçek kod
-          } else {
-            // SMS izni yok: bilgi ver ama OTP ekranına geç
-            if (status.isPermanentlyDenied) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('SMS izni kapalı. Giriş için bypass şifresi kullanın.'),
-                  duration: Duration(seconds: 3),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('SMS gönderilemedi. Bypass şifresi ile giriş yapabilirsiniz.')),
-              );
-            }
-            // Bypass şifresiyle OTP ekranına yönlendir
-          }
-        } else {
-          // Windows veya diğer platformlarda test ederken SMS gitmez
-          debugPrint('TEST MODU (SMS Gönderilmedi): $message');
-        }
-      } catch (e) {
-        debugPrint('SMS Gönderme Hatası: $e');
-        // SMS hata verse de OTP'ye geç (bypass şifresiyle)
-      }
-
       if (!mounted) return;
-
-      // OTP ekranına yönlendir (SMS gittiyse gerçek kod, gitmediyse bypass: 1234)
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              OtpScreen(phoneNumber: cleanPhone, correctCode: correctCode),
-          transitionsBuilder: (context, anim, secondaryAnim, child) {
-            return FadeTransition(opacity: anim, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
-    } else {
-      // E-posta ile giriş → ShellScreen'e gönder
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              const ShellScreen(),
-          transitionsBuilder: (context, anim, secondaryAnim, child) {
-            return FadeTransition(opacity: anim, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+      
+      if (otpRequestId != null) {
+        // OTP Ekranına yönlendir
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                OtpScreen(phoneNumber: loginId, otpRequestId: otpRequestId, password: password),
+            transitionsBuilder: (context, anim, secondaryAnim, child) {
+              return FadeTransition(opacity: anim, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      String errorMsg = e.toString();
+      if (errorMsg.startsWith('Exception: ')) {
+        errorMsg = errorMsg.substring(11);
+      }
+      showDialog(
+          context: context,
+          // Giriş ekranı hep açık temada olduğu için diyalogu da açık
+          // temaya sabitliyoruz; aksi halde uygulama koyu moddayken
+          // pencere koyu gelirdi.
+          builder: (context) => Theme(
+            data: AppTheme.light(),
+            child: AlertDialog(
+              title: const Text('Giriş Hatası'),
+              content: Text(errorMsg),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tamam'),
+                ),
+              ],
+            ),
+          ),
+        );
     }
   }
 

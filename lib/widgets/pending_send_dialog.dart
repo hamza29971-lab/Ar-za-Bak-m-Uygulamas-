@@ -360,7 +360,7 @@ class _PendingTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(item.vehicleCode,
+                Text(AppScope.read(context).displayNameFor(item.vehicleCode),
                     style: const TextStyle(
                         fontSize: 20, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 7),

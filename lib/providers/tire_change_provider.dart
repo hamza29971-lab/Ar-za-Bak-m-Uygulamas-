@@ -8,8 +8,42 @@ import '../models/tire_change_model.dart';
 import '../state/app_state.dart';
 
 class TireChangeProvider extends ChangeNotifier {
-  // Tüm araç listesi
-  final List<VehicleModel> vehicles = VehicleModel.demoVehicles();
+  final List<VehicleModel> _allVehicles = VehicleModel.demoVehicles();
+
+  /// Araç kodu (`VehicleModel.name`) → sunucudaki ad.
+  Map<String, String> _serverNames = const <String, String>{};
+
+  /// Sunucuya bağlı kodlar; `null` ise dizin henüz bilinmiyor ve tüm yerel
+  /// araçlar gösterilir.
+  Set<String>? _boundCodes;
+
+  /// Listelenen araçlar: dizin bilindiğinde yalnızca sunucudakiler.
+  List<VehicleModel> get vehicles {
+    final Set<String>? bound = _boundCodes;
+    if (bound == null) return _allVehicles;
+    return _allVehicles.where((VehicleModel v) => bound.contains(v.name)).toList();
+  }
+
+  /// Ekranda gösterilecek ad.
+  String displayNameOf(VehicleModel vehicle) =>
+      _serverNames[vehicle.name] ?? vehicle.name;
+
+  /// Sunucu dizinindeki değişiklikleri (isim, yeni/kayıp bağ) uygular.
+  void applyDirectory({
+    required Map<String, String> serverNames,
+    required Set<String>? boundCodes,
+  }) {
+    if (mapEquals(_serverNames, serverNames) && setEquals(_boundCodes, boundCodes)) {
+      return;
+    }
+    _serverNames = serverNames;
+    _boundCodes = boundCodes;
+    if (_selectedVehicle != null && !vehicles.contains(_selectedVehicle)) {
+      _selectedVehicle = null;
+      _tireRecords = [];
+    }
+    notifyListeners();
+  }
 
   // Seçili araç
   VehicleModel? _selectedVehicle;
@@ -18,7 +52,6 @@ class TireChangeProvider extends ChangeNotifier {
   void clearSelectedVehicle() {
     _selectedVehicle = null;
     _tireRecords = [];
-    _editingTireNumber = null;
     notifyListeners();
   }
 
@@ -26,9 +59,6 @@ class TireChangeProvider extends ChangeNotifier {
   List<TireRecord> _tireRecords = [];
   List<TireRecord> get tireRecords => List.unmodifiable(_tireRecords);
 
-  // Hangi satır "değiştirme modunda" — null ise hiçbiri
-  int? _editingTireNumber;
-  int? get editingTireNumber => _editingTireNumber;
 
   // Gönderme durumu (demo için simüle edilecek)
   bool _isSending = false;
@@ -65,7 +95,7 @@ class TireChangeProvider extends ChangeNotifier {
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      list = list.where((v) => v.name.toLowerCase().contains(q));
+      list = list.where((v) => displayNameOf(v).toLowerCase().contains(q));
     }
     return list.toList();
   }
@@ -89,7 +119,6 @@ class TireChangeProvider extends ChangeNotifier {
   /// Araç seçimi
   void selectVehicle(VehicleModel vehicle) {
     _selectedVehicle = vehicle;
-    _editingTireNumber = null;
     _loadTireRecords(vehicle);
     notifyListeners();
   }
@@ -120,8 +149,15 @@ class TireChangeProvider extends ChangeNotifier {
           return TireRecord(
             tireNumber: item['tireNumber'],
             serialNumber: finalSerial,
+            pressure: (item['pressure'] as num?)?.toDouble(),
+            brand: item['brand'] as String? ?? '',
+            coated: item['coated'] as bool?,
             lastChangedDate: DateTime.parse(item['lastChangedDate']),
             actionHistory: history,
+            previousTires: <TireMount>[
+              for (final Object? t in (item['previousTires'] as List?) ?? const <Object?>[])
+                if (t is Map) TireMount.fromJson(Map<String, dynamic>.from(t)),
+            ],
             hasInitialRecord: (isOldMock && !hasInitial) ? false : hasInitial,
           );
         }).toList();
@@ -158,15 +194,8 @@ class TireChangeProvider extends ChangeNotifier {
     if (_undoSnapshots.containsKey(tireNumber)) return;
     final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
     if (idx < 0) return;
-    final r = _tireRecords[idx];
-    _undoSnapshots[tireNumber] = TireRecord(
-      tireNumber: r.tireNumber,
-      serialNumber: r.serialNumber,
-      lastChangedDate: r.lastChangedDate,
-      actionHistory: List<TireActionRecord>.from(r.actionHistory),
-      isChanged: r.isChanged,
-      hasInitialRecord: r.hasInitialRecord,
-    );
+    // copyWith listeleri de kopyalar; geri alınacak hâl sonradan değişmez.
+    _undoSnapshots[tireNumber] = _tireRecords[idx].copyWith();
   }
 
   /// Gönderilmeden iptal edilen işlemler: kayıtlar değişiklik öncesi hâline
@@ -179,7 +208,6 @@ class TireChangeProvider extends ChangeNotifier {
       if (idx >= 0) _tireRecords[idx] = entry.value;
     }
     _undoSnapshots.clear();
-    _editingTireNumber = null;
     await _saveTireRecords();
     notifyListeners();
     return count;
@@ -199,37 +227,50 @@ class TireChangeProvider extends ChangeNotifier {
     }
   }
 
-  /// Bir lastiği "düzenleme moduna" al
-  void startEditing(int tireNumber) {
-    _editingTireNumber = tireNumber;
-    notifyListeners();
-  }
-
-  /// Düzenlemeyi iptal et
-  void cancelEditing() {
-    _editingTireNumber = null;
-    notifyListeners();
-  }
-
-  /// Seri numarasını değiştir / kaydet
-  Future<void> confirmChange(int tireNumber, String newSerial, {bool isInitial = false}) async {
-    if (newSerial.trim().isEmpty) {
-      _editingTireNumber = null;
-      notifyListeners();
-      return;
-    }
+  /// Lastiği takar: ilk kayıt ya da değişim.
+  ///
+  /// Değişimde sökülen lastik bilgileriyle birlikte [TireRecord.previousTires]
+  /// listesine eklenir. [replacesPending] ise henüz gönderilmemiş bir girişin
+  /// düzeltilmesidir: o lastik hiç takılmamış sayılır, geçmişe eklenmez.
+  Future<void> mountTire(
+    int tireNumber, {
+    required String serialNumber,
+    required double pressure,
+    required String brand,
+    required bool coated,
+    bool replacesPending = false,
+  }) async {
+    final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
+    if (idx < 0) return;
 
     _snapshot(tireNumber);
-    final idx = _tireRecords.indexWhere((r) => r.tireNumber == tireNumber);
-    if (idx >= 0) {
-      _tireRecords[idx] = _tireRecords[idx].copyWith(
-        serialNumber: newSerial.trim(),
-        lastChangedDate: DateTime.now(),
-        isChanged: true,
-        hasInitialRecord: true,
-      );
-    }
-    _editingTireNumber = null;
+    final TireRecord current = _tireRecords[idx];
+    final DateTime now = DateTime.now();
+    final bool hadTire = current.hasInitialRecord &&
+        current.serialNumber.trim().isNotEmpty &&
+        current.serialNumber != '---';
+
+    _tireRecords[idx] = current.copyWith(
+      serialNumber: serialNumber.trim(),
+      pressure: pressure,
+      brand: brand.trim(),
+      coated: coated,
+      lastChangedDate: now,
+      previousTires: <TireMount>[
+        ...current.previousTires,
+        if (hadTire && !replacesPending)
+          TireMount(
+            serialNumber: current.serialNumber,
+            pressure: current.pressure,
+            brand: current.brand,
+            coated: current.coated,
+            mountedAt: current.lastChangedDate,
+            removedAt: now,
+          ),
+      ],
+      isChanged: true,
+      hasInitialRecord: true,
+    );
     await _saveTireRecords();
     notifyListeners();
   }
@@ -272,8 +313,12 @@ class TireChangeProvider extends ChangeNotifier {
         .map((r) => {
               'tireNumber': r.tireNumber,
               'serialNumber': r.serialNumber,
+              'pressure': r.pressure,
+              'brand': r.brand,
+              'coated': r.coated,
               'lastChangedDate': r.lastChangedDate.toIso8601String(),
               'actionHistory': r.actionHistory.map((a) => a.toJson()).toList(),
+              'previousTires': r.previousTires.map((t) => t.toJson()).toList(),
               'hasInitialRecord': r.hasInitialRecord,
             })
         .toList();

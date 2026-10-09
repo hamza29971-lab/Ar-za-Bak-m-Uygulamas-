@@ -12,6 +12,10 @@ const List<String> _weekdays = <String>[
 
 String two(int n) => n.toString().padLeft(2, '0');
 
+/// Türkçe büyük harf: Dart'ın `toUpperCase`'i `i`'yi `I` yapar
+/// ("Lastik" → "LASTIK"); doğrusu `İ`.
+String upperTr(String s) => s.replaceAll('i', 'İ').toUpperCase();
+
 /// 17.08.2026
 String formatDate(DateTime d) => '${two(d.day)}.${two(d.month)}.${d.year}';
 

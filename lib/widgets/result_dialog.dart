@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../utils/formats.dart';
 import 'common.dart';
 
 /// İşlem sonucu penceresi (ör. "Takviye Kaydedildi").
@@ -16,6 +17,7 @@ Future<void> showResultDialog(
   required String title,
   String? subtitle,
   Map<String, String> details = const <String, String>{},
+  String detailsTitle = 'İşlem ayrıntıları',
   String? note,
   IconData icon = Icons.check_circle,
   Color? accent,
@@ -27,6 +29,7 @@ Future<void> showResultDialog(
       title: title,
       subtitle: subtitle,
       details: details,
+      detailsTitle: detailsTitle,
       note: note,
       icon: icon,
       accent: accent,
@@ -39,6 +42,7 @@ class _ResultDialog extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.details,
+    required this.detailsTitle,
     required this.note,
     required this.icon,
     required this.accent,
@@ -47,6 +51,7 @@ class _ResultDialog extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Map<String, String> details;
+  final String detailsTitle;
   final String? note;
   final IconData icon;
   final Color? accent;
@@ -112,7 +117,7 @@ class _ResultDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     if (details.isNotEmpty) ...<Widget>[
-                      const _SubTitle(text: 'İşlem ayrıntıları'),
+                      _SubTitle(text: detailsTitle),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
@@ -195,7 +200,7 @@ class _SubTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      text.toUpperCase(),
+      upperTr(text),
       style: TextStyle(
         fontSize: 14,
         letterSpacing: 0.8,
