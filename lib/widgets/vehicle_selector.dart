@@ -111,10 +111,11 @@ class _VehicleSelectorState extends State<VehicleSelector> {
 
   void _clear() {
     _typing = false;
+    _removeOverlay();       // FIX: overlay açık kalmasın
+    _focusNode.unfocus();
     _controller.clear();
     widget.onSelected(null);
     setState(() {});
-    _entry?.markNeedsBuild();
   }
 
   /// Kenarlıklarda kullanılan renk; verilmemişse vurgu rengine düşer.
