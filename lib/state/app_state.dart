@@ -503,6 +503,7 @@ class AppState extends ChangeNotifier {
     OilRecord record,
     double amount, {
     String product = '',
+    String filter = '',
   }) {
     final DateTime now = DateTime.now();
     // Takviye gönderilmeden önce düzeltilebilsin diye kaydın önceki hâli
@@ -510,10 +511,12 @@ class AppState extends ChangeNotifier {
     final double previousAmount = record.amount;
     final DateTime? previousOilDate = record.lastOilDate;
     final String previousProduct = record.lastProduct;
+    final String previousFilter = record.lastFilter;
     record
       ..amount = amount
       ..lastOilDate = now
-      ..lastProduct = product;
+      ..lastProduct = product
+      ..lastFilter = filter;
     final String activityId = 'oil-${now.microsecondsSinceEpoch}';
     addActivity(
       OilRefillActivity(
@@ -528,7 +531,7 @@ class AppState extends ChangeNotifier {
     final PendingOperation pending = PendingOperation(
       kind: PendingKind.oil,
       vehicleCode: vehicle.code,
-      label: _refillLabel(record, amount, product),
+      label: _refillLabel(record, amount, product, filter: filter),
       date: now,
       payload: <String, Object?>{
         // Manuel yağlama / yağ takviyesi ayrımını `category` (panelde
@@ -538,6 +541,7 @@ class AppState extends ChangeNotifier {
         'oilType': record.oilType,
         'amount': amount,
         'product': product,
+        if (filter.isNotEmpty) 'filter': filter,
       },
     );
     _pendingRefills[pending.id] = _PendingRefill(
@@ -546,6 +550,7 @@ class AppState extends ChangeNotifier {
       previousAmount: previousAmount,
       previousOilDate: previousOilDate,
       previousProduct: previousProduct,
+      previousFilter: previousFilter,
     );
     addPending(pending);
     addNotification(
@@ -553,7 +558,8 @@ class AppState extends ChangeNotifier {
         title: 'Yağ takviyesi kaydedildi',
         message: '${vehicle.name} • ${record.label}'
             ' • ${amount.toStringAsFixed(1)} L'
-            '${product.isEmpty ? '' : ' • $product'}',
+            '${product.isEmpty ? '' : ' • $product'}'
+            '${filter.isEmpty ? '' : ' • Filtre: $filter'}',
         date: now,
         kind: NotificationKind.oil,
         vehicleCode: vehicle.code,
@@ -562,6 +568,7 @@ class AppState extends ChangeNotifier {
           'Takviye yapılan bölge': record.label,
           'Yağ türü': record.category.label,
           'Kullanılan ürün': product,
+          if (filter.isNotEmpty) 'Değiştirilen filtre': filter,
           'Takviye miktarı': '${amount.toStringAsFixed(1)} L',
           'Önceki miktar': '${previousAmount.toStringAsFixed(1)} L',
           'Takviye tarihi': formatDateTime(now),
@@ -578,9 +585,15 @@ class AppState extends ChangeNotifier {
   /// (pending id -> kayıt + kontrolden önceki tarih).
   final Map<String, _PendingCheck> _pendingChecks = <String, _PendingCheck>{};
 
-  static String _refillLabel(OilRecord record, double amount, String product) =>
+  static String _refillLabel(
+    OilRecord record,
+    double amount,
+    String product, {
+    String filter = '',
+  }) =>
       '${record.label} • ${amount.toStringAsFixed(1)} L'
-      '${product.isEmpty ? '' : ' • $product'}';
+      '${product.isEmpty ? '' : ' • $product'}'
+      '${filter.isEmpty ? '' : ' • Filtre: $filter'}';
 
   /// [record] için gönderilmeyi bekleyen takviye; yoksa `null`.
   /// Ekran, bu kayıt varsa satırda "Takviye Yap" yerine "Düzenle" gösterir.
@@ -598,6 +611,7 @@ class AppState extends ChangeNotifier {
     PendingOperation pending,
     double amount, {
     String product = '',
+    String filter = '',
   }) {
     final _PendingRefill? context = _pendingRefills[pending.id];
     final int index =
@@ -608,7 +622,8 @@ class AppState extends ChangeNotifier {
     context.record
       ..amount = amount
       ..lastOilDate = now
-      ..lastProduct = product;
+      ..lastProduct = product
+      ..lastFilter = filter;
     for (final ActivityRecord activity in _activities) {
       if (activity.id == context.activityId && activity is OilRefillActivity) {
         activity
@@ -618,12 +633,13 @@ class AppState extends ChangeNotifier {
       }
     }
     _pending[index] = pending.copyWith(
-      label: _refillLabel(context.record, amount, product),
+      label: _refillLabel(context.record, amount, product, filter: filter),
       date: now,
       payload: <String, Object?>{
         ...pending.payload,
         'amount': amount,
         'product': product,
+        if (filter.isNotEmpty) 'filter': filter,
       },
     );
     notifyListeners();
@@ -638,7 +654,8 @@ class AppState extends ChangeNotifier {
       context.record
         ..amount = context.previousAmount
         ..lastOilDate = context.previousOilDate
-        ..lastProduct = context.previousProduct;
+        ..lastProduct = context.previousProduct
+        ..lastFilter = context.previousFilter;
       _activities
           .removeWhere((ActivityRecord a) => a.id == context.activityId);
     }
@@ -951,6 +968,7 @@ class _PendingRefill {
     required this.previousAmount,
     required this.previousOilDate,
     required this.previousProduct,
+    this.previousFilter = '',
   });
 
   final OilRecord record;
@@ -960,6 +978,9 @@ class _PendingRefill {
 
   /// Takviyeden önceki ürün; iptal edilirse kayda geri yazılır.
   final String previousProduct;
+
+  /// Takviyeden önceki filtre; iptal edilirse kayda geri yazılır.
+  final String previousFilter;
 }
 
 /// Bekleyen bir seviye kontrolünün iptal edilebilmesi için gereken bağlam:

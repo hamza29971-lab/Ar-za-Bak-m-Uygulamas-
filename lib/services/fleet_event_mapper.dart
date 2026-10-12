@@ -141,6 +141,7 @@ class FleetEventMapper {
         'oilType' => 'yagTuru',
         'amount' => 'miktarLitre',
         'product' => 'urun',
+        'filter' => 'degistirilenFiltre',
         _ => key,
       };
 }

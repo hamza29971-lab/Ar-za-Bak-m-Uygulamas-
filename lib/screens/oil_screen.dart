@@ -295,7 +295,13 @@ class _OilScreenState extends State<OilScreen> {
     }
 
     if (pending == null) {
-      state.refillOil(vehicle, record, request.amount, product: request.product);
+      state.refillOil(
+        vehicle,
+        record,
+        request.amount,
+        product: request.product,
+        filter: request.filter,
+      );
       await showResultDialog(
         context,
         title: '$kindLabel Kaydedildi',
@@ -308,7 +314,12 @@ class _OilScreenState extends State<OilScreen> {
       return;
     }
 
-    state.updateOilRefill(pending, request.amount, product: request.product);
+    state.updateOilRefill(
+      pending,
+      request.amount,
+      product: request.product,
+      filter: request.filter,
+    );
     await showResultDialog(
       context,
       title: '$kindLabel Güncellendi',
@@ -334,6 +345,7 @@ class _OilScreenState extends State<OilScreen> {
       _manualCategory ? 'Kullanılan yağ miktarı' : 'Takviye miktarı':
           '${request.amount.toStringAsFixed(1)} L',
       'Kullanılan ürün': request.product,
+      if (request.filter.isNotEmpty) 'Değiştirilen filtre': request.filter,
       _manualCategory ? 'Yağlama tarihi' : 'Takviye tarihi':
           formatDateTime(DateTime.now()),
     };
@@ -472,18 +484,23 @@ class _OilScreenState extends State<OilScreen> {
 
 /// Takviye penceresinin sonucu.
 class _RefillRequest {
-  const _RefillRequest(this.amount, this.product) : cancelled = false;
+  const _RefillRequest(this.amount, this.product, {this.filter = ''})
+      : cancelled = false;
 
   /// Bekleyen takviyenin tamamen geri alınması istendi.
   const _RefillRequest.cancel()
       : amount = 0,
         product = '',
+        filter = '',
         cancelled = true;
 
   final double amount;
 
   /// Kullanılan yağ / gres ürünü (bkz. [Fleet.oilProducts]).
   final String product;
+
+  /// Değiştirilen filtre (yağ takviyesi için zorunlu).
+  final String filter;
 
   final bool cancelled;
 }
@@ -513,6 +530,7 @@ class _RefillDialog extends StatefulWidget {
 class _RefillDialogState extends State<_RefillDialog> {
   String? _product;
   final TextEditingController _amount = TextEditingController();
+  final TextEditingController _filter = TextEditingController();
 
   /// Eksik alan uyarısı yalnızca kaydetmeye çalışıldıktan sonra gösterilir.
   bool _showErrors = false;
@@ -533,12 +551,15 @@ class _RefillDialogState extends State<_RefillDialog> {
       if (amount > 0) _amount.text = amount.toStringAsFixed(1);
       final String product = (pending.payload['product'] as String?) ?? '';
       if (product.isNotEmpty) _product = product;
+      final String filter = (pending.payload['filter'] as String?) ?? '';
+      if (filter.isNotEmpty) _filter.text = filter;
     }
   }
 
   @override
   void dispose() {
     _amount.dispose();
+    _filter.dispose();
     super.dispose();
   }
 
@@ -546,12 +567,13 @@ class _RefillDialogState extends State<_RefillDialog> {
     final String? product = _product;
     final double value =
         double.tryParse(_amount.text.replaceAll(',', '.')) ?? 0;
-    if (product == null || value <= 0) {
+    final String filter = _filter.text.trim();
+    if (product == null || value <= 0 || (!_manual && filter.isEmpty)) {
       setState(() => _showErrors = true);
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
-    Navigator.of(context).pop(_RefillRequest(value, product));
+    Navigator.of(context).pop(_RefillRequest(value, product, filter: filter));
   }
 
   void _cancelEntry() {
@@ -626,6 +648,21 @@ class _RefillDialogState extends State<_RefillDialog> {
               ),
               onSubmitted: (_) => _save(),
             ),
+            if (!_manual) ...<Widget>[
+              const SizedBox(height: 16),
+              const Text('Filtre', style: TextStyle(fontSize: 13)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _filter,
+                decoration: InputDecoration(
+                  hintText: 'Değiştirilen filtreyi yazınız',
+                  errorText: _showErrors && _filter.text.trim().isEmpty
+                      ? 'Değiştirilen filtreyi yazınız.'
+                      : null,
+                ),
+                onSubmitted: (_) => _save(),
+              ),
+            ],
             const SizedBox(height: 16),
             InfoLine(
               label: _manual ? 'Yağlama tarihi' : 'Takviye tarihi',

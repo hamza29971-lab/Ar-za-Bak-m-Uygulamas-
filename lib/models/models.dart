@@ -185,6 +185,9 @@ class OilRecord {
   /// bildirilir; hiç takviye yapılmamışsa boştur.
   String lastProduct = '';
 
+  /// Son takviyede değiştirilen filtre.
+  String lastFilter = '';
+
   /// Seviye kontrolünün yapıldığı son tarih ("Kontrol Et").
   DateTime? lastCheckDate;
 

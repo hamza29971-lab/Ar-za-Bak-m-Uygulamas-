@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nimo_arizabakim/data/fleet.dart';
 import 'package:nimo_arizabakim/models/models.dart';
 import 'package:nimo_arizabakim/models/tire_change_model.dart';
-import 'package:nimo_arizabakim/providers/tire_change_provider.dart';
-import 'package:nimo_arizabakim/services/fleet_event_client.dart';
 import 'package:nimo_arizabakim/services/fleet_event_mapper.dart';
 import 'package:nimo_arizabakim/state/app_state.dart';
 
@@ -347,6 +345,41 @@ void main() {
 
     expect(record.lastProduct, '');
     expect(record.amount, 0);
+    expect(record.lastFilter, '');
+  });
+
+  test('takviyede girilen filtre sunucu alanina ve kayda yansir', () {
+    final AppState state = AppState();
+    final Vehicle vehicle = state.vehicles.first;
+    final OilRecord record = OilRecord(
+      areaId: 'YT-03',
+      oilType: 'Motor',
+      category: OilCategory.refill,
+      amount: 0,
+    );
+
+    state.refillOil(
+      vehicle,
+      record,
+      15.0,
+      product: 'RUBIA WORKS 1000 15W-40',
+      filter: 'LF16015 Yağ Filtresi',
+    );
+
+    expect(record.lastFilter, 'LF16015 Yağ Filtresi');
+    final Map<String, Object?> fields = fieldsOf(lastOilEvent(state));
+    expect(fields['degistirilenFiltre'], 'LF16015 Yağ Filtresi');
+
+    // Takviye güncellendiğinde filtre de güncellenir
+    final PendingOperation pending = state.pendingOf(PendingKind.oil).last;
+    state.updateOilRefill(
+      pending,
+      20.0,
+      product: 'RUBIA WORKS 1000 15W-40',
+      filter: 'LF9009',
+    );
+    expect(record.lastFilter, 'LF9009');
+    expect(fieldsOf(lastOilEvent(state))['degistirilenFiltre'], 'LF9009');
   });
 
   test('mekanik operasyon servis saati gondermez', () {
