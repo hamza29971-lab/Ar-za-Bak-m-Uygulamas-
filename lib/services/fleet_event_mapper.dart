@@ -61,7 +61,7 @@ class FleetEventMapper {
   /// Servis Raporu / Mekanik Operasyon ekranından gönderilen rapor.
   static FleetEvent fromReport({
     required String reportType,
-    required String? service,
+    String? service,
     required String description,
     required int imageCount,
     required List<String> imageNames,

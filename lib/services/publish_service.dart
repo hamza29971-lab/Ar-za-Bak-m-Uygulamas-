@@ -25,7 +25,7 @@ class PublishService {
   Future<PublishResult> publishReport({
     required AppState state,
     required String reportType,
-    required String? service,
+    String? service,
     required String description,
     required List<String> imagePaths,
     List<Map<String, Object?>> items = const <Map<String, Object?>>[],

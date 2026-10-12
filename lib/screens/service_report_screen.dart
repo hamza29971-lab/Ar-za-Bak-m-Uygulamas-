@@ -491,6 +491,7 @@ class _ServiceReportScreenState extends State<ServiceReportScreen> {
       final PublishResult result = await PublishService.instance.publishReport(
         state: state,
         reportType: widget.type.label,
+        service: item.serviceType,
         description: fullDescription,
         imagePaths: imagePaths,
         items: const <Map<String, Object?>>[],
