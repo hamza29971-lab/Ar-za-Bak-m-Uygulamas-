@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/fleet.dart';
+import '../data/vehicle_filters.dart';
 import '../models/models.dart';
 import '../services/publish_service.dart';
 import '../state/app_state.dart';
@@ -529,8 +530,8 @@ class _RefillDialog extends StatefulWidget {
 
 class _RefillDialogState extends State<_RefillDialog> {
   String? _product;
+  String? _filter;
   final TextEditingController _amount = TextEditingController();
-  final TextEditingController _filter = TextEditingController();
 
   /// Eksik alan uyarısı yalnızca kaydetmeye çalışıldıktan sonra gösterilir.
   bool _showErrors = false;
@@ -539,6 +540,15 @@ class _RefillDialogState extends State<_RefillDialog> {
 
   /// Gönderilmemiş bir kaydın üzerinde mi çalışıyoruz?
   bool get _editing => widget.pending != null;
+
+  List<String> get _availableFilters {
+    final List<String> list = VehicleFilters.filtersFor(widget.vehicle);
+    final String? current = _filter;
+    if (current != null && current.isNotEmpty && !list.contains(current)) {
+      return <String>[current, ...list];
+    }
+    return list;
+  }
 
   @override
   void initState() {
@@ -552,14 +562,13 @@ class _RefillDialogState extends State<_RefillDialog> {
       final String product = (pending.payload['product'] as String?) ?? '';
       if (product.isNotEmpty) _product = product;
       final String filter = (pending.payload['filter'] as String?) ?? '';
-      if (filter.isNotEmpty) _filter.text = filter;
+      if (filter.isNotEmpty) _filter = filter;
     }
   }
 
   @override
   void dispose() {
     _amount.dispose();
-    _filter.dispose();
     super.dispose();
   }
 
@@ -567,7 +576,7 @@ class _RefillDialogState extends State<_RefillDialog> {
     final String? product = _product;
     final double value =
         double.tryParse(_amount.text.replaceAll(',', '.')) ?? 0;
-    final String filter = _filter.text.trim();
+    final String filter = _filter?.trim() ?? '';
     if (product == null || value <= 0 || (!_manual && filter.isEmpty)) {
       setState(() => _showErrors = true);
       return;
@@ -652,15 +661,21 @@ class _RefillDialogState extends State<_RefillDialog> {
               const SizedBox(height: 16),
               const Text('Filtre', style: TextStyle(fontSize: 13)),
               const SizedBox(height: 6),
-              TextField(
-                controller: _filter,
-                decoration: InputDecoration(
-                  hintText: 'Değiştirilen filtreyi yazınız',
-                  errorText: _showErrors && _filter.text.trim().isEmpty
-                      ? 'Değiştirilen filtreyi yazınız.'
-                      : null,
-                ),
-                onSubmitted: (_) => _save(),
+              DropdownMenu<String>(
+                key: const ValueKey<String>('oil-filter'),
+                initialSelection: _filter,
+                requestFocusOnTap: false,
+                menuHeight: 320,
+                expandedInsets: EdgeInsets.zero,
+                hintText: 'Değiştirilen filtreyi seçiniz',
+                errorText: _showErrors && (_filter == null || _filter!.trim().isEmpty)
+                    ? 'Değiştirilen filtreyi seçiniz.'
+                    : null,
+                dropdownMenuEntries: <DropdownMenuEntry<String>>[
+                  for (final String f in _availableFilters)
+                    DropdownMenuEntry<String>(value: f, label: f),
+                ],
+                onSelected: (String? f) => setState(() => _filter = f),
               ),
             ],
             const SizedBox(height: 16),

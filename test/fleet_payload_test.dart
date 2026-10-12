@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nimo_arizabakim/data/fleet.dart';
 import 'package:nimo_arizabakim/models/models.dart';
 import 'package:nimo_arizabakim/models/tire_change_model.dart';
+import 'package:nimo_arizabakim/providers/tire_change_provider.dart';
 import 'package:nimo_arizabakim/services/fleet_event_mapper.dart';
 import 'package:nimo_arizabakim/state/app_state.dart';
 
