@@ -17,21 +17,73 @@ class RolePolicy {
   /// Hiçbiri tutmazsa reddedilir.
   static bool canUseApp(
     Map<String, dynamic> userJson, {
+    String? phoneNumber,
     List<String> allowedTypes = AppConfig.allowedRoleTypes,
     List<String> allowedRoles = AppConfig.workshopRoles,
+    List<String> whitelistedPhones = AppConfig.whitelistedPhones,
+    List<String> whitelistedEmails = AppConfig.whitelistedEmails,
   }) =>
-      matchedRule(userJson, allowedTypes: allowedTypes, allowedRoles: allowedRoles) != null;
+      matchedRule(
+        userJson,
+        phoneNumber: phoneNumber,
+        allowedTypes: allowedTypes,
+        allowedRoles: allowedRoles,
+        whitelistedPhones: whitelistedPhones,
+        whitelistedEmails: whitelistedEmails,
+      ) !=
+      null;
 
   /// Kararın gerekçesi (log için); reddedilirse `null`.
   static String? matchedRule(
     Map<String, dynamic> userJson, {
+    String? phoneNumber,
     List<String> allowedTypes = AppConfig.allowedRoleTypes,
     List<String> allowedRoles = AppConfig.workshopRoles,
+    List<String> whitelistedPhones = AppConfig.whitelistedPhones,
+    List<String> whitelistedEmails = AppConfig.whitelistedEmails,
   }) {
+    // 1. Beyaz listedeki telefon numarası kontrolü
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      final String clean = phoneNumber.replaceAll(RegExp(r'\D'), '');
+      for (final String wp in whitelistedPhones) {
+        final String cleanWp = wp.replaceAll(RegExp(r'\D'), '');
+        if (clean.isNotEmpty &&
+            cleanWp.isNotEmpty &&
+            (clean.endsWith(cleanWp) || cleanWp.endsWith(clean))) {
+          return 'yetkili telefon ($phoneNumber)';
+        }
+      }
+    }
+
+    // 2. Beyaz listedeki e-posta kontrolü
+    final Object? mailVal = userJson['mail'] ?? userJson['email'];
+    if (mailVal is String && mailVal.trim().isNotEmpty) {
+      final String normalizedMail = mailVal.trim().toLowerCase();
+      if (whitelistedEmails.any((e) => e.trim().toLowerCase() == normalizedMail)) {
+        return 'yetkili e-posta ($mailVal)';
+      }
+    }
+
+    // 3. userData içindeki telefon alanları kontrolü
+    final Object? phoneVal = userJson['phone'] ?? userJson['phoneNumber'];
+    if (phoneVal is String && phoneVal.trim().isNotEmpty) {
+      final String clean = phoneVal.replaceAll(RegExp(r'\D'), '');
+      for (final String wp in whitelistedPhones) {
+        final String cleanWp = wp.replaceAll(RegExp(r'\D'), '');
+        if (clean.isNotEmpty &&
+            cleanWp.isNotEmpty &&
+            (clean.endsWith(cleanWp) || cleanWp.endsWith(clean))) {
+          return 'yetkili profil telefonu ($phoneVal)';
+        }
+      }
+    }
+
+    // 4. Rol türü kontrolü
     final Set<String> types = allowedTypes.map(normalize).toSet();
     final String? path = _findValue(userJson, types, 'userData', 0);
     if (path != null) return 'rol türü ($path)';
 
+    // 5. Bilinen atölye rolleri kontrolü
     final String role = normalize(UserProfile.roleFromJson(userJson));
     if (role.isNotEmpty && allowedRoles.map(normalize).contains(role)) {
       return 'bilinen atölye rolü';

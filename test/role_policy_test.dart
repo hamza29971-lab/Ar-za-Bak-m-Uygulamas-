@@ -71,4 +71,27 @@ void main() {
     expect(UserProfile.roleFromJson(<String, dynamic>{'roleName': 'ŞOFÖR'}), 'ŞOFÖR');
     expect(UserProfile.roleFromJson(<String, dynamic>{'name': 'Şahin'}), '');
   });
+
+  test('beyaz listedeki telefon numaralari (0544 376 09 10) rolune bakilmaksizin kabul edilir', () {
+    // Hamza'nın backend rolü: Operasyonel Görev Yöneticisi
+    final Map<String, dynamic> hamzaJson = <String, dynamic>{
+      'fullName': 'Hamza Çonlu',
+      'mail': 'hamza29971@gmail.com',
+      'role': <String, dynamic>{'name': 'Operasyonel Görev Yöneticisi', 'isAdmin': true},
+    };
+
+    expect(RolePolicy.canUseApp(hamzaJson, phoneNumber: '05443760910'), isTrue);
+    expect(RolePolicy.canUseApp(hamzaJson, phoneNumber: '0544 376 09 10'), isTrue);
+    expect(RolePolicy.canUseApp(hamzaJson, phoneNumber: '+90 544 376 09 10'), isTrue);
+    expect(RolePolicy.canUseApp(hamzaJson), isTrue); // e-postadan da tanır
+
+    // Bilinmeyen telefon ve yetkisiz rol reddedilmeli
+    expect(
+      RolePolicy.canUseApp(
+        <String, dynamic>{'role': 'ŞOFÖR'},
+        phoneNumber: '0555 111 22 33',
+      ),
+      isFalse,
+    );
+  });
 }

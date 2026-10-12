@@ -90,6 +90,18 @@ class AppConfig {
     'Atölye Bakım',
   ];
 
+  /// Yetkilendirme kontrolünde role bakılmaksızın doğrudan kabul edilecek telefon numaraları.
+  static const List<String> whitelistedPhones = <String>[
+    '05443760910',
+    '5443760910',
+    '905443760910',
+  ];
+
+  /// Yetkilendirme kontrolünde role bakılmaksızın doğrudan kabul edilecek e-posta adresleri.
+  static const List<String> whitelistedEmails = <String>[
+    'hamza29971@gmail.com',
+  ];
+
   /// Nimo Fleet Source.
   static const String fleetSource = String.fromEnvironment(
     'NIMO_FLEET_SOURCE',

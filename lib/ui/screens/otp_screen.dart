@@ -106,7 +106,10 @@ class _OtpScreenState extends State<OtpScreen> {
     final AuthSession session = parsed.session;
 
     // Rol türü uygun değilse oturum açılmaz, token saklanmaz.
-    final String? rule = RolePolicy.matchedRule(parsed.userJson);
+    final String? rule = RolePolicy.matchedRule(
+      parsed.userJson,
+      phoneNumber: widget.phoneNumber,
+    );
     if (kDebugMode) {
       debugPrint('[Auth] giriş ${rule == null ? 'REDDEDİLDİ' : 'kabul: $rule'}'
           ' (rol: "${session.user.role}")');
